@@ -242,24 +242,25 @@ export type VaultAccount = {
   category: "Banking" | "Email" | "Social Media" | "Shopping" | "Business" | "Entertainment";
   lastUsed: string;
   favorite: boolean;
-  color: string; // avatar background
-  initial: string; // avatar letter
+  color: string; // avatar background (fallback)
+  initial: string; // avatar letter (fallback)
+  domain: string; // used to fetch the real brand logo
   secret: string;
   strength: "strong" | "medium" | "weak";
   twoFactor: boolean;
 };
 
 export const vaultAccounts: VaultAccount[] = [
-  { id: "a1",  name: "HDFC Bank",       username: "amit.sharma@hdfcbank",     category: "Banking",       lastUsed: "2 mins ago", favorite: true,  color: "#1e40af", initial: "H", secret: "H&dfc#2026!secure", strength: "strong", twoFactor: true },
-  { id: "a2",  name: "ICICI Net Banking", username: "amit.icici@gmail.com",   category: "Banking",       lastUsed: "1 hour ago", favorite: false, color: "#ea580c", initial: "I", secret: "Ic!ci$Biz9021",    strength: "strong", twoFactor: true },
-  { id: "a3",  name: "Gmail Personal",   username: "amitsharma@gmail.com",     category: "Email",         lastUsed: "3 hours ago", favorite: false, color: "#ea4335", initial: "G", secret: "G##mail_pass_88",  strength: "strong", twoFactor: true },
-  { id: "a4",  name: "Outlook Email",    username: "amit.sharma@outlook.com",  category: "Email",         lastUsed: "5 hours ago", favorite: false, color: "#0078d4", initial: "O", secret: "0utl00k!mail",     strength: "medium", twoFactor: false },
-  { id: "a5",  name: "LinkedIn",         username: "amit.sharma@linkedin.com", category: "Social Media",  lastUsed: "1 day ago",  favorite: false, color: "#0a66c2", initial: "in", secret: "L!nked1n_2026",    strength: "strong", twoFactor: true },
-  { id: "a6",  name: "Instagram",        username: "amit_sharma_23",           category: "Social Media",  lastUsed: "1 day ago",  favorite: false, color: "#e1306c", initial: "ig", secret: "1nsta#gram99",    strength: "medium", twoFactor: false },
-  { id: "a7",  name: "Amazon",           username: "amit.amazon@gmail.com",    category: "Shopping",      lastUsed: "2 days ago", favorite: false, color: "#f59e0b", initial: "a", secret: "Am@zon_shop21",    strength: "strong", twoFactor: true },
-  { id: "a8",  name: "Flipkart",         username: "amit.flipkart@gmail.com",  category: "Shopping",      lastUsed: "2 days ago", favorite: false, color: "#2563eb", initial: "F", secret: "Fl!pkart_88",      strength: "weak",   twoFactor: false },
-  { id: "a9",  name: "YouTube",          username: "amit.sharma.youtube",      category: "Entertainment", lastUsed: "3 days ago", favorite: false, color: "#ff0000", initial: "Y", secret: "Y0uTube!watch",    strength: "medium", twoFactor: true },
-  { id: "a10", name: "WordPress Admin",  username: "admin@mywebsite.com",      category: "Business",      lastUsed: "3 days ago", favorite: false, color: "#334155", initial: "W", secret: "Wp!Admin_secure",  strength: "strong", twoFactor: true },
+  { id: "a1",  name: "HDFC Bank",         username: "amit.sharma@hdfcbank",     category: "Banking",       lastUsed: "2 mins ago",  favorite: true,  color: "#1e40af", initial: "H",  domain: "hdfcbank.com",  secret: "H&dfc#2026!secure", strength: "strong", twoFactor: true },
+  { id: "a2",  name: "ICICI Net Banking", username: "amit.icici@gmail.com",     category: "Banking",       lastUsed: "1 hour ago",  favorite: false, color: "#ea580c", initial: "I",  domain: "icicibank.com", secret: "Ic!ci$Biz9021",     strength: "strong", twoFactor: true },
+  { id: "a3",  name: "Gmail Personal",    username: "amitsharma@gmail.com",     category: "Email",         lastUsed: "3 hours ago", favorite: false, color: "#ea4335", initial: "G",  domain: "gmail.com",     secret: "G##mail_pass_88",   strength: "strong", twoFactor: true },
+  { id: "a4",  name: "Outlook Email",     username: "amit.sharma@outlook.com",  category: "Email",         lastUsed: "5 hours ago", favorite: false, color: "#0078d4", initial: "O",  domain: "outlook.com",   secret: "0utl00k!mail",      strength: "medium", twoFactor: false },
+  { id: "a5",  name: "LinkedIn",          username: "amit.sharma@linkedin.com", category: "Social Media",  lastUsed: "1 day ago",   favorite: false, color: "#0a66c2", initial: "in", domain: "linkedin.com",  secret: "L!nked1n_2026",     strength: "strong", twoFactor: true },
+  { id: "a6",  name: "Instagram",         username: "amit_sharma_23",           category: "Social Media",  lastUsed: "1 day ago",   favorite: false, color: "#e1306c", initial: "ig", domain: "instagram.com", secret: "1nsta#gram99",      strength: "medium", twoFactor: false },
+  { id: "a7",  name: "Amazon",            username: "amit.amazon@gmail.com",    category: "Shopping",      lastUsed: "2 days ago",  favorite: false, color: "#f59e0b", initial: "a",  domain: "amazon.in",     secret: "Am@zon_shop21",     strength: "strong", twoFactor: true },
+  { id: "a8",  name: "Flipkart",          username: "amit.flipkart@gmail.com",  category: "Shopping",      lastUsed: "2 days ago",  favorite: false, color: "#2563eb", initial: "F",  domain: "flipkart.com",  secret: "Fl!pkart_88",       strength: "weak",   twoFactor: false },
+  { id: "a9",  name: "YouTube",           username: "amit.sharma.youtube",      category: "Entertainment", lastUsed: "3 days ago",  favorite: false, color: "#ff0000", initial: "Y",  domain: "youtube.com",   secret: "Y0uTube!watch",     strength: "medium", twoFactor: true },
+  { id: "a10", name: "WordPress Admin",   username: "admin@mywebsite.com",      category: "Business",      lastUsed: "3 days ago",  favorite: false, color: "#334155", initial: "W",  domain: "wordpress.org", secret: "Wp!Admin_secure",   strength: "strong", twoFactor: true },
 ];
 
 export type VaultCategory = {
@@ -282,18 +283,28 @@ export const vaultCategories: VaultCategory[] = [
   { name: "Other",          count: 47,  icon: "circle",   color: "#94a3b8" },
 ];
 
+export type CardNetwork = "VISA" | "Mastercard" | "RuPay" | "Amex";
+export type CardTheme = "blue" | "orange" | "dark" | "purple" | "green" | "rose";
+
 export type VaultCard = {
   id: string;
   bank: string;
-  network: "VISA" | "Mastercard" | "RuPay";
+  label: string; // e.g. "HDFC Debit Card"
+  type: "Credit" | "Debit";
+  network: CardNetwork;
+  number: string; // full number, masked in UI
+  holder: string;
+  expiry: string; // MM/YY
+  cvv: string;
   pin: string;
-  theme: "blue" | "orange" | "dark";
+  theme: CardTheme;
 };
 
 export const vaultCards: VaultCard[] = [
-  { id: "c1", bank: "HDFC Debit Card",  network: "VISA",       pin: "1234", theme: "blue" },
-  { id: "c2", bank: "ICICI Credit Card", network: "Mastercard", pin: "56789", theme: "orange" },
-  { id: "c3", bank: "SBI Debit Card",   network: "RuPay",      pin: "90123", theme: "dark" },
+  { id: "c1", bank: "HDFC Bank",  label: "HDFC Debit Card",   type: "Debit",  network: "VISA",       number: "4111 5678 9012 1234", holder: "Amit Sharma", expiry: "08/27", cvv: "412", pin: "1234",  theme: "blue" },
+  { id: "c2", bank: "ICICI Bank", label: "ICICI Credit Card", type: "Credit", network: "Mastercard", number: "5238 4102 7745 5678", holder: "Amit Sharma", expiry: "11/26", cvv: "833", pin: "56789", theme: "orange" },
+  { id: "c3", bank: "SBI",        label: "SBI Debit Card",    type: "Debit",  network: "RuPay",      number: "6070 2233 8890 9012", holder: "Amit Sharma", expiry: "03/28", cvv: "290", pin: "90123", theme: "dark" },
+  { id: "c4", bank: "Axis Bank",  label: "Axis Credit Card",  type: "Credit", network: "VISA",       number: "4915 6621 0034 4402", holder: "Amit Sharma", expiry: "06/29", cvv: "551", pin: "4402",  theme: "purple" },
 ];
 
 export const vaultStats = [

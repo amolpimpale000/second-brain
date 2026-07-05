@@ -163,6 +163,7 @@ export async function getVault(): Promise<VaultAccount[]> {
       favorite: false,
       color: "#64748b",
       initial: (r.name?.[0] ?? "?").toUpperCase(),
+      domain: r.domain ?? "",
       secret: r.secret,
       strength: r.strength,
       twoFactor: false,
