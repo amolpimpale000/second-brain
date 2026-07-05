@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   FileText, Pin, LayoutGrid, Bell, Trash2, Plus, Search, Maximize2,
   Lock, Wallet, Briefcase, Lightbulb, Heart, Plane, Folder, GraduationCap, Circle, Layers,
@@ -10,6 +10,7 @@ import type { RichNote, ChecklistItem, Reminder } from "@/lib/data";
 import { sampleNotes, sampleReminders, sampleNoteTrash, noteCategories, noteTags } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import { Modal, Field, inputCls, Dropdown } from "@/components/vault-ui";
+import { createClient } from "@/utils/supabase/client";
 
 /* helpers -------------------------------------------------------------------*/
 const catIconMap: Record<string, React.ElementType> = {
@@ -40,16 +41,36 @@ const colorSwatch: Record<RichNote["color"], string> = {
 const uid = () => Math.random().toString(36).slice(2, 9);
 const ci = (text: string, done = false): ChecklistItem => ({ id: uid(), text, done });
 
-function usePersist<T>(key: string, seed: T) {
-  const [val, setVal] = useState<T>(seed);
-  const ready = useRef(false);
-  useEffect(() => {
-    try { const raw = localStorage.getItem(key); if (raw) setVal(JSON.parse(raw)); } catch {}
-    ready.current = true;
-  }, [key]);
-  useEffect(() => { if (ready.current) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} } }, [key, val]);
-  return [val, setVal] as const;
-}
+/* Supabase row <-> RichNote mapping */
+type Row = Record<string, unknown>;
+const noteFromRow = (r: Row): RichNote => ({
+  id: r.id as string,
+  title: r.title as string,
+  body: (r.body as string) ?? undefined,
+  itemsLabel: (r.items_label as string) ?? undefined,
+  items: (r.items as ChecklistItem[]) ?? undefined,
+  listStyle: (r.list_style as RichNote["listStyle"]) ?? undefined,
+  category: r.category as string,
+  tags: (r.tags as string[]) ?? [],
+  color: r.color as RichNote["color"],
+  time: r.time as string,
+  pinned: !!r.pinned,
+  starred: !!r.starred,
+  sort: r.sort as number,
+});
+const noteToRow = (n: RichNote, trashed: boolean): Row => ({
+  id: n.id, title: n.title, body: n.body ?? null, items_label: n.itemsLabel ?? null,
+  items: n.items ?? null, list_style: n.listStyle ?? null, category: n.category,
+  tags: n.tags ?? [], color: n.color, time: n.time, pinned: n.pinned, starred: n.starred,
+  trashed, sort: n.sort ?? -Date.now(),
+});
+const reminderFromRow = (r: Row): Reminder => ({
+  id: r.id as string, title: r.title as string, time: r.time as string,
+  color: r.color as string, done: !!r.done, sort: r.sort as number,
+});
+const reminderToRow = (r: Reminder): Row => ({
+  id: r.id, title: r.title, time: r.time, color: r.color, done: r.done, sort: r.sort ?? -Date.now(),
+});
 
 function Menu({ items }: { items: { label: string; icon: React.ElementType; onClick: () => void; danger?: boolean }[] }) {
   const [open, setOpen] = useState(false);
@@ -77,9 +98,41 @@ function Menu({ items }: { items: { label: string; icon: React.ElementType; onCl
 
 /* =========================================================================== */
 export function NotesClient() {
-  const [notes, setNotes] = usePersist<RichNote[]>("sb.notes", sampleNotes);
-  const [reminders, setReminders] = usePersist<Reminder[]>("sb.notes.reminders", sampleReminders);
-  const [trash, setTrash] = usePersist<RichNote[]>("sb.notes.trash", sampleNoteTrash);
+  const supabase = useMemo(() => createClient(), []);
+  const [notes, setNotes] = useState<RichNote[]>(sampleNotes);
+  const [trash, setTrash] = useState<RichNote[]>(sampleNoteTrash);
+  const [reminders, setReminders] = useState<Reminder[]>(sampleReminders);
+
+  // Load from Supabase; seed the tables on first run so the DB matches the UI.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const { data: nd, error: ne } = await supabase.from("user_notes").select("*").order("sort", { ascending: true });
+      if (!active) return;
+      if (!ne && nd) {
+        if (nd.length === 0) {
+          const seed = sampleNotes.map((n, i) => noteToRow({ ...n, sort: i + 1 }, false))
+            .concat(sampleNoteTrash.map((n, i) => noteToRow({ ...n, sort: 1000 + i }, true)));
+          await supabase.from("user_notes").insert(seed);
+          setNotes(sampleNotes); setTrash(sampleNoteTrash);
+        } else {
+          setNotes(nd.filter((r) => !r.trashed).map(noteFromRow));
+          setTrash(nd.filter((r) => r.trashed).map(noteFromRow));
+        }
+      }
+      const { data: rd, error: re } = await supabase.from("note_reminders").select("*").order("sort", { ascending: true });
+      if (!active) return;
+      if (!re && rd) {
+        if (rd.length === 0) {
+          await supabase.from("note_reminders").insert(sampleReminders.map((r, i) => reminderToRow({ ...r, sort: i + 1 })));
+          setReminders(sampleReminders);
+        } else {
+          setReminders(rd.map(reminderFromRow));
+        }
+      }
+    })();
+    return () => { active = false; };
+  }, [supabase]);
 
   const [activeCat, setActiveCat] = useState("All Notes");
   const [activeTag, setActiveTag] = useState<string | null>(null);
@@ -128,24 +181,51 @@ export function NotesClient() {
     return list;
   }, [notes, activeCat, activeTag, query, sort]);
 
-  /* mutations */
-  const saveNote = (n: RichNote) => setNotes((prev) => prev.some((x) => x.id === n.id) ? prev.map((x) => (x.id === n.id ? n : x)) : [n, ...prev]);
-  const removeNote = (id: string) => {
+  /* mutations — optimistic UI + Supabase persistence */
+  const saveNote = async (n: RichNote) => {
+    const isNew = !notes.some((x) => x.id === n.id) && !trash.some((x) => x.id === n.id);
+    const note = isNew ? { ...n, sort: -Date.now() } : n;
+    setNotes((prev) => prev.some((x) => x.id === note.id) ? prev.map((x) => (x.id === note.id ? note : x)) : [note, ...prev]);
+    const { error } = await supabase.from("user_notes").upsert(noteToRow(note, false));
+    if (error) flash("Saved offline — will sync later");
+  };
+  const removeNote = async (id: string) => {
     const note = notes.find((n) => n.id === id);
     if (note) setTrash((t) => [note, ...t]);
     setNotes((prev) => prev.filter((n) => n.id !== id));
     flash("Moved to Trash");
+    await supabase.from("user_notes").update({ trashed: true }).eq("id", id);
   };
-  const restoreNote = (id: string) => {
+  const restoreNote = async (id: string) => {
     const note = trash.find((n) => n.id === id);
     if (note) setNotes((p) => [note, ...p]);
     setTrash((t) => t.filter((n) => n.id !== id));
+    await supabase.from("user_notes").update({ trashed: false }).eq("id", id);
   };
-  const purgeNote = (id: string) => setTrash((t) => t.filter((n) => n.id !== id));
-  const togglePin = (id: string) => setNotes((p) => p.map((n) => (n.id === id ? { ...n, pinned: !n.pinned } : n)));
-  const toggleStar = (id: string) => setNotes((p) => p.map((n) => (n.id === id ? { ...n, starred: !n.starred } : n)));
-  const toggleItem = (noteId: string, itemId: string) =>
-    setNotes((p) => p.map((n) => n.id === noteId ? { ...n, items: n.items?.map((i) => (i.id === itemId ? { ...i, done: !i.done } : i)) } : n));
+  const purgeNote = async (id: string) => {
+    setTrash((t) => t.filter((n) => n.id !== id));
+    await supabase.from("user_notes").delete().eq("id", id);
+  };
+  const emptyTrash = async () => {
+    setTrash([]); flash("Trash emptied");
+    await supabase.from("user_notes").delete().eq("trashed", true);
+  };
+  const togglePin = async (id: string) => {
+    const n = notes.find((x) => x.id === id); if (!n) return;
+    setNotes((p) => p.map((x) => (x.id === id ? { ...x, pinned: !x.pinned } : x)));
+    await supabase.from("user_notes").update({ pinned: !n.pinned }).eq("id", id);
+  };
+  const toggleStar = async (id: string) => {
+    const n = notes.find((x) => x.id === id); if (!n) return;
+    setNotes((p) => p.map((x) => (x.id === id ? { ...x, starred: !x.starred } : x)));
+    await supabase.from("user_notes").update({ starred: !n.starred }).eq("id", id);
+  };
+  const toggleItem = async (noteId: string, itemId: string) => {
+    const n = notes.find((x) => x.id === noteId); if (!n?.items) return;
+    const items = n.items.map((i) => (i.id === itemId ? { ...i, done: !i.done } : i));
+    setNotes((p) => p.map((x) => (x.id === noteId ? { ...x, items } : x)));
+    await supabase.from("user_notes").update({ items }).eq("id", noteId);
+  };
 
   const addQuick = () => {
     if (!quick.trim()) return;
@@ -154,9 +234,20 @@ export function NotesClient() {
     setQuick("");
     flash("Note added");
   };
-  const toggleReminder = (id: string) => setReminders((p) => p.map((r) => (r.id === id ? { ...r, done: !r.done } : r)));
-  const addReminder = (title: string, time: string) => setReminders((p) => [{ id: uid(), title, time: time || "No date", color: "#8b5cf6", done: false }, ...p]);
-  const deleteReminder = (id: string) => setReminders((p) => p.filter((r) => r.id !== id));
+  const toggleReminder = async (id: string) => {
+    const r = reminders.find((x) => x.id === id); if (!r) return;
+    setReminders((p) => p.map((x) => (x.id === id ? { ...x, done: !x.done } : x)));
+    await supabase.from("note_reminders").update({ done: !r.done }).eq("id", id);
+  };
+  const addReminder = async (title: string, time: string) => {
+    const r: Reminder = { id: uid(), title, time: time || "No date", color: "#8b5cf6", done: false, sort: -Date.now() };
+    setReminders((p) => [r, ...p]);
+    await supabase.from("note_reminders").insert(reminderToRow(r));
+  };
+  const deleteReminder = async (id: string) => {
+    setReminders((p) => p.filter((r) => r.id !== id));
+    await supabase.from("note_reminders").delete().eq("id", id);
+  };
 
   const recent = notes.slice(0, 5);
 
@@ -339,7 +430,7 @@ export function NotesClient() {
                   <button onClick={() => purgeNote(n.id)} className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-red-50 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
                 </div>
               ))}
-              <button onClick={() => { setTrash([]); flash("Trash emptied"); }} className="mt-2 w-full rounded-xl border border-border py-2 text-sm font-medium text-red-500 hover:bg-red-50">Empty Trash</button>
+              <button onClick={emptyTrash} className="mt-2 w-full rounded-xl border border-border py-2 text-sm font-medium text-red-500 hover:bg-red-50">Empty Trash</button>
             </div>
           )}
         </Modal>

@@ -348,6 +348,7 @@ export type RichNote = {
   time: string;
   pinned: boolean;
   starred: boolean;
+  sort?: number;
 };
 
 const ci = (text: string, done = false): ChecklistItem => ({ id: Math.random().toString(36).slice(2, 8), text, done });
@@ -384,7 +385,7 @@ export const sampleNotes: RichNote[] = [
   { id: "note9", title: "Learning Goals", color: "white", listStyle: "bullet", items: [ci("Learn UI/UX Design"), ci("Improve Communication"), ci("Read 12 Books a Year")], category: "Education", tags: ["Project", "Ideas"], time: "15 May, 11:45 AM", pinned: false, starred: false },
 ];
 
-export type Reminder = { id: string; title: string; time: string; color: string; done: boolean };
+export type Reminder = { id: string; title: string; time: string; color: string; done: boolean; sort?: number };
 
 export const sampleReminders: Reminder[] = [
   { id: "rem1", title: "Team meeting notes", time: "Today, 11:00 AM", color: "#3b82f6", done: false },
