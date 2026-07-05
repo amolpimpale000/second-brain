@@ -1,0 +1,121 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Light premium theme */
+  --bg: #f4f6f5;
+  --surface: #ffffff;
+  --surface-2: #f8faf9;
+  --card: #ffffff;
+  --border: #eceff0;
+  --ink: #101915;
+  --muted: #6b7772;
+  --faint: #9aa4a0;
+
+  /* Lime / green premium accent (from reference) */
+  --brand: #a3e635;
+  --brand-soft: #ecfccb;
+  --brand-ink: #3f6212;
+
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  /* Chart palette */
+  --c-green: #84cc16;
+  --c-lime: #bef264;
+  --c-amber: #f59e0b;
+  --c-orange: #fb923c;
+  --c-teal: #2dd4bf;
+  --c-sky: #38bdf8;
+  --c-violet: #a78bfa;
+  --c-rose: #fb7185;
+  --c-slate: #cbd5e1;
+}
+
+.dark {
+  --bg: #0c0f0e;
+  --surface: #14181a;
+  --surface-2: #1a1f21;
+  --card: #14181a;
+  --border: #242a2c;
+  --ink: #f0f3f2;
+  --muted: #98a5a0;
+  --faint: #6b7772;
+  --brand: #a3e635;
+  --brand-soft: #1f2a12;
+  --brand-ink: #bef264;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--brand);
+  color: #1a2e05;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--faint);
+}
+
+@layer components {
+  .card {
+    @apply bg-card border border-border rounded-3xl shadow-card;
+  }
+  .card-pad {
+    @apply p-5;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium transition-colors;
+  }
+  .btn-brand {
+    @apply btn bg-ink text-white hover:opacity-90;
+  }
+  .btn-ghost {
+    @apply btn text-muted hover:bg-surface-2 hover:text-ink;
+  }
+  .btn-soft {
+    @apply btn bg-surface-2 text-ink hover:bg-border;
+  }
+  .stat-num {
+    @apply text-3xl font-semibold tracking-tight text-ink;
+  }
+  .nav-item {
+    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-surface-2 hover:text-ink;
+  }
+  .nav-item-active {
+    @apply bg-surface-2 text-ink;
+  }
+  .label {
+    @apply text-xs font-medium uppercase tracking-wide text-faint;
+  }
+}
+
+.grid-bg {
+  background-image: radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.04) 1px, transparent 0);
+  background-size: 22px 22px;
+}
