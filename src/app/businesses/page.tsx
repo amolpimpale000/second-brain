@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { FileText, CheckCircle2, ArrowUpRight } from "lucide-react";
 import { Card, CardHeader, Delta, PageHeader, ProgressBar, StatCard } from "@/components/ui";
-import { businesses } from "@/lib/data";
+import { getBusinesses } from "@/lib/queries";
 import { inr } from "@/lib/utils";
 
-export default function BusinessesPage() {
+export default async function BusinessesPage() {
+  const businesses = await getBusinesses();
   const revenue = businesses.reduce((s, b) => s + b.revenue, 0);
   const profit = businesses.reduce((s, b) => s + (b.revenue - b.expenses), 0);
   const submissions = businesses.reduce((s, b) => s + b.submissions, 0);

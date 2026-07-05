@@ -1,9 +1,11 @@
 import { Card, CardHeader, Delta, PageHeader, ProgressBar, StatCard } from "@/components/ui";
 import { DonutChart, StackedBars } from "@/components/charts";
-import { businesses, businessMonthly } from "@/lib/data";
+import { businessMonthly } from "@/lib/data";
+import { getBusinesses } from "@/lib/queries";
 import { inr } from "@/lib/utils";
 
-export default function AnalyticsPage() {
+export default async function AnalyticsPage() {
+  const businesses = await getBusinesses();
   const revenue = businesses.reduce((s, b) => s + b.revenue, 0);
   const profit = businesses.reduce((s, b) => s + (b.revenue - b.expenses), 0);
   const revenueSplit = businesses.map((b) => ({ name: b.code, value: b.revenue, color: b.color }));

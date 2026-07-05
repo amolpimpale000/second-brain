@@ -10,14 +10,8 @@ import {
 } from "lucide-react";
 import { Card, CardHeader, Delta, PageHeader, ProgressBar, StatCard } from "@/components/ui";
 import { CashflowChart, DonutChart, Gauge } from "@/components/charts";
-import {
-  cashflow,
-  goals,
-  netWorth,
-  quickStats,
-  transactions,
-  businesses,
-} from "@/lib/data";
+import { cashflow, netWorth, quickStats } from "@/lib/data";
+import { getGoals, getTransactions, getBusinesses } from "@/lib/queries";
 import { inr } from "@/lib/utils";
 
 const iconFor = {
@@ -27,7 +21,12 @@ const iconFor = {
   invest: <TrendingUp className="h-5 w-5" />,
 };
 
-export default function Dashboard() {
+export default async function Dashboard() {
+  const [goals, transactions, businesses] = await Promise.all([
+    getGoals(),
+    getTransactions(),
+    getBusinesses(),
+  ]);
   const totalRevenue = businesses.reduce((s, b) => s + b.revenue, 0);
   const totalProfit = businesses.reduce((s, b) => s + (b.revenue - b.expenses), 0);
 

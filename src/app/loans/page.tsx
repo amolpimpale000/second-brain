@@ -1,9 +1,10 @@
 import { Landmark, CalendarClock } from "lucide-react";
 import { Card, CardHeader, PageHeader, ProgressBar, StatCard } from "@/components/ui";
-import { loans } from "@/lib/data";
+import { getLoans } from "@/lib/queries";
 import { inr } from "@/lib/utils";
 
-export default function LoansPage() {
+export default async function LoansPage() {
+  const loans = await getLoans();
   const outstanding = loans.reduce((s, l) => s + l.outstanding, 0);
   const monthlyEmi = loans.reduce((s, l) => s + l.emi, 0);
   const totalPrincipal = loans.reduce((s, l) => s + l.principal, 0);

@@ -1,10 +1,12 @@
 import { TrendingUp } from "lucide-react";
 import { Card, CardHeader, Delta, PageHeader, StatCard } from "@/components/ui";
 import { DonutChart, GrowthLine } from "@/components/charts";
-import { holdings, portfolio, portfolioAllocation, portfolioGrowth } from "@/lib/data";
+import { portfolio, portfolioAllocation, portfolioGrowth } from "@/lib/data";
+import { getHoldings } from "@/lib/queries";
 import { inr } from "@/lib/utils";
 
-export default function InvestmentsPage() {
+export default async function InvestmentsPage() {
+  const holdings = await getHoldings();
   const gain = portfolio.current - portfolio.invested;
 
   return (

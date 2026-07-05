@@ -1,8 +1,10 @@
 import { Pin, Plus, StickyNote } from "lucide-react";
 import { Card, PageHeader } from "@/components/ui";
-import { notes } from "@/lib/data";
+import type { Note } from "@/lib/data";
+import { getNotes } from "@/lib/queries";
 
-export default function NotesPage() {
+export default async function NotesPage() {
+  const notes = await getNotes();
   const pinned = notes.filter((n) => n.pinned);
   const rest = notes.filter((n) => !n.pinned);
 
@@ -33,7 +35,7 @@ export default function NotesPage() {
   );
 }
 
-function NoteCard({ n }: { n: (typeof notes)[number] }) {
+function NoteCard({ n }: { n: Note }) {
   return (
     <Card className="group card-pad cursor-pointer transition-shadow hover:shadow-card-lg">
       <div className="flex items-start justify-between gap-2">

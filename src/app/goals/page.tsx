@@ -1,6 +1,6 @@
 import { Car, Heart, Plane, Shield, Target, Plus } from "lucide-react";
 import { Card, CardHeader, PageHeader, ProgressBar, StatCard } from "@/components/ui";
-import { goals } from "@/lib/data";
+import { getGoals } from "@/lib/queries";
 import { inr } from "@/lib/utils";
 
 const icons: Record<string, React.ReactNode> = {
@@ -10,7 +10,8 @@ const icons: Record<string, React.ReactNode> = {
   shield: <Shield className="h-5 w-5" />,
 };
 
-export default function GoalsPage() {
+export default async function GoalsPage() {
+  const goals = await getGoals();
   const target = goals.reduce((s, g) => s + g.target, 0);
   const saved = goals.reduce((s, g) => s + g.saved, 0);
   const monthly = goals.reduce((s, g) => s + g.monthly, 0);

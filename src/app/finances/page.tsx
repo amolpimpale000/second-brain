@@ -1,10 +1,12 @@
 import { ArrowDownRight, ArrowUpRight, Filter, Download } from "lucide-react";
 import { Card, CardHeader, PageHeader, StatCard } from "@/components/ui";
 import { CashflowChart, DonutChart } from "@/components/charts";
-import { cashflow, spendingByCategory, transactions } from "@/lib/data";
+import { cashflow, spendingByCategory } from "@/lib/data";
+import { getTransactions } from "@/lib/queries";
 import { inr } from "@/lib/utils";
 
-export default function FinancesPage() {
+export default async function FinancesPage() {
+  const transactions = await getTransactions();
   const income = transactions.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
   const expense = transactions.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
   const totalSpend = spendingByCategory.reduce((s, c) => s + c.value, 0);
