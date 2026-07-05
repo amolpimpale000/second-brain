@@ -330,3 +330,71 @@ export const vaultSecurity = {
     { label: "Old Passwords",    value: "5",   note: "Need Update", icon: "clock",   tone: "red" },
   ],
 } as const;
+
+// ---------------------------------- NOTES ----------------------------------
+
+export type ChecklistItem = { id: string; text: string; done: boolean };
+
+export type RichNote = {
+  id: string;
+  title: string;
+  body?: string;
+  itemsLabel?: string;
+  items?: ChecklistItem[];
+  listStyle?: "bullet" | "check";
+  category: string;
+  tags: string[];
+  color: "yellow" | "green" | "pink" | "white";
+  time: string;
+  pinned: boolean;
+  starred: boolean;
+};
+
+const ci = (text: string, done = false): ChecklistItem => ({ id: Math.random().toString(36).slice(2, 8), text, done });
+
+export const noteCategories = [
+  { name: "Personal", icon: "lock", color: "#ec4899" },
+  { name: "Finance", icon: "wallet", color: "#22c55e" },
+  { name: "Business", icon: "briefcase", color: "#8b5cf6" },
+  { name: "Ideas", icon: "bulb", color: "#f59e0b" },
+  { name: "Health", icon: "heart", color: "#ef4444" },
+  { name: "Travel", icon: "plane", color: "#3b82f6" },
+  { name: "Work", icon: "folder", color: "#f59e0b" },
+  { name: "Education", icon: "cap", color: "#14b8a6" },
+  { name: "Others", icon: "circle", color: "#94a3b8" },
+];
+
+export const noteTags = [
+  { name: "Important", color: "#ef4444" },
+  { name: "Meeting", color: "#f59e0b" },
+  { name: "Project", color: "#22c55e" },
+  { name: "To-Do", color: "#3b82f6" },
+  { name: "Ideas", color: "#8b5cf6" },
+];
+
+export const sampleNotes: RichNote[] = [
+  { id: "note1", title: "Business Plan Ideas", color: "yellow", body: "Explore SaaS based solutions for healthcare industry. Focus on EMR, patient management and analytics.", category: "Business", tags: ["Important", "Ideas"], time: "Today, 10:30 AM", pinned: true, starred: true },
+  { id: "note2", title: "Book Recommendations", color: "white", listStyle: "bullet", items: [ci("Atomic Habits"), ci("Deep Work"), ci("The Psychology of Money"), ci("Thinking, Fast and Slow")], category: "Personal", tags: ["Ideas"], time: "20 May, 08:20 PM", pinned: false, starred: true },
+  { id: "note3", title: "Investment Strategy", color: "white", body: "Focus on long term SIP in index funds. Diversify in equity and debt based on risk appetite.", category: "Finance", tags: ["Important"], time: "17 May, 02:30 PM", pinned: false, starred: false },
+  { id: "note4", title: "Monthly Budget Plan", color: "green", listStyle: "check", items: [ci("House Rent", true), ci("Groceries", true), ci("Transportation", true), ci("Utilities"), ci("Entertainment")], category: "Finance", tags: ["To-Do"], time: "Today, 09:15 AM", pinned: true, starred: true },
+  { id: "note5", title: "Project Meeting Notes", color: "pink", body: "Discussed the new module requirements and timeline.", itemsLabel: "Key Points:", listStyle: "bullet", items: [ci("User authentication"), ci("Dashboard design"), ci("Report generation")], category: "Work", tags: ["Meeting", "Project"], time: "19 May, 03:10 PM", pinned: true, starred: false },
+  { id: "note6", title: "Workout Routine", color: "white", listStyle: "bullet", items: [ci("30 min Cardio"), ci("Upper Body Strength"), ci("Core Exercises"), ci("Cool Down & Stretch")], category: "Health", tags: ["To-Do"], time: "16 May, 06:20 AM", pinned: false, starred: true },
+  { id: "note7", title: "Travel Checklist", color: "white", listStyle: "bullet", items: [ci("Passport"), ci("Flight Tickets"), ci("Hotel Booking"), ci("Travel Insurance"), ci("Local Currency")], category: "Travel", tags: ["To-Do"], time: "Yesterday, 06:45 PM", pinned: false, starred: true },
+  { id: "note8", title: "Daily Affirmations", color: "white", body: "I am focused and productive. I choose positivity and peace. I attract success and happiness every day.", category: "Personal", tags: [], time: "18 May, 07:00 AM", pinned: false, starred: true },
+  { id: "note9", title: "Learning Goals", color: "white", listStyle: "bullet", items: [ci("Learn UI/UX Design"), ci("Improve Communication"), ci("Read 12 Books a Year")], category: "Education", tags: ["Project", "Ideas"], time: "15 May, 11:45 AM", pinned: false, starred: false },
+];
+
+export type Reminder = { id: string; title: string; time: string; color: string; done: boolean };
+
+export const sampleReminders: Reminder[] = [
+  { id: "rem1", title: "Team meeting notes", time: "Today, 11:00 AM", color: "#3b82f6", done: false },
+  { id: "rem2", title: "Pay credit card bill", time: "Tomorrow, 09:00 AM", color: "#f59e0b", done: false },
+  { id: "rem3", title: "Project deadline", time: "24 May, 05:00 PM", color: "#ef4444", done: false },
+  { id: "rem4", title: "Renew insurance", time: "28 May, 11:30 AM", color: "#8b5cf6", done: false },
+];
+
+export const sampleNoteTrash: RichNote[] = [
+  { id: "tn1", title: "Old Meeting Notes", color: "white", body: "Legacy sprint retro notes.", category: "Work", tags: [], time: "10 May, 04:00 PM", pinned: false, starred: false },
+  { id: "tn2", title: "Draft Ideas", color: "yellow", body: "Rough app concepts to revisit.", category: "Ideas", tags: [], time: "08 May, 01:20 PM", pinned: false, starred: false },
+  { id: "tn3", title: "Shopping List", color: "white", listStyle: "bullet", items: [ci("Milk"), ci("Eggs"), ci("Coffee")], category: "Others", tags: [], time: "05 May, 09:00 AM", pinned: false, starred: false },
+];
