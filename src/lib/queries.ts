@@ -6,7 +6,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import * as sample from "./data";
-import type { Txn, Holding, Loan, Goal, Business, Task, Note, Vault } from "./data";
+import type { Txn, Holding, Loan, Goal, Business, Task, Note, VaultAccount } from "./data";
 
 async function db() {
   const cookieStore = await cookies();
@@ -149,21 +149,25 @@ export async function getNotes(): Promise<Note[]> {
 
 // Vault is intentionally locked at the DB layer (no public read policy), so this
 // returns the local sample until Supabase Auth + owner-scoped RLS are added.
-export async function getVault(): Promise<Vault[]> {
+export async function getVault(): Promise<VaultAccount[]> {
   try {
     const supabase = await db();
     const { data, error } = await supabase.from("vault").select("*").order("position");
-    if (error || !data?.length) return sample.vault;
+    if (error || !data?.length) return sample.vaultAccounts;
     return data.map((r) => ({
       id: r.id,
       name: r.name,
+      username: r.identifier,
       category: r.category,
-      identifier: r.identifier,
+      lastUsed: r.updated,
+      favorite: false,
+      color: "#64748b",
+      initial: (r.name?.[0] ?? "?").toUpperCase(),
       secret: r.secret,
-      updated: r.updated,
       strength: r.strength,
+      twoFactor: false,
     }));
   } catch {
-    return sample.vault;
+    return sample.vaultAccounts;
   }
 }

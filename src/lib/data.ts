@@ -235,22 +235,87 @@ export const notes: Note[] = [
 
 // -------------------------------- PASSWORDS --------------------------------
 
-export type Vault = {
+export type VaultAccount = {
   id: string;
   name: string;
-  category: "Bank" | "ATM / Card" | "Email" | "Business" | "Other";
-  identifier: string;
+  username: string;
+  category: "Banking" | "Email" | "Social Media" | "Shopping" | "Business" | "Entertainment";
+  lastUsed: string;
+  favorite: boolean;
+  color: string; // avatar background
+  initial: string; // avatar letter
   secret: string;
-  updated: string;
   strength: "strong" | "medium" | "weak";
+  twoFactor: boolean;
 };
 
-export const vault: Vault[] = [
-  { id: "v1", name: "HDFC Net Banking", category: "Bank", identifier: "amol.p", secret: "H&dfc#2026!secure", updated: "12 Jun", strength: "strong" },
-  { id: "v2", name: "ICICI Business", category: "Bank", identifier: "ijsrt.corp", secret: "Ic!ci$Biz9021", updated: "02 Jul", strength: "strong" },
-  { id: "v3", name: "SBI ATM PIN", category: "ATM / Card", identifier: "•••• 4821", secret: "4821", updated: "01 Jan", strength: "weak" },
-  { id: "v4", name: "HDFC Debit Card", category: "ATM / Card", identifier: "•••• 7790", secret: "CVV 4-digit vault", updated: "20 May", strength: "medium" },
-  { id: "v5", name: "Gmail — Personal", category: "Email", identifier: "amolpimpale000@gmail.com", secret: "G## mail_pass_88", updated: "18 Jun", strength: "strong" },
-  { id: "v6", name: "IJSRT Editor Portal", category: "Business", identifier: "editor@ijsrt.org", secret: "Ojs!Editor2026", updated: "28 Jun", strength: "medium" },
-  { id: "v7", name: "Crossref DOI Account", category: "Business", identifier: "doi-admin", secret: "Cr0ssRef#Doi", updated: "10 Jun", strength: "strong" },
+export const vaultAccounts: VaultAccount[] = [
+  { id: "a1",  name: "HDFC Bank",       username: "amit.sharma@hdfcbank",     category: "Banking",       lastUsed: "2 mins ago", favorite: true,  color: "#1e40af", initial: "H", secret: "H&dfc#2026!secure", strength: "strong", twoFactor: true },
+  { id: "a2",  name: "ICICI Net Banking", username: "amit.icici@gmail.com",   category: "Banking",       lastUsed: "1 hour ago", favorite: false, color: "#ea580c", initial: "I", secret: "Ic!ci$Biz9021",    strength: "strong", twoFactor: true },
+  { id: "a3",  name: "Gmail Personal",   username: "amitsharma@gmail.com",     category: "Email",         lastUsed: "3 hours ago", favorite: false, color: "#ea4335", initial: "G", secret: "G##mail_pass_88",  strength: "strong", twoFactor: true },
+  { id: "a4",  name: "Outlook Email",    username: "amit.sharma@outlook.com",  category: "Email",         lastUsed: "5 hours ago", favorite: false, color: "#0078d4", initial: "O", secret: "0utl00k!mail",     strength: "medium", twoFactor: false },
+  { id: "a5",  name: "LinkedIn",         username: "amit.sharma@linkedin.com", category: "Social Media",  lastUsed: "1 day ago",  favorite: false, color: "#0a66c2", initial: "in", secret: "L!nked1n_2026",    strength: "strong", twoFactor: true },
+  { id: "a6",  name: "Instagram",        username: "amit_sharma_23",           category: "Social Media",  lastUsed: "1 day ago",  favorite: false, color: "#e1306c", initial: "ig", secret: "1nsta#gram99",    strength: "medium", twoFactor: false },
+  { id: "a7",  name: "Amazon",           username: "amit.amazon@gmail.com",    category: "Shopping",      lastUsed: "2 days ago", favorite: false, color: "#f59e0b", initial: "a", secret: "Am@zon_shop21",    strength: "strong", twoFactor: true },
+  { id: "a8",  name: "Flipkart",         username: "amit.flipkart@gmail.com",  category: "Shopping",      lastUsed: "2 days ago", favorite: false, color: "#2563eb", initial: "F", secret: "Fl!pkart_88",      strength: "weak",   twoFactor: false },
+  { id: "a9",  name: "YouTube",          username: "amit.sharma.youtube",      category: "Entertainment", lastUsed: "3 days ago", favorite: false, color: "#ff0000", initial: "Y", secret: "Y0uTube!watch",    strength: "medium", twoFactor: true },
+  { id: "a10", name: "WordPress Admin",  username: "admin@mywebsite.com",      category: "Business",      lastUsed: "3 days ago", favorite: false, color: "#334155", initial: "W", secret: "Wp!Admin_secure",  strength: "strong", twoFactor: true },
 ];
+
+export type VaultCategory = {
+  name: string;
+  count: number;
+  icon: string;
+  color: string;
+};
+
+export const vaultCategories: VaultCategory[] = [
+  { name: "All Passwords",  count: 128, icon: "lock",     color: "var(--c-green)" },
+  { name: "Banking",        count: 8,   icon: "landmark", color: "#4f46e5" },
+  { name: "Email",          count: 12,  icon: "mail",     color: "#ef4444" },
+  { name: "Social Media",   count: 15,  icon: "share",    color: "#3b82f6" },
+  { name: "Shopping",       count: 10,  icon: "bag",      color: "#f59e0b" },
+  { name: "Business",       count: 18,  icon: "briefcase", color: "#a855f7" },
+  { name: "Entertainment",  count: 8,   icon: "play",     color: "#ec4899" },
+  { name: "Education",      count: 6,   icon: "cap",      color: "#14b8a6" },
+  { name: "Crypto Wallets", count: 4,   icon: "wallet",   color: "#eab308" },
+  { name: "Other",          count: 47,  icon: "circle",   color: "#94a3b8" },
+];
+
+export type VaultCard = {
+  id: string;
+  bank: string;
+  network: "VISA" | "Mastercard" | "RuPay";
+  pin: string;
+  theme: "blue" | "orange" | "dark";
+};
+
+export const vaultCards: VaultCard[] = [
+  { id: "c1", bank: "HDFC Debit Card",  network: "VISA",       pin: "1234", theme: "blue" },
+  { id: "c2", bank: "ICICI Credit Card", network: "Mastercard", pin: "56789", theme: "orange" },
+  { id: "c3", bank: "SBI Debit Card",   network: "RuPay",      pin: "90123", theme: "dark" },
+];
+
+export const vaultStats = [
+  { label: "Total Passwords", value: "128", sub: "All accounts",        icon: "lock",   tone: "green" },
+  { label: "Categories",      value: "12",  sub: "Active groups",       icon: "folder", tone: "purple" },
+  { label: "Security Score",  value: "92%", sub: "Strong",              icon: "shield", tone: "green" },
+  { label: "Compromised",     value: "0",   sub: "Accounts at risk",    icon: "check",  tone: "amber" },
+  { label: "Weak Passwords",  value: "3",   sub: "Update recommended",  icon: "alert",  tone: "red" },
+] as const;
+
+export const vaultSecurity = {
+  score: 92,
+  breakdown: [
+    { label: "Strong Passwords",   value: 115 },
+    { label: "Two-Factor Enabled", value: 96 },
+    { label: "No Compromised",     value: 0 },
+    { label: "Regularly Updated",  value: 89 },
+  ],
+  dashboard: [
+    { label: "Password Health",  value: "92%", note: "Strong",      icon: "shield",  tone: "green" },
+    { label: "Two-Factor Auth",  value: "96%", note: "Enabled",     icon: "lock",    tone: "green" },
+    { label: "Reused Passwords", value: "2",   note: "Accounts",    icon: "refresh", tone: "amber" },
+    { label: "Old Passwords",    value: "5",   note: "Need Update", icon: "clock",   tone: "red" },
+  ],
+} as const;
