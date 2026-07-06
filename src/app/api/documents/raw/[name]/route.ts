@@ -44,7 +44,8 @@ export async function GET(
       headers: {
         "Content-Type": type,
         "Content-Disposition": `inline; filename="${filename}"`,
-        "Cache-Control": "public, max-age=31536000, immutable",
+        // Documents can be deleted/replaced, so avoid shared-CDN caching.
+        "Cache-Control": "private, max-age=0, must-revalidate",
       },
     });
   } catch (err) {
