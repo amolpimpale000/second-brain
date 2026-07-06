@@ -1,7 +1,7 @@
 "use client";
 
-import { Search, Bell, Plus, Sun, Moon, ChevronDown } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { Search, Bell, Plus, ChevronDown } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { owner } from "@/lib/data";
 import { cn } from "@/lib/utils";
@@ -14,13 +14,8 @@ const quickLinks = [
 ];
 
 export function Topbar() {
-  const [dark, setDark] = useState(false);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-  }, [dark]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -61,13 +56,6 @@ export function Topbar() {
             </div>
           )}
         </div>
-        <button
-          onClick={() => setDark((d) => !d)}
-          className="grid h-10 w-10 place-items-center rounded-xl border border-border bg-surface text-muted transition-colors hover:text-ink"
-          aria-label="Toggle theme"
-        >
-          {dark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
-        </button>
         <button className="relative grid h-10 w-10 place-items-center rounded-xl border border-border bg-surface text-muted transition-colors hover:text-ink">
           <Bell className="h-[18px] w-[18px]" />
           <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-brand ring-2 ring-surface" />

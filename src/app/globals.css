@@ -32,20 +32,6 @@
   --c-slate: #cbd5e1;
 }
 
-.dark {
-  --bg: #0c0f0e;
-  --surface: #14181a;
-  --surface-2: #1a1f21;
-  --card: #14181a;
-  --border: #242a2c;
-  --ink: #f0f3f2;
-  --muted: #98a5a0;
-  --faint: #6b7772;
-  --brand: #a3e635;
-  --brand-soft: #1f2a12;
-  --brand-ink: #bef264;
-}
-
 * {
   border-color: var(--border);
 }

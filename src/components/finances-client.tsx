@@ -46,6 +46,41 @@ function NetflixIcon({ className }: { className?: string }) {
   );
 }
 
+function HdfcIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 40 40" fill="none">
+      <rect width="40" height="40" rx="8" fill="#ED232A" />
+      <text x="20" y="25" textAnchor="middle" fill="white" fontSize="11" fontWeight="700" fontFamily="Arial, sans-serif">HDFC</text>
+    </svg>
+  );
+}
+
+function SbiIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 40 40" fill="none">
+      <circle cx="20" cy="20" r="20" fill="#0052CC" />
+      <circle cx="20" cy="15" r="4.5" stroke="white" strokeWidth="2" />
+      <path d="M20 19.5V29M15 25H25" stroke="white" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IciciIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 40 40" fill="none">
+      <rect width="40" height="40" rx="8" fill="#EF4123" />
+      <path d="M20 8L32 32H8L20 8Z" fill="white" />
+    </svg>
+  );
+}
+
+const bankLogo: Record<string, React.ElementType> = {
+  hdfc: HdfcIcon,
+  sbi: SbiIcon,
+  icici: IciciIcon,
+  cash: Wallet,
+};
+
 import {
   ResponsiveContainer,
   BarChart,
@@ -152,10 +187,10 @@ function Tip({ children }: { children: React.ReactNode }) {
   return <div className="rounded-xl border border-border bg-card px-3 py-2 text-xs shadow-lg">{children}</div>;
 }
 
-function Spark({ data, color }: { data: number[]; color: string }) {
+function Spark({ data, color, height = 44 }: { data: number[]; color: string; height?: number }) {
   const d = data.map((v, i) => ({ i, v }));
   return (
-    <ResponsiveContainer width="100%" height={44}>
+    <ResponsiveContainer width="100%" height={height}>
       <LineChart data={d} margin={{ top: 6, bottom: 4, left: 2, right: 2 }}>
         <Line type="monotone" dataKey="v" stroke={color} strokeWidth={2} dot={false} />
       </LineChart>
@@ -499,28 +534,39 @@ function TopSpending() {
 
 function AccountsOverview({ setModal }: { setModal: () => void }) {
   return (
-    <Card>
-      <Head title="Accounts Overview" right={<ViewAll href="/finances" />} />
-      <div className="space-y-2">
+    <Card className="flex h-full flex-col">
+      <Head title="Accounts Overview" />
+      <div className="flex-1 space-y-1">
         {accounts.map((a) => {
-          const Icon = a.icon === "cash" ? Wallet : Landmark;
+          const Icon = bankLogo[a.icon] ?? Wallet;
           return (
-            <div key={a.id} className="flex items-center gap-2.5 rounded-lg p-1.5 -mx-1.5 hover:bg-surface-2/50 transition-colors">
-              <div
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-full"
-                style={{ background: `linear-gradient(135deg, ${a.color}18, ${a.color}06)` }}
-              >
-                <Icon className="h-4 w-4" style={{ color: a.color }} />
+            <div
+              key={a.id}
+              className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-surface-2/60"
+            >
+              <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl">
+                <Icon className="h-full w-full" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[12px] font-medium text-ink">{a.name}</p>
-                {a.type && <p className="text-[10px] text-muted">{a.type}</p>}
+                <p className="text-[13px] font-semibold text-ink">{a.name}</p>
+                <p className="text-[11px] text-muted">
+                  {a.type}
+                  {a.mask && <> • ****{a.mask}</>}
+                </p>
               </div>
-              <p className="shrink-0 text-[12px] font-semibold text-ink">₹ {a.balance.toLocaleString("en-IN")}</p>
+              <p className="shrink-0 text-[13px] font-semibold text-ink">
+                ₹ {a.balance.toLocaleString("en-IN")}
+              </p>
             </div>
           );
         })}
       </div>
+      <Link
+        href="/finances"
+        className="mt-3 inline-flex items-center gap-1 text-[12px] font-semibold text-brand hover:underline"
+      >
+        All Accounts <ArrowRight className="h-3.5 w-3.5" />
+      </Link>
       <AddButton label="Add Account" onClick={setModal} />
     </Card>
   );
@@ -753,54 +799,43 @@ function AddForm({
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Total Net Worth premium card
+   Net Worth card (half-width) with embedded trend line
    ═══════════════════════════════════════════════════════════════════════════ */
-function TotalNetWorth() {
+function NetWorthCard() {
   const netWorth = kpis.find((k) => k.label === "Net Worth")!;
   const assets = 2202950;
   const liabilities = 327000;
   return (
-    <Card className="!p-0 overflow-hidden">
-      <div className="flex flex-col md:flex-row">
-        <div className="flex-1 bg-gradient-to-br from-brand-soft/80 via-white to-brand-soft/40 p-6">
-          <div className="flex items-center gap-2">
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-white shadow-sm">
-              <Home className="h-5 w-5 text-brand-ink" />
-            </div>
-            <span className="text-sm font-medium text-muted">Total Net Worth</span>
-          </div>
-          <p className="mt-3 text-[32px] font-semibold tracking-tight text-ink">₹ {netWorth.value.toLocaleString("en-IN")}</p>
-          <div className="mt-2 flex items-center gap-2 text-sm">
-            <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-green-600">
-              <ArrowUpRight className="h-3 w-3" /> {netWorth.delta}%
-            </span>
-            <span className="text-muted">{netWorth.vs}</span>
-          </div>
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            <div className="rounded-xl bg-white/70 p-3 shadow-sm border border-border/50">
-              <p className="text-xs text-muted">Total Assets</p>
-              <p className="mt-1 text-base font-semibold text-ink">₹ {assets.toLocaleString("en-IN")}</p>
-            </div>
-            <div className="rounded-xl bg-white/70 p-3 shadow-sm border border-border/50">
-              <p className="text-xs text-muted">Total Liabilities</p>
-              <p className="mt-1 text-base font-semibold text-ink">₹ {liabilities.toLocaleString("en-IN")}</p>
-            </div>
-          </div>
+    <Card className="flex h-full flex-col">
+      <div className="flex items-center gap-2">
+        <div className="grid h-9 w-9 place-items-center rounded-xl bg-brand-soft">
+          <Home className="h-5 w-5 text-brand-ink" />
         </div>
-        <div className="flex-1 p-6">
-          <p className="text-sm font-semibold text-ink">Net Worth Trend</p>
-          <div className="mt-2 h-[120px]">
-            <Spark data={netWorth.spark} color="#22c55e" />
-          </div>
-          <div className="mt-4 flex items-center justify-between rounded-xl bg-surface-2/60 p-3">
-            <div>
-              <p className="text-xs text-muted">Monthly Growth</p>
-              <p className="text-sm font-semibold text-green-600">+₹ 42,500</p>
-            </div>
-            <Link href="/finances" className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline">
-              Details <ArrowRight className="h-3 w-3" />
-            </Link>
-          </div>
+        <span className="text-sm font-medium text-muted">Total Net Worth</span>
+      </div>
+      <p className="mt-3 text-[32px] font-semibold tracking-tight text-ink">
+        ₹ {netWorth.value.toLocaleString("en-IN")}
+      </p>
+      <div className="mt-2 flex items-center gap-2 text-sm">
+        <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-green-600">
+          <ArrowUpRight className="h-3 w-3" /> {netWorth.delta}%
+        </span>
+        <span className="text-muted">{netWorth.vs}</span>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="rounded-xl border border-border/60 bg-surface-2/40 p-3">
+          <p className="text-xs text-muted">Total Assets</p>
+          <p className="mt-1 text-base font-semibold text-ink">₹ {assets.toLocaleString("en-IN")}</p>
+        </div>
+        <div className="rounded-xl border border-border/60 bg-surface-2/40 p-3">
+          <p className="text-xs text-muted">Total Liabilities</p>
+          <p className="mt-1 text-base font-semibold text-ink">₹ {liabilities.toLocaleString("en-IN")}</p>
+        </div>
+      </div>
+      <div className="mt-4 flex-1 rounded-xl border border-border/60 bg-surface-2/30 p-3">
+        <p className="text-xs font-medium text-muted">Net Worth Trend</p>
+        <div className="mt-1 h-[80px]">
+          <Spark data={netWorth.spark} color="#22c55e" height={80} />
         </div>
       </div>
     </Card>
@@ -816,7 +851,11 @@ export function FinancesClient() {
   return (
     <div className="animate-fade-up space-y-4">
       <KpiCards />
-      <TotalNetWorth />
+
+      <div className="grid items-start gap-4 md:grid-cols-2">
+        <NetWorthCard />
+        <AccountsOverview setModal={() => setModal("account")} />
+      </div>
 
       <div className="grid items-start gap-4 xl:grid-cols-[1fr_1fr_300px]">
         <CashFlow />
@@ -828,10 +867,7 @@ export function FinancesClient() {
         <RecentTransactions />
         <BudgetVsActual />
         <TopSpending />
-        <div className="space-y-4">
-          <AccountsOverview setModal={() => setModal("account")} />
-          <UpcomingBills />
-        </div>
+        <UpcomingBills />
       </div>
 
       <div className="grid items-start gap-4 xl:grid-cols-3">

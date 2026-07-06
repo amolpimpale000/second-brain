@@ -67,10 +67,10 @@ export const topSpending = [
 
 /* ── Accounts overview ────────────────────────────────────────────────────── */
 export const accounts = [
-  { id: "a1", name: "HDFC Bank", type: "Savings", balance: 125430, color: "#1e40af", icon: "hdfc" },
-  { id: "a2", name: "SBI Bank", type: "Salary", balance: 215600, color: "#22c55e", icon: "sbi" },
-  { id: "a3", name: "ICICI Bank", type: "FD", balance: 100000, color: "#ea580c", icon: "icici" },
-  { id: "a4", name: "Cash In Hand", type: "", balance: 44200, color: "#16a34a", icon: "cash" },
+  { id: "a1", name: "HDFC Bank", type: "Savings", mask: "5678", balance: 125430, color: "#1e40af", icon: "hdfc" },
+  { id: "a2", name: "SBI Bank", type: "Salary", mask: "1234", balance: 215600, color: "#22c55e", icon: "sbi" },
+  { id: "a3", name: "ICICI Bank", type: "FD", mask: "7890", balance: 100000, color: "#ea580c", icon: "icici" },
+  { id: "a4", name: "Cash In Hand", type: "", mask: "", balance: 44200, color: "#16a34a", icon: "cash" },
 ];
 
 /* ── Upcoming bills ───────────────────────────────────────────────────────── */
