@@ -1,15 +1,34 @@
 "use client";
 
-import { Search, Bell, Plus, Sun, Moon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Search, Bell, Plus, Sun, Moon, ChevronDown } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
 import { owner } from "@/lib/data";
+import { cn } from "@/lib/utils";
+
+const quickLinks = [
+  { label: "Transaction", href: "/finances" },
+  { label: "Note", href: "/notes" },
+  { label: "Task", href: "/tasks" },
+  { label: "Goal", href: "/goals" },
+];
 
 export function Topbar() {
   const [dark, setDark] = useState(false);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    if (open) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
 
   return (
     <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-bg/80 px-4 py-3 backdrop-blur-md sm:px-6 lg:px-8">
@@ -23,9 +42,25 @@ export function Topbar() {
       </div>
 
       <div className="ml-auto flex items-center gap-2">
-        <button className="btn-brand hidden sm:inline-flex">
-          <Plus className="h-4 w-4" /> Quick add
-        </button>
+        <div className="relative hidden sm:block" ref={ref}>
+          <button onClick={() => setOpen(!open)} className="btn-brand inline-flex">
+            <Plus className="h-4 w-4" /> Quick add <ChevronDown className={cn("h-3 w-3 transition-transform", open && "rotate-180")} />
+          </button>
+          {open && (
+            <div className="absolute right-0 top-full z-40 mt-2 w-40 rounded-xl border border-border bg-card p-1 shadow-card-lg">
+              {quickLinks.map((l) => (
+                <Link
+                  key={l.label}
+                  href={l.href}
+                  onClick={() => setOpen(false)}
+                  className="block rounded-lg px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-ink"
+                >
+                  {l.label}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
         <button
           onClick={() => setDark((d) => !d)}
           className="grid h-10 w-10 place-items-center rounded-xl border border-border bg-surface text-muted transition-colors hover:text-ink"

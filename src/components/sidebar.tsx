@@ -41,7 +41,7 @@ const nav: NavSection[] = [
     { href: "/analytics", label: "Business Analytics", icon: BarChart3 },
   ]},
   { section: "Money", items: [
-    { href: "/finances", label: "Finances", icon: Wallet },
+    { href: "/finances", label: "Personal Finances", icon: Wallet },
     { href: "/investments", label: "Investments", icon: TrendingUp },
     { href: "/loans", label: "Loans", icon: Landmark },
     { href: "/goals", label: "Savings Goals", icon: Target },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import {
   Wallet,
@@ -112,8 +112,18 @@ function ViewAll({ href }: { href: string }) {
 
 function MonthDropdown() {
   const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    if (open) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
   return (
-    <div className="relative">
+    <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
         className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-muted hover:bg-surface-2 transition-colors"
@@ -353,7 +363,7 @@ function ExpenseBreakdown() {
   );
 }
 
-function SavingsGoals() {
+function SavingsGoals({ setModal }: { setModal: () => void }) {
   return (
     <Card>
       <Head title="Savings Goals" right={<ViewAll href="/goals" />} />
@@ -382,7 +392,7 @@ function SavingsGoals() {
           );
         })}
       </div>
-      <AddButton label="Add New Goal" />
+      <AddButton label="Add New Goal" onClick={setModal} />
     </Card>
   );
 }
@@ -486,7 +496,7 @@ function TopSpending() {
   );
 }
 
-function AccountsOverview() {
+function AccountsOverview({ setModal }: { setModal: () => void }) {
   return (
     <Card>
       <Head title="Accounts Overview" right={<ViewAll href="/finances" />} />
@@ -510,7 +520,7 @@ function AccountsOverview() {
           );
         })}
       </div>
-      <AddButton label="Add Account" />
+      <AddButton label="Add Account" onClick={setModal} />
     </Card>
   );
 }
@@ -584,7 +594,7 @@ function LoansOverview() {
   );
 }
 
-function MoneyDueToOthers() {
+function MoneyDueToOthers({ setModal }: { setModal: () => void }) {
   return (
     <Card>
       <Head title="Money due to others" right={<ViewAll href="/finances" />} />
@@ -605,7 +615,7 @@ function MoneyDueToOthers() {
           </div>
         ))}
       </div>
-      <AddButton label="Add New" />
+      <AddButton label="Add New" onClick={setModal} />
     </Card>
   );
 }
@@ -635,6 +645,100 @@ function FinancialHealth() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   Modal for add buttons
+   ═══════════════════════════════════════════════════════════════════════════ */
+type ModalType = "goal" | "account" | "debt" | null;
+
+function Modal({
+  open,
+  onClose,
+  title,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-card-lg animate-fade-up">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-ink">{title}</h3>
+          <button onClick={onClose} className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-ink">
+            <Plus className="h-5 w-5 rotate-45" />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function AddForm({
+  fields,
+  submitLabel,
+  onSubmit,
+  onClose,
+}: {
+  fields: { name: string; label: string; type?: string; placeholder?: string }[];
+  submitLabel: string;
+  onSubmit: (data: Record<string, string>) => void;
+  onClose: () => void;
+}) {
+  const [data, setData] = useState<Record<string, string>>({});
+  const [submitted, setSubmitted] = useState(false);
+
+  if (submitted) {
+    return (
+      <div className="text-center py-4">
+        <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-emerald-50">
+          <Check className="h-6 w-6 text-emerald-600" />
+        </div>
+        <p className="font-medium text-ink">Saved successfully!</p>
+        <button onClick={onClose} className="mt-4 rounded-xl bg-ink px-4 py-2 text-sm font-medium text-white hover:opacity-90">
+          Close
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit(data);
+        setSubmitted(true);
+      }}
+      className="space-y-3"
+    >
+      {fields.map((f) => (
+        <div key={f.name}>
+          <label className="mb-1 block text-xs font-medium text-muted">{f.label}</label>
+          <input
+            type={f.type || "text"}
+            placeholder={f.placeholder}
+            required
+            className="w-full rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+            onChange={(e) => setData((prev) => ({ ...prev, [f.name]: e.target.value }))}
+          />
+        </div>
+      ))}
+      <div className="flex gap-2 pt-2">
+        <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-border py-2 text-sm font-medium text-muted hover:bg-surface-2">
+          Cancel
+        </button>
+        <button type="submit" className="flex-1 rounded-xl bg-ink py-2 text-sm font-medium text-white hover:opacity-90">
+          {submitLabel}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    Total Net Worth premium card
    ═══════════════════════════════════════════════════════════════════════════ */
 function TotalNetWorth() {
@@ -644,33 +748,33 @@ function TotalNetWorth() {
   return (
     <Card className="!p-0 overflow-hidden">
       <div className="flex flex-col md:flex-row">
-        <div className="flex-1 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 text-white">
+        <div className="flex-1 bg-gradient-to-br from-brand-soft/80 via-white to-brand-soft/40 p-6">
           <div className="flex items-center gap-2">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-white/10">
-              <Home className="h-4 w-4 text-brand" />
+            <div className="grid h-9 w-9 place-items-center rounded-xl bg-white shadow-sm">
+              <Home className="h-5 w-5 text-brand-ink" />
             </div>
-            <span className="text-sm font-medium text-slate-300">Total Net Worth</span>
+            <span className="text-sm font-medium text-muted">Total Net Worth</span>
           </div>
-          <p className="mt-3 text-3xl font-semibold tracking-tight">₹ {netWorth.value.toLocaleString("en-IN")}</p>
+          <p className="mt-3 text-[32px] font-semibold tracking-tight text-ink">₹ {netWorth.value.toLocaleString("en-IN")}</p>
           <div className="mt-2 flex items-center gap-2 text-sm">
-            <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-300">
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-green-600">
               <ArrowUpRight className="h-3 w-3" /> {netWorth.delta}%
             </span>
-            <span className="text-slate-400">{netWorth.vs}</span>
+            <span className="text-muted">{netWorth.vs}</span>
           </div>
-          <div className="mt-5 grid grid-cols-2 gap-4">
-            <div className="rounded-xl bg-white/5 p-3">
-              <p className="text-xs text-slate-400">Total Assets</p>
-              <p className="mt-1 text-base font-semibold">₹ {assets.toLocaleString("en-IN")}</p>
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="rounded-xl bg-white/70 p-3 shadow-sm border border-border/50">
+              <p className="text-xs text-muted">Total Assets</p>
+              <p className="mt-1 text-base font-semibold text-ink">₹ {assets.toLocaleString("en-IN")}</p>
             </div>
-            <div className="rounded-xl bg-white/5 p-3">
-              <p className="text-xs text-slate-400">Total Liabilities</p>
-              <p className="mt-1 text-base font-semibold">₹ {liabilities.toLocaleString("en-IN")}</p>
+            <div className="rounded-xl bg-white/70 p-3 shadow-sm border border-border/50">
+              <p className="text-xs text-muted">Total Liabilities</p>
+              <p className="mt-1 text-base font-semibold text-ink">₹ {liabilities.toLocaleString("en-IN")}</p>
             </div>
           </div>
         </div>
         <div className="flex-1 p-6">
-          <p className="text-sm font-medium text-muted">Net Worth Trend</p>
+          <p className="text-sm font-semibold text-ink">Net Worth Trend</p>
           <div className="mt-2 h-[120px]">
             <Spark data={netWorth.spark} color="#22c55e" />
           </div>
@@ -693,6 +797,8 @@ function TotalNetWorth() {
    Main page
    ═══════════════════════════════════════════════════════════════════════════ */
 export function FinancesClient() {
+  const [modal, setModal] = useState<ModalType>(null);
+
   return (
     <div className="animate-fade-up space-y-4">
       <KpiCards />
@@ -701,7 +807,7 @@ export function FinancesClient() {
       <div className="grid items-start gap-4 xl:grid-cols-[1fr_1fr_300px]">
         <CashFlow />
         <ExpenseBreakdown />
-        <SavingsGoals />
+        <SavingsGoals setModal={() => setModal("goal")} />
       </div>
 
       <div className="grid items-start gap-4 xl:grid-cols-[1fr_1fr_1fr_300px]">
@@ -709,16 +815,55 @@ export function FinancesClient() {
         <BudgetVsActual />
         <TopSpending />
         <div className="space-y-4">
-          <AccountsOverview />
+          <AccountsOverview setModal={() => setModal("account")} />
           <UpcomingBills />
         </div>
       </div>
 
       <div className="grid items-start gap-4 xl:grid-cols-3">
         <LoansOverview />
-        <MoneyDueToOthers />
+        <MoneyDueToOthers setModal={() => setModal("debt")} />
         <FinancialHealth />
       </div>
+
+      <Modal open={modal === "goal"} onClose={() => setModal(null)} title="Add New Goal">
+        <AddForm
+          fields={[
+            { name: "name", label: "Goal Name", placeholder: "e.g. New Car" },
+            { name: "target", label: "Target Amount", type: "number", placeholder: "₹" },
+            { name: "saved", label: "Saved So Far", type: "number", placeholder: "₹" },
+          ]}
+          submitLabel="Save Goal"
+          onSubmit={(data) => console.log("New goal:", data)}
+          onClose={() => setModal(null)}
+        />
+      </Modal>
+
+      <Modal open={modal === "account"} onClose={() => setModal(null)} title="Add Account">
+        <AddForm
+          fields={[
+            { name: "bank", label: "Bank / Institution", placeholder: "e.g. HDFC Bank" },
+            { name: "type", label: "Account Type", placeholder: "e.g. Savings" },
+            { name: "balance", label: "Current Balance", type: "number", placeholder: "₹" },
+          ]}
+          submitLabel="Save Account"
+          onSubmit={(data) => console.log("New account:", data)}
+          onClose={() => setModal(null)}
+        />
+      </Modal>
+
+      <Modal open={modal === "debt"} onClose={() => setModal(null)} title="Add Money Due">
+        <AddForm
+          fields={[
+            { name: "name", label: "Person Name", placeholder: "e.g. Rohan Sharma" },
+            { name: "amount", label: "Amount", type: "number", placeholder: "₹" },
+            { name: "due", label: "Due Date", type: "date" },
+          ]}
+          submitLabel="Save"
+          onSubmit={(data) => console.log("New debt:", data)}
+          onClose={() => setModal(null)}
+        />
+      </Modal>
     </div>
   );
 }
