@@ -663,10 +663,9 @@ function Modal({
   useEffect(() => {
     if (typeof window === "undefined" || !open) return;
     const html = document.documentElement;
-    const original = html.style.overflow;
-    html.style.overflow = "hidden";
+    html.classList.add("overflow-hidden");
     return () => {
-      html.style.overflow = original;
+      html.classList.remove("overflow-hidden");
     };
   }, [open]);
 
