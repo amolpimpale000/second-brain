@@ -18,6 +18,7 @@ import {
   Sparkles,
   ChevronsLeft,
   FolderOpen,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +35,7 @@ const nav = [
   ]},
   { section: "Business", items: [
     { href: "/businesses", label: "Journals", icon: Briefcase },
+    { href: "/journal-management", label: "Journal Management", icon: BookOpen },
   ]},
   { section: "Life", items: [
     { href: "/tasks", label: "Tasks", icon: CheckSquare },

@@ -255,6 +255,45 @@ export function Gauge({ value, label }: { value: number; label: string }) {
   );
 }
 
+// -------- Multi-series line (submissions overview) --------
+export function MultiLineChart({
+  data,
+  series,
+  height = 260,
+}: {
+  data: Record<string, number | string>[];
+  series: { key: string; name: string; color: string }[];
+  height?: number;
+}) {
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <LineChart data={data} margin={{ left: 6, right: 6, top: 10 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+        <XAxis dataKey="label" {...axis} />
+        <YAxis {...axis} width={36} />
+        <Tooltip
+          content={({ active, payload, label }) =>
+            active && payload?.length ? (
+              <Box>
+                <p className="mb-1 font-medium text-ink">{label}</p>
+                {payload.map((p) => (
+                  <p key={p.name} className="flex items-center gap-1.5 text-muted">
+                    <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
+                    {p.name}: <span className="font-medium text-ink">{p.value}</span>
+                  </p>
+                ))}
+              </Box>
+            ) : null
+          }
+        />
+        {series.map((s) => (
+          <Line key={s.key} type="monotone" dataKey={s.key} name={s.name} stroke={s.color} strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
+        ))}
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
 // -------- Mini sparkline --------
 export function Sparkline({ data, color = "var(--c-green)" }: { data: number[]; color?: string }) {
   const d = data.map((v, i) => ({ i, v }));

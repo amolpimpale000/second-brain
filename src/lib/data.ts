@@ -477,3 +477,145 @@ export const docFolders = [
   { id: "f3", name: "Medical Records", count: 31, color: "#ef4444" },
   { id: "f4", name: "Tax Filings", count: 18, color: "#f59e0b" },
 ];
+
+// --------------------------- JOURNAL MANAGEMENT ----------------------------
+
+export const jmStats = [
+  { label: "Total Journals", value: "5", sub: "Active Journals", subTone: "muted", icon: "book", tone: "indigo" },
+  { label: "Total Manuscripts", value: "1,248", sub: "18.7% vs Apr 2025", subTone: "green", icon: "file", tone: "blue" },
+  { label: "Published Papers", value: "842", sub: "16.2% vs Apr 2025", subTone: "green", icon: "check", tone: "green" },
+  { label: "Under Review", value: "406", sub: "5.2% vs Apr 2025", subTone: "red", icon: "review", tone: "amber" },
+  { label: "Total Users", value: "12,540", sub: "22.1% vs Apr 2025", subTone: "green", icon: "users", tone: "pink" },
+  { label: "Total Revenue", value: "₹18,75,450", sub: "24.8% vs Apr 2025", subTone: "green", icon: "rupee", tone: "emerald" },
+];
+
+export const JCOL = { IJPS: "#22c55e", IJSRT: "#3b82f6", IJMPS: "#8b5cf6", IJES: "#f59e0b", JPS: "#06b6d4" };
+
+export const submissionsTrend = [
+  { label: "May 01", total: 210, review: 120, accepted: 90, rejected: 45 },
+  { label: "May 04", total: 245, review: 140, accepted: 105, rejected: 52 },
+  { label: "May 07", total: 268, review: 150, accepted: 118, rejected: 48 },
+  { label: "May 10", total: 300, review: 172, accepted: 130, rejected: 60 },
+  { label: "May 13", total: 285, review: 165, accepted: 140, rejected: 55 },
+  { label: "May 16", total: 330, review: 190, accepted: 152, rejected: 64 },
+  { label: "May 19", total: 355, review: 205, accepted: 168, rejected: 58 },
+  { label: "May 22", total: 372, review: 210, accepted: 176, rejected: 70 },
+  { label: "May 25", total: 390, review: 225, accepted: 188, rejected: 66 },
+  { label: "May 28", total: 410, review: 238, accepted: 200, rejected: 72 },
+  { label: "May 31", total: 435, review: 250, accepted: 215, rejected: 68 },
+];
+
+export const submissionsByJournal = [
+  { name: "IJPS", value: 437, pct: 35, color: JCOL.IJPS },
+  { name: "IJSRT", value: 312, pct: 25, color: JCOL.IJSRT },
+  { name: "IJMPS", value: 225, pct: 18, color: JCOL.IJMPS },
+  { name: "IJES", value: 150, pct: 12, color: JCOL.IJES },
+  { name: "JPS", value: 124, pct: 10, color: JCOL.JPS },
+];
+
+export const jmActivities = [
+  { id: "a1", text: "New submission in IJPS Journal", meta: "By Dr. Rahul Verma", time: "10 mins ago", icon: "file", color: "#3b82f6" },
+  { id: "a2", text: "Article accepted in IJSRT Journal", meta: "“AI in Healthcare”", time: "1 hour ago", icon: "check", color: "#22c55e" },
+  { id: "a3", text: "Payment received", meta: "₹15,000 from Dr. Neha Patel", time: "2 hours ago", icon: "rupee", color: "#f59e0b" },
+  { id: "a4", text: "New reviewer registered", meta: "Prof. Amit Kumar", time: "3 hours ago", icon: "user", color: "#8b5cf6" },
+  { id: "a5", text: "Issue published", meta: "IJMPS Journal – Vol 12 Issue 5", time: "5 hours ago", icon: "book", color: "#ef4444" },
+];
+
+export type JournalPerf = {
+  code: string; name: string; manuscripts: number; published: number;
+  acceptance: number; impact: number; revenue: number; growth: number; color: string;
+};
+export const journalPerformance: JournalPerf[] = [
+  { code: "IJPS", name: "International Journal of Pharmaceutical Sciences", manuscripts: 437, published: 312, acceptance: 71.4, impact: 4.892, revenue: 625450, growth: 28.6, color: JCOL.IJPS },
+  { code: "IJSRT", name: "International Journal of Scientific Research & Technology", manuscripts: 312, published: 215, acceptance: 68.9, impact: 3.721, revenue: 450200, growth: 22.4, color: JCOL.IJSRT },
+  { code: "IJMPS", name: "International Journal of Medical & Pharmaceutical Sciences", manuscripts: 225, published: 156, acceptance: 69.3, impact: 2.986, revenue: 315600, growth: 15.3, color: JCOL.IJMPS },
+  { code: "IJES", name: "International Journal of Engineering & Science", manuscripts: 150, published: 98, acceptance: 65.3, impact: 2.456, revenue: 210300, growth: 10.1, color: JCOL.IJES },
+  { code: "JPS", name: "Journal of Pharmacy & Sciences", manuscripts: 124, published: 61, acceptance: 49.2, impact: 1.923, revenue: 173900, growth: 8.7, color: JCOL.JPS },
+];
+
+export const revenueBreakdown = [
+  { name: "Article Processing Charges", value: 1525300, pct: 81.3, color: "#6366f1" },
+  { name: "Subscription", value: 245600, pct: 13.1, color: "#22c55e" },
+  { name: "Other Income", value: 104550, pct: 5.6, color: "#f59e0b" },
+];
+
+export const articleStatus = [
+  { name: "Under Review", value: 425, pct: 34.1, color: "#22c55e" },
+  { name: "Revision", value: 312, pct: 25.0, color: "#3b82f6" },
+  { name: "Accepted", value: 289, pct: 23.2, color: "#8b5cf6" },
+  { name: "Published", value: 152, pct: 12.2, color: "#f59e0b" },
+  { name: "Rejected", value: 70, pct: 5.6, color: "#ef4444" },
+];
+
+export const submissionSource = [
+  { name: "Direct Website", value: 524, pct: 42, color: "#3b82f6" },
+  { name: "Email", value: 312, pct: 25, color: "#8b5cf6" },
+  { name: "Editorial Manager", value: 225, pct: 18, color: "#22c55e" },
+  { name: "Referral", value: 125, pct: 10, color: "#f59e0b" },
+  { name: "Other", value: 62, pct: 5, color: "#94a3b8" },
+];
+
+export const financialSummary = [
+  { label: "Total Revenue", value: "₹18,75,450", growth: 24.8, color: "var(--c-green)", spark: [12, 15, 13, 18, 20, 19, 24, 26, 25, 30] },
+  { label: "Total Expenses", value: "₹7,25,300", growth: 9.3, color: "var(--c-rose)", spark: [8, 9, 11, 10, 12, 11, 13, 12, 14, 13] },
+  { label: "Net Profit", value: "₹11,50,150", growth: 21.3, color: "var(--c-green)", spark: [6, 7, 8, 9, 10, 11, 12, 13, 14, 16] },
+];
+
+export const keyMetrics = [
+  { label: "Unique Visitors", value: "45,230", growth: 12.4, color: "var(--c-green)", spark: [20, 22, 21, 25, 27, 26, 30, 32, 31, 35] },
+  { label: "Downloads", value: "12,450", growth: 8.7, color: "var(--c-violet)", spark: [10, 12, 11, 13, 14, 13, 15, 16, 15, 18] },
+  { label: "Citations", value: "2,345", growth: 15.5, color: "var(--c-amber)", spark: [5, 6, 7, 6, 8, 9, 8, 10, 11, 12] },
+  { label: "Altmetric Score", value: "1,890", growth: 10.2, color: "var(--c-sky)", spark: [4, 5, 6, 7, 6, 8, 9, 8, 10, 11] },
+];
+
+export const subjectAreas = [
+  { name: "Pharmaceutical Sciences", pct: 45, color: "#22c55e" },
+  { name: "Engineering & Technology", pct: 25, color: "#3b82f6" },
+  { name: "Medical Sciences", pct: 15, color: "#8b5cf6" },
+  { name: "Management & Social Sci.", pct: 10, color: "#f59e0b" },
+  { name: "Others", pct: 5, color: "#94a3b8" },
+];
+
+export const subscription = [
+  { label: "Active Subscribers", value: "2,350", growth: 14.2, icon: "users" },
+  { label: "Institutional Subscribers", value: "320", growth: 8.6, icon: "building" },
+  { label: "Active Plans", value: "12", growth: 5.3, icon: "card" },
+];
+
+export const publicationTrend = [
+  { label: "Jan", published: 120, accepted: 60 },
+  { label: "Feb", published: 150, accepted: 72 },
+  { label: "Mar", published: 175, accepted: 88 },
+  { label: "Apr", published: 200, accepted: 95 },
+  { label: "May", published: 215, accepted: 110 },
+];
+
+export const jmAlerts = [
+  { id: "al1", text: "12 manuscripts require reviewer invitation", tone: "red" },
+  { id: "al2", text: "5 payment receipts pending", tone: "amber" },
+  { id: "al3", text: "3 journals have low balance", tone: "red" },
+];
+
+export const quickActionsJM = [
+  { label: "Add New Journal", icon: "add" },
+  { label: "View All Manuscripts", icon: "file" },
+  { label: "Generate Report", icon: "report" },
+  { label: "Manage Users", icon: "users" },
+  { label: "Add Announcement", icon: "megaphone" },
+];
+
+// ------------------------- EMPLOYEE PRODUCTIVITY ---------------------------
+
+export type Employee = {
+  id: string; name: string; role: string; journal: string; initials: string; color: string;
+  handled: number; completed: number; pending: number; turnaround: number; score: number; trend: number;
+};
+export const employees: Employee[] = [
+  { id: "emp1", name: "Priya Sharma", role: "Managing Editor", journal: "IJPS", initials: "PS", color: "#22c55e", handled: 48, completed: 42, pending: 6, turnaround: 3.2, score: 94, trend: 6.2 },
+  { id: "emp2", name: "Rahul Verma", role: "Section Editor", journal: "IJSRT", initials: "RV", color: "#3b82f6", handled: 36, completed: 33, pending: 3, turnaround: 4.1, score: 88, trend: 3.4 },
+  { id: "emp3", name: "Neha Patel", role: "Copy Editor", journal: "IJMPS", initials: "NP", color: "#8b5cf6", handled: 52, completed: 50, pending: 2, turnaround: 2.8, score: 96, trend: 8.1 },
+  { id: "emp4", name: "Amit Kumar", role: "Reviewer", journal: "IJES", initials: "AK", color: "#f59e0b", handled: 28, completed: 24, pending: 4, turnaround: 5.5, score: 81, trend: -2.3 },
+  { id: "emp5", name: "Sanjay Gupta", role: "Production Lead", journal: "JPS", initials: "SG", color: "#06b6d4", handled: 40, completed: 38, pending: 2, turnaround: 3.9, score: 90, trend: 4.7 },
+  { id: "emp6", name: "Kavita Rao", role: "Reviewer", journal: "IJPS", initials: "KR", color: "#ec4899", handled: 31, completed: 29, pending: 2, turnaround: 4.8, score: 85, trend: 1.9 },
+  { id: "emp7", name: "Vikram Singh", role: "Layout Editor", journal: "IJMPS", initials: "VS", color: "#14b8a6", handled: 44, completed: 41, pending: 3, turnaround: 3.5, score: 92, trend: 5.5 },
+];
