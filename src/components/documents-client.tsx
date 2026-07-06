@@ -131,9 +131,44 @@ export function DocumentsClient() {
   useEffect(() => { setPage(1); }, [activeCat, typeFilter, sort, tab]);
 
   /* mutations */
-  const removeDoc = (id: string) => { setDocs((p) => p.map((d) => (d.id === id ? { ...d, trashed: true } : d))); flash("Moved to Trash"); };
-  const restoreDoc = (id: string) => setDocs((p) => p.map((d) => (d.id === id ? { ...d, trashed: false } : d)));
-  const purgeDoc = (id: string) => setDocs((p) => p.filter((d) => d.id !== id));
+  const removeDoc = async (id: string) => {
+    setDocs((p) => p.map((d) => (d.id === id ? { ...d, trashed: true } : d)));
+    try {
+      const res = await fetch(`/api/documents?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Delete failed");
+      flash("Moved to Trash");
+    } catch (err) {
+      console.error(err);
+      flash("Delete failed");
+      // revert
+      setDocs((p) => p.map((d) => (d.id === id ? { ...d, trashed: false } : d)));
+    }
+  };
+  const restoreDoc = async (id: string) => {
+    setDocs((p) => p.map((d) => (d.id === id ? { ...d, trashed: false } : d)));
+    try {
+      const res = await fetch(`/api/documents?id=${encodeURIComponent(id)}&action=restore`, { method: "PATCH" });
+      if (!res.ok) throw new Error("Restore failed");
+      flash("Document restored");
+    } catch (err) {
+      console.error(err);
+      flash("Restore failed");
+      setDocs((p) => p.map((d) => (d.id === id ? { ...d, trashed: true } : d)));
+    }
+  };
+  const purgeDoc = async (id: string) => {
+    const prev = docs.find((d) => d.id === id);
+    setDocs((p) => p.filter((d) => d.id !== id));
+    try {
+      const res = await fetch(`/api/documents?id=${encodeURIComponent(id)}&mode=hard`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Purge failed");
+      flash("Deleted permanently");
+    } catch (err) {
+      console.error(err);
+      flash("Delete failed");
+      if (prev) setDocs((p) => [...p, prev]);
+    }
+  };
 
   const onUpload = async (files: FileList | null) => {
     if (!files?.length) return;
