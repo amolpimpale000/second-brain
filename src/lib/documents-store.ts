@@ -1,5 +1,6 @@
 import { writeFile, mkdir, readFile, stat, rename, unlink } from "fs/promises";
 import path from "path";
+import { existsSync } from "fs";
 
 const MANIFEST = "documents.json";
 const TRASH_DIR = ".trashed";
@@ -27,10 +28,19 @@ export function fmtSize(bytes: number) {
   return `${bytes} B`;
 }
 
+function isHostingerCwd(cwd: string) {
+  return existsSync(path.join(cwd, "public_html"));
+}
+
 export function getUploadDir() {
   const envPath = process.env.DOCUMENTS_UPLOAD_PATH;
   if (envPath) return path.resolve(envPath);
-  return path.join(process.cwd(), "public", "uploads", "documents");
+
+  const cwd = process.cwd();
+  if (isHostingerCwd(cwd)) {
+    return path.join(cwd, "public_html", "Documents");
+  }
+  return path.join(cwd, "public", "uploads", "documents");
 }
 
 export function getTrashDir(uploadDir: string) {
@@ -38,7 +48,14 @@ export function getTrashDir(uploadDir: string) {
 }
 
 export function getBaseUrl() {
-  return (process.env.NEXT_PUBLIC_DOCUMENTS_BASE_URL || "/uploads/documents").replace(/\/$/, "");
+  if (process.env.NEXT_PUBLIC_DOCUMENTS_BASE_URL) {
+    return process.env.NEXT_PUBLIC_DOCUMENTS_BASE_URL.replace(/\/$/, "");
+  }
+  const cwd = process.cwd();
+  if (isHostingerCwd(cwd)) {
+    return "/Documents";
+  }
+  return "/uploads/documents";
 }
 
 export function sanitize(name: string) {
