@@ -134,7 +134,11 @@ export function DocumentsClient() {
   const removeDoc = async (id: string) => {
     setDocs((p) => p.map((d) => (d.id === id ? { ...d, trashed: true } : d)));
     try {
-      const res = await fetch(`/api/documents?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const res = await fetch("/api/documents/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
       if (!res.ok) throw new Error("Delete failed");
       flash("Moved to Trash");
     } catch (err) {
@@ -147,7 +151,11 @@ export function DocumentsClient() {
   const restoreDoc = async (id: string) => {
     setDocs((p) => p.map((d) => (d.id === id ? { ...d, trashed: false } : d)));
     try {
-      const res = await fetch(`/api/documents?id=${encodeURIComponent(id)}&action=restore`, { method: "PATCH" });
+      const res = await fetch("/api/documents/restore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
       if (!res.ok) throw new Error("Restore failed");
       flash("Document restored");
     } catch (err) {
@@ -160,7 +168,11 @@ export function DocumentsClient() {
     const prev = docs.find((d) => d.id === id);
     setDocs((p) => p.filter((d) => d.id !== id));
     try {
-      const res = await fetch(`/api/documents?id=${encodeURIComponent(id)}&mode=hard`, { method: "DELETE" });
+      const res = await fetch("/api/documents/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, mode: "hard" }),
+      });
       if (!res.ok) throw new Error("Purge failed");
       flash("Deleted permanently");
     } catch (err) {

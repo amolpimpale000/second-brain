@@ -1,69 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir, readFile, stat, rename, unlink } from "fs/promises";
+import { mkdir, writeFile } from "fs/promises";
+import {
+  StoredDoc,
+  uid,
+  fmtSize,
+  getUploadDir,
+  getBaseUrl,
+  sanitize,
+  readManifest,
+  writeManifest,
+  fileExists,
+} from "@/lib/documents-store";
 import path from "path";
 
-const MANIFEST = "documents.json";
-const TRASH_DIR = ".trashed";
 const ALLOWED_EXTS = ["pdf", "jpg", "jpeg", "png", "docx", "doc", "xlsx", "xls", "txt", "webp"];
 const MAX_SIZE_MB = 50;
-
-export type StoredDoc = {
-  id: string;
-  name: string;
-  filename: string;
-  category: string;
-  ext: "PDF" | "JPG" | "PNG" | "DOCX";
-  size: string;
-  date: string;
-  kind: "doc" | "image";
-  url: string;
-  trashed?: boolean;
-};
-
-function uid() {
-  return Math.random().toString(36).slice(2, 9);
-}
-
-function fmtSize(bytes: number) {
-  if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
-  if (bytes >= 1_000) return `${Math.round(bytes / 1_000)} KB`;
-  return `${bytes} B`;
-}
-
-function getUploadDir() {
-  const envPath = process.env.DOCUMENTS_UPLOAD_PATH;
-  if (envPath) return path.resolve(envPath);
-  return path.join(process.cwd(), "public", "uploads", "documents");
-}
-
-function getTrashDir(uploadDir: string) {
-  return path.join(uploadDir, TRASH_DIR);
-}
-
-function getBaseUrl() {
-  return (process.env.NEXT_PUBLIC_DOCUMENTS_BASE_URL || "/uploads/documents").replace(/\/$/, "");
-}
-
-function sanitize(name: string) {
-  return name.replace(/[^a-zA-Z0-9.-]/g, "_").replace(/_{2,}/g, "_");
-}
-
-async function readManifest(uploadDir: string): Promise<StoredDoc[]> {
-  try {
-    const raw = await readFile(path.join(uploadDir, MANIFEST), "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-
-async function writeManifest(uploadDir: string, docs: StoredDoc[]) {
-  await writeFile(path.join(uploadDir, MANIFEST), JSON.stringify(docs, null, 2));
-}
-
-function fileExists(p: string) {
-  return stat(p).then(() => true).catch(() => false);
-}
 
 export async function GET() {
   try {
@@ -75,7 +26,7 @@ export async function GET() {
     const existing: StoredDoc[] = [];
     let changed = false;
     for (const d of docs) {
-      const filePath = path.join(uploadDir, d.trashed ? TRASH_DIR : "", d.filename);
+      const filePath = path.join(uploadDir, d.trashed ? ".trashed" : "", d.filename);
       if (await fileExists(filePath)) {
         existing.push(d);
       } else {
@@ -149,81 +100,5 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error("Upload error:", err);
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });
-  }
-}
-
-export async function DELETE(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
-    const mode = searchParams.get("mode") || "soft";
-
-    if (!id) {
-      return NextResponse.json({ error: "Missing document id" }, { status: 400 });
-    }
-
-    const uploadDir = getUploadDir();
-    const manifest = await readManifest(uploadDir);
-    const idx = manifest.findIndex((d) => d.id === id);
-    if (idx === -1) {
-      return NextResponse.json({ error: "Document not found" }, { status: 404 });
-    }
-
-    const doc = manifest[idx];
-    const filePath = path.join(uploadDir, doc.filename);
-    const trashedPath = path.join(getTrashDir(uploadDir), doc.filename);
-
-    if (mode === "hard") {
-      // Permanently delete
-      try { await unlink(doc.trashed ? trashedPath : filePath); } catch {}
-      manifest.splice(idx, 1);
-    } else {
-      // Soft delete: move to trash folder
-      await mkdir(getTrashDir(uploadDir), { recursive: true });
-      if (await fileExists(filePath)) {
-        await rename(filePath, trashedPath);
-      }
-      manifest[idx] = { ...doc, trashed: true };
-    }
-
-    await writeManifest(uploadDir, manifest);
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error("Delete error:", err);
-    return NextResponse.json({ error: "Delete failed" }, { status: 500 });
-  }
-}
-
-export async function PATCH(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
-    const action = searchParams.get("action");
-
-    if (!id || action !== "restore") {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-    }
-
-    const uploadDir = getUploadDir();
-    const manifest = await readManifest(uploadDir);
-    const idx = manifest.findIndex((d) => d.id === id);
-    if (idx === -1) {
-      return NextResponse.json({ error: "Document not found" }, { status: 404 });
-    }
-
-    const doc = manifest[idx];
-    const filePath = path.join(uploadDir, doc.filename);
-    const trashedPath = path.join(getTrashDir(uploadDir), doc.filename);
-
-    if (await fileExists(trashedPath)) {
-      await rename(trashedPath, filePath);
-    }
-
-    manifest[idx] = { ...doc, trashed: false };
-    await writeManifest(uploadDir, manifest);
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error("Restore error:", err);
-    return NextResponse.json({ error: "Restore failed" }, { status: 500 });
   }
 }
