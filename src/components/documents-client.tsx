@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  FolderOpen, LayoutGrid, HardDrive, Users, Clock, Plus, FileText, Award, GraduationCap,
+  FolderOpen, LayoutGrid, HardDrive, Plus, FileText, Award, GraduationCap,
   CreditCard, BadgeCheck, Image as ImageIcon, ShieldCheck, User, Upload, FolderPlus, ScanLine,
-  Send, Share2, MoreVertical, Download, Trash2, Filter, List, ChevronDown, RotateCcw, Check, Folder,
+  Share2, MoreVertical, Download, Trash2, List, RotateCcw, Check, Folder, Users,
+  ImagePlus, FileUp, Replace, Clock,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import type { DocItem } from "@/lib/data";
-import { docStats, docCategories, storageOverview, sampleDocs, expiringDocs, docActivity, docFolders } from "@/lib/data";
+import { docCategories, docFolders } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import { Modal, Field, inputCls, Dropdown } from "@/components/vault-ui";
 
@@ -17,16 +18,10 @@ const catIconMap: Record<string, React.ElementType> = {
   folder: FolderOpen, user: User, award: Award, cap: GraduationCap, id: CreditCard,
   users: Users, badge: BadgeCheck, image: ImageIcon, shield: ShieldCheck,
 };
-const statIconMap: Record<string, React.ElementType> = {
-  folder: FolderOpen, grid: LayoutGrid, drive: HardDrive, users: Users, clock: Clock,
-};
 const toneBg: Record<string, string> = {
   violet: "bg-violet-100 text-violet-600", amber: "bg-amber-100 text-amber-500",
   green: "bg-green-100 text-green-600", blue: "bg-blue-100 text-blue-600",
   red: "bg-red-100 text-red-500",
-};
-const subToneText: Record<string, string> = {
-  green: "text-green-600", muted: "text-faint", violet: "text-violet-600",
 };
 const extBadge: Record<string, string> = {
   PDF: "bg-red-50 text-red-600", JPG: "bg-blue-50 text-blue-600", JPEG: "bg-blue-50 text-blue-600",
@@ -36,6 +31,9 @@ const extBadge: Record<string, string> = {
 };
 const badgeCls = (ext: string) => extBadge[ext] ?? "bg-slate-100 text-slate-600";
 const uid = () => Math.random().toString(36).slice(2, 9);
+const PHOTO_CATEGORY = "Images / Photos";
+const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp";
+const DOC_ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.txt";
 
 function catColor(name: string) {
   return docCategories.find((c) => c.name === name)?.color ?? "#8b5cf6";
@@ -45,9 +43,35 @@ function catIconFor(name: string) {
   return catIconMap[icon] ?? FileText;
 }
 function fmtSize(bytes: number) {
+  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(2)} GB`;
   if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(1)} MB`;
   if (bytes >= 1e3) return `${Math.round(bytes / 1e3)} KB`;
   return `${bytes} B`;
+}
+/** Parse a size string like "1.2 MB" back into bytes. */
+function parseSize(s: string) {
+  const m = s?.match(/([\d.]+)\s*(GB|MB|KB|B)/i);
+  if (!m) return 0;
+  const n = parseFloat(m[1]);
+  const u = m[2].toUpperCase();
+  return n * (u === "GB" ? 1e9 : u === "MB" ? 1e6 : u === "KB" ? 1e3 : 1);
+}
+/** Documents get an id like `${Date.now()}-xxxx`; use it for ordering + relative time. */
+function docTime(id: string) {
+  const n = Number(String(id).split("-")[0]);
+  return Number.isFinite(n) && n > 1e12 ? n : 0;
+}
+function relTime(ms: number) {
+  if (!ms) return "";
+  const s = (Date.now() - ms) / 1000;
+  if (s < 60) return "just now";
+  const m = s / 60;
+  if (m < 60) return `${Math.floor(m)}m ago`;
+  const h = m / 60;
+  if (h < 24) return `${Math.floor(h)}h ago`;
+  const d = h / 24;
+  if (d < 30) return `${Math.floor(d)}d ago`;
+  return `${Math.floor(d / 30)}mo ago`;
 }
 
 function usePersist<T>(key: string, seed: T) {
@@ -70,8 +94,8 @@ function Menu({ items }: { items: { label: string; icon: React.ElementType; onCl
       </button>
       {open && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-20 mt-1 min-w-[150px] rounded-xl border border-border bg-card p-1 shadow-card-lg">
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-50 mt-1 min-w-[160px] rounded-xl border border-border bg-card p-1 shadow-card-lg">
             {items.map((it) => (
               <button key={it.label} onClick={() => { it.onClick(); setOpen(false); }}
                 className={cn("flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2", it.danger ? "text-red-500" : "text-muted hover:text-ink")}>
@@ -89,9 +113,9 @@ const PAGE_SIZE = 12;
 
 /* =========================================================================== */
 export function DocumentsClient() {
-  const [docs, setDocs] = useState<DocItem[]>(sampleDocs);
+  const [docs, setDocs] = useState<DocItem[]>([]);
   const [folders, setFolders] = usePersist("sb.docs.folders", docFolders);
-  const [tab, setTab] = useState<"all" | "folders" | "trash">("all");
+  const [tab, setTab] = useState<"all" | "photos" | "folders" | "trash">("all");
   const [activeCat, setActiveCat] = useState<string | null>(null);
   const [sort, setSort] = useState("Recently Added");
   const [typeFilter, setTypeFilter] = useState("All Types");
@@ -101,129 +125,170 @@ export function DocumentsClient() {
   const [modal, setModal] = useState<null | "category" | "folder">(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const replacingId = useRef<string | null>(null);
 
-  const flash = (m: string) => { setToast(m); setTimeout(() => setToast(null), 2000); };
+  const flash = (m: string) => { setToast(m); setTimeout(() => setToast(null), 2200); };
 
-  useEffect(() => {
+  const reload = () => {
     setLoading(true);
     fetch("/api/documents")
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Failed to load documents"))))
-      .then((data) => {
-        if (Array.isArray(data.docs)) {
-          setDocs((prev) => (data.docs.length ? data.docs : prev));
-        }
-      })
+      .then((data) => { if (Array.isArray(data.docs)) setDocs(data.docs); })
       .catch((err) => { console.error(err); flash("Could not load documents"); })
       .finally(() => setLoading(false));
-  }, []);
+  };
+  useEffect(reload, []);
 
-  const live = docs.filter((d) => !d.trashed);
-  const trashed = docs.filter((d) => d.trashed);
+  const live = useMemo(() => docs.filter((d) => !d.trashed), [docs]);
+  const trashed = useMemo(() => docs.filter((d) => d.trashed), [docs]);
+  const photos = useMemo(() => live.filter((d) => d.kind === "image"), [live]);
 
+  /* accurate, computed data --------------------------------------------------*/
+  const categoryCount = (name: string) => live.filter((d) => d.category === name).length;
+  const usedBytes = live.reduce((s, d) => s + parseSize(d.size), 0);
+  const imageBytes = photos.reduce((s, d) => s + parseSize(d.size), 0);
+  const docBytes = usedBytes - imageBytes;
+  const nonEmptyCats = docCategories.filter((c) => categoryCount(c.name) > 0).length;
+
+  const stats = [
+    { label: "Total Documents", value: String(live.length), sub: `${photos.length} photos`, tone: "violet", Icon: FolderOpen },
+    { label: "Photos", value: String(photos.length), sub: "Images only", tone: "blue", Icon: ImageIcon },
+    { label: "Total Size", value: fmtSize(usedBytes), sub: "Across all files", tone: "green", Icon: HardDrive },
+    { label: "Categories", value: String(nonEmptyCats), sub: `${docCategories.length} available`, tone: "amber", Icon: LayoutGrid },
+    { label: "In Trash", value: String(trashed.length), sub: "Recoverable", tone: "red", Icon: Trash2 },
+  ];
+
+  const storageBreakdown = [
+    { name: "Documents", value: Math.max(docBytes, 0), color: "#8b5cf6" },
+    { name: "Images", value: imageBytes, color: "#3b82f6" },
+  ];
+
+  const recentActivity = useMemo(
+    () => [...live].sort((a, b) => docTime(b.id) - docTime(a.id)).slice(0, 5),
+    [live]
+  );
+
+  /* current-tab list + pagination -------------------------------------------*/
   const filtered = useMemo(() => {
-    let list = live.filter((d) => (!activeCat || d.category === activeCat) && (typeFilter === "All Types" || d.ext === typeFilter));
+    const source = tab === "photos" ? photos : live;
+    let list = source.filter(
+      (d) => (tab === "photos" || !activeCat || d.category === activeCat) &&
+             (typeFilter === "All Types" || d.ext === typeFilter)
+    );
     if (sort === "Name") list = [...list].sort((a, b) => a.name.localeCompare(b.name));
-    else if (sort === "Size") list = [...list].sort((a, b) => parseFloat(b.size) - parseFloat(a.size));
+    else if (sort === "Size") list = [...list].sort((a, b) => parseSize(b.size) - parseSize(a.size));
+    else list = [...list].sort((a, b) => docTime(b.id) - docTime(a.id));
     return list;
-  }, [live, activeCat, typeFilter, sort]);
+  }, [tab, live, photos, activeCat, typeFilter, sort]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pages);
   const shown = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
   useEffect(() => { setPage(1); }, [activeCat, typeFilter, sort, tab]);
 
-  /* mutations */
+  /* mutations ----------------------------------------------------------------*/
   const removeDoc = async (id: string) => {
     setDocs((p) => p.map((d) => (d.id === id ? { ...d, trashed: true } : d)));
     try {
-      const res = await fetch("/api/documents/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
+      const res = await fetch("/api/documents/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
       if (!res.ok) throw new Error("Delete failed");
       flash("Moved to Trash");
-    } catch (err) {
-      console.error(err);
-      flash("Delete failed");
-      // revert
-      setDocs((p) => p.map((d) => (d.id === id ? { ...d, trashed: false } : d)));
-    }
+    } catch (err) { console.error(err); flash("Delete failed"); setDocs((p) => p.map((d) => (d.id === id ? { ...d, trashed: false } : d))); }
   };
   const restoreDoc = async (id: string) => {
     setDocs((p) => p.map((d) => (d.id === id ? { ...d, trashed: false } : d)));
     try {
-      const res = await fetch("/api/documents/restore", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
+      const res = await fetch("/api/documents/restore", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
       if (!res.ok) throw new Error("Restore failed");
       flash("Document restored");
-    } catch (err) {
-      console.error(err);
-      flash("Restore failed");
-      setDocs((p) => p.map((d) => (d.id === id ? { ...d, trashed: true } : d)));
-    }
+    } catch (err) { console.error(err); flash("Restore failed"); setDocs((p) => p.map((d) => (d.id === id ? { ...d, trashed: true } : d))); }
   };
   const purgeDoc = async (id: string) => {
     const prev = docs.find((d) => d.id === id);
     setDocs((p) => p.filter((d) => d.id !== id));
     try {
-      const res = await fetch("/api/documents/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, mode: "hard" }),
-      });
+      const res = await fetch("/api/documents/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, mode: "hard" }) });
       if (!res.ok) throw new Error("Purge failed");
       flash("Deleted permanently");
-    } catch (err) {
-      console.error(err);
-      flash("Delete failed");
-      if (prev) setDocs((p) => [...p, prev]);
-    }
+    } catch (err) { console.error(err); flash("Delete failed"); if (prev) setDocs((p) => [...p, prev]); }
   };
 
-  const onUpload = async (files: FileList | null) => {
+  const onUpload = async (files: FileList | null, asPhoto: boolean) => {
     if (!files?.length) return;
     setUploading(true);
     try {
       const formData = new FormData();
       Array.from(files).forEach((f) => formData.append("files", f));
-      formData.append("category", activeCat || "Important Docs");
-
+      formData.append("category", asPhoto ? PHOTO_CATEGORY : activeCat || "Important Docs");
       const res = await fetch("/api/documents", { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Upload failed");
-
-      const uploaded: DocItem[] = data.docs.map((d: DocItem) => ({
-        ...d,
-        thumb: d.kind === "image" ? d.url : undefined,
-      }));
+      const uploaded: DocItem[] = data.docs.map((d: DocItem) => ({ ...d, thumb: d.kind === "image" ? d.url : undefined }));
       setDocs((p) => [...uploaded, ...p]);
-      flash(`${uploaded.length} document${uploaded.length > 1 ? "s" : ""} uploaded`);
-    } catch (err: any) {
-      console.error(err);
-      flash(err.message || "Upload failed");
-    } finally {
-      setUploading(false);
-    }
+      flash(`${uploaded.length} ${asPhoto ? "photo" : "document"}${uploaded.length > 1 ? "s" : ""} uploaded`);
+    } catch (err) { console.error(err); flash(err instanceof Error ? err.message : "Upload failed"); }
+    finally { setUploading(false); }
+  };
+
+  const startReplace = (id: string) => { replacingId.current = id; replaceInputRef.current?.click(); };
+  const onReplace = async (files: FileList | null) => {
+    const id = replacingId.current;
+    if (!id || !files?.length) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("id", id);
+      formData.append("files", files[0]);
+      const res = await fetch("/api/documents/update", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Update failed");
+      const updated: DocItem = { ...data.doc, thumb: data.doc.kind === "image" ? data.doc.url : undefined };
+      setDocs((p) => p.map((d) => (d.id === id ? updated : d)));
+      flash("File updated");
+    } catch (err) { console.error(err); flash(err instanceof Error ? err.message : "Update failed"); }
+    finally { setUploading(false); replacingId.current = null; }
+  };
+
+  const download = (d: DocItem) => {
+    if (!d.url) return;
+    const a = document.createElement("a");
+    a.href = `${d.url}?dl=1`;
+    a.download = d.name;
+    a.click();
+  };
+  const share = async (d: DocItem) => {
+    try { await navigator.clipboard.writeText(location.origin + (d.url ?? "")); flash("Link copied"); }
+    catch { flash("Could not copy link"); }
   };
 
   const quickActions = [
-    { label: "Upload Document", icon: Upload, onClick: () => fileRef.current?.click() },
+    { label: "Upload Document", icon: FileUp, onClick: () => docInputRef.current?.click() },
+    { label: "Upload Photo", icon: ImagePlus, onClick: () => photoInputRef.current?.click() },
     { label: "Create New Folder", icon: FolderPlus, onClick: () => setModal("folder") },
-    { label: "Scan Document", icon: ScanLine, onClick: () => fileRef.current?.click() },
-    { label: "Request Document", icon: Send, onClick: () => flash("Request sent to family") },
+    { label: "Scan Document", icon: ScanLine, onClick: () => docInputRef.current?.click() },
     { label: "Share with Family", icon: Share2, onClick: () => flash("Sharing link copied") },
   ];
 
   return (
     <div className="animate-fade-up space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-ink">Documents</h1>
-        <p className="mt-1 text-sm text-muted">Store, organize and manage all your important documents in one secure place.</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-ink">Documents</h1>
+          <p className="mt-1 text-sm text-muted">Store, organize and manage all your important documents in one secure place.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => docInputRef.current?.click()} disabled={uploading}
+            className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 disabled:opacity-60">
+            <FileUp className="h-4 w-4" /> Upload Documents
+          </button>
+          <button onClick={() => photoInputRef.current?.click()} disabled={uploading}
+            className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-60">
+            <ImagePlus className="h-4 w-4" /> Upload Photos
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1fr_300px]">
@@ -231,43 +296,37 @@ export function DocumentsClient() {
         <div className="min-w-0 space-y-5">
           {/* Stat cards */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-            {docStats.map((s) => {
-              const Icon = statIconMap[s.icon];
-              return (
-                <div key={s.label} className="rounded-2xl border border-border bg-card p-4 shadow-card">
-                  <div className="flex items-center gap-2">
-                    <div className={cn("grid h-8 w-8 place-items-center rounded-lg", toneBg[s.tone])}><Icon className="h-4 w-4" /></div>
-                    <p className="text-xs font-medium text-muted">{s.label}</p>
-                  </div>
-                  <p className="mt-3 text-2xl font-bold text-ink">{s.value}</p>
-                  <p className={cn("mt-0.5 text-[11px] font-medium", subToneText[s.subTone])}>{s.sub}</p>
+            {stats.map((s) => (
+              <div key={s.label} className="rounded-2xl border border-border bg-card p-4 shadow-card">
+                <div className="flex items-center gap-2">
+                  <div className={cn("grid h-8 w-8 place-items-center rounded-lg", toneBg[s.tone])}><s.Icon className="h-4 w-4" /></div>
+                  <p className="text-xs font-medium text-muted">{s.label}</p>
                 </div>
-              );
-            })}
+                <p className="mt-3 text-2xl font-bold text-ink">{s.value}</p>
+                <p className="mt-0.5 text-[11px] font-medium text-faint">{s.sub}</p>
+              </div>
+            ))}
           </div>
 
           {/* Browse by Category */}
           <div>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="font-semibold text-ink">Browse by Category</h2>
-              <div className="flex items-center gap-2">
-                <Dropdown label="All Family Members" options={["All Family Members", "Amol", "Family"]} onSelect={() => {}} />
-                <button onClick={() => setActiveCat(null)} className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-600 hover:bg-violet-100">View All</button>
-              </div>
+              <button onClick={() => setActiveCat(null)} className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-600 hover:bg-violet-100">View All</button>
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {docCategories.map((c) => {
                 const Icon = catIconMap[c.icon] ?? FileText;
                 const active = activeCat === c.name;
                 return (
-                  <button key={c.name} onClick={() => setActiveCat(active ? null : c.name)}
+                  <button key={c.name} onClick={() => { setTab("all"); setActiveCat(active ? null : c.name); }}
                     className={cn("flex items-center gap-3 rounded-2xl border bg-card p-3 text-left shadow-card transition-colors hover:border-violet-200", active ? "border-violet-300 ring-1 ring-violet-200" : "border-border")}>
                     <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: `${c.color}1a`, color: c.color }}>
                       <Icon className="h-5 w-5" />
                     </div>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-ink">{c.name}</p>
-                      <p className="text-xs text-muted">{c.count}</p>
+                      <p className="text-xs text-muted">{categoryCount(c.name)} files</p>
                     </div>
                   </button>
                 );
@@ -282,18 +341,20 @@ export function DocumentsClient() {
           <div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border">
               <div className="flex gap-5">
-                {([["all", "All Documents"], ["folders", "Folders"], ["trash", "Trash"]] as const).map(([k, label]) => (
+                {([["all", "All Documents"], ["photos", "Photos"], ["folders", "Folders"], ["trash", "Trash"]] as const).map(([k, label]) => (
                   <button key={k} onClick={() => setTab(k)}
                     className={cn("relative pb-3 text-sm font-medium transition-colors", tab === k ? "text-violet-600" : "text-muted hover:text-ink")}>
-                    {label}{k === "trash" && trashed.length > 0 ? ` (${trashed.length})` : ""}
+                    {label}
+                    {k === "photos" && photos.length > 0 ? ` (${photos.length})` : ""}
+                    {k === "trash" && trashed.length > 0 ? ` (${trashed.length})` : ""}
                     {tab === k && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-violet-600" />}
                   </button>
                 ))}
               </div>
-              {tab === "all" && (
+              {(tab === "all" || tab === "photos") && (
                 <div className="flex items-center gap-2 pb-2">
                   <Dropdown label={`Sort by: ${sort}`} options={["Recently Added", "Name", "Size"]} onSelect={setSort} />
-                  <Dropdown label={typeFilter === "All Types" ? "Filter" : typeFilter} options={["All Types", "PDF", "JPG", "PNG", "DOCX"]} onSelect={setTypeFilter} />
+                  {tab === "all" && <Dropdown label={typeFilter === "All Types" ? "Filter" : typeFilter} options={["All Types", "PDF", "JPG", "PNG", "DOCX"]} onSelect={setTypeFilter} />}
                   <div className="flex items-center gap-1 rounded-xl border border-border bg-surface p-0.5">
                     <button onClick={() => setView("list")} className={cn("grid h-8 w-8 place-items-center rounded-lg", view === "list" ? "bg-violet-50 text-violet-600" : "text-faint")}><List className="h-4 w-4" /></button>
                     <button onClick={() => setView("grid")} className={cn("grid h-8 w-8 place-items-center rounded-lg", view === "grid" ? "bg-violet-50 text-violet-600" : "text-faint")}><LayoutGrid className="h-4 w-4" /></button>
@@ -333,24 +394,39 @@ export function DocumentsClient() {
               )
             ) : shown.length === 0 ? (
               <div className="mt-4 rounded-2xl border border-border bg-card p-14 text-center text-sm text-muted shadow-card">
-                No documents here. <button onClick={() => fileRef.current?.click()} className="font-medium text-violet-600 hover:underline">Upload one</button>
+                {loading ? "Loading…" : (
+                  <>
+                    {tab === "photos" ? "No photos yet. " : "No documents here. "}
+                    <button onClick={() => (tab === "photos" ? photoInputRef : docInputRef).current?.click()} className="font-medium text-violet-600 hover:underline">
+                      Upload {tab === "photos" ? "a photo" : "one"}
+                    </button>
+                  </>
+                )}
               </div>
             ) : view === "grid" ? (
               <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
-                {shown.map((d) => <DocCard key={d.id} doc={d} onDelete={() => removeDoc(d.id)} onCopy={() => flash("Link copied")} />)}
+                {shown.map((d) => (
+                  <DocCard key={d.id} doc={d} onDelete={() => removeDoc(d.id)} onDownload={() => download(d)} onShare={() => share(d)} onReplace={() => startReplace(d.id)} />
+                ))}
               </div>
             ) : (
-              <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+              <div className="mt-4 rounded-2xl border border-border bg-card shadow-card">
                 {shown.map((d) => {
                   const Icon = catIconFor(d.category);
                   return (
                     <div key={d.id} className="flex items-center gap-3 border-b border-border p-3 last:border-0 hover:bg-surface-2/50">
                       <div className="grid h-10 w-10 place-items-center rounded-lg" style={{ background: `${catColor(d.category)}1a`, color: catColor(d.category) }}><Icon className="h-5 w-5" /></div>
-                      <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-ink">{d.name}</p><p className="text-xs text-faint">{d.category}</p></div>
+                      <button onClick={() => d.url && window.open(d.url, "_blank")} className="min-w-0 flex-1 text-left"><p className="truncate text-sm font-medium text-ink hover:text-violet-600">{d.name}</p><p className="text-xs text-faint">{d.category}</p></button>
                       <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-semibold", badgeCls(d.ext))}>{d.ext}</span>
                       <span className="hidden text-xs text-muted sm:block">{d.size}</span>
                       <span className="hidden text-xs text-faint md:block">{d.date}</span>
-                      <Menu items={[{ label: "Download", icon: Download, onClick: () => { if (d.url) { const a=document.createElement("a"); a.href=d.url; a.download=d.name; a.target="_blank"; a.rel="noopener noreferrer"; a.click(); } } }, { label: "Share", icon: Share2, onClick: () => flash("Link copied") }, { label: "Delete", icon: Trash2, danger: true, onClick: () => removeDoc(d.id) }]} />
+                      <Menu items={[
+                        { label: "Open", icon: FileText, onClick: () => d.url && window.open(d.url, "_blank") },
+                        { label: "Download", icon: Download, onClick: () => download(d) },
+                        { label: "Replace file", icon: Replace, onClick: () => startReplace(d.id) },
+                        { label: "Share", icon: Share2, onClick: () => share(d) },
+                        { label: "Delete", icon: Trash2, danger: true, onClick: () => removeDoc(d.id) },
+                      ]} />
                     </div>
                   );
                 })}
@@ -358,9 +434,9 @@ export function DocumentsClient() {
             )}
 
             {/* Pagination */}
-            {tab === "all" && shown.length > 0 && (
+            {(tab === "all" || tab === "photos") && shown.length > 0 && (
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-xs text-muted">Showing {(safePage - 1) * PAGE_SIZE + 1} to {Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length} documents</p>
+                <p className="text-xs text-muted">Showing {(safePage - 1) * PAGE_SIZE + 1} to {Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length} {tab === "photos" ? "photos" : "documents"}</p>
                 <div className="flex items-center gap-1">
                   <PageBtn disabled={safePage === 1} onClick={() => setPage(safePage - 1)}>‹</PageBtn>
                   {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
@@ -382,27 +458,26 @@ export function DocumentsClient() {
               <div className="relative h-28 w-28 shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={storageOverview.breakdown} dataKey="value" innerRadius="72%" outerRadius="100%" paddingAngle={3} stroke="none" startAngle={90} endAngle={-270}>
-                      {storageOverview.breakdown.map((b, i) => <Cell key={i} fill={b.color} />)}
+                    <Pie data={usedBytes > 0 ? storageBreakdown : [{ name: "Empty", value: 1, color: "#e5e7eb" }]} dataKey="value" innerRadius="72%" outerRadius="100%" paddingAngle={3} stroke="none" startAngle={90} endAngle={-270}>
+                      {(usedBytes > 0 ? storageBreakdown : [{ name: "Empty", value: 1, color: "#e5e7eb" }]).map((b, i) => <Cell key={i} fill={b.color} />)}
                     </Pie>
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="text-sm font-bold text-ink">{storageOverview.usedLabel}</span>
-                  <span className="text-[10px] text-faint">of {storageOverview.totalLabel} Used</span>
+                  <span className="text-sm font-bold text-ink">{fmtSize(usedBytes)}</span>
+                  <span className="text-[10px] text-faint">Used</span>
                 </div>
               </div>
               <div className="flex-1 space-y-2">
-                {storageOverview.breakdown.map((b) => (
+                {storageBreakdown.map((b) => (
                   <div key={b.name} className="flex items-center gap-2 text-xs">
                     <span className="h-2.5 w-2.5 rounded-sm" style={{ background: b.color }} />
                     <span className="text-muted">{b.name}</span>
-                    <span className="ml-auto font-medium text-ink">{b.value} GB</span>
+                    <span className="ml-auto font-medium text-ink">{fmtSize(b.value)}</span>
                   </div>
                 ))}
               </div>
             </div>
-            <button className="mt-4 w-full rounded-xl bg-violet-50 py-2.5 text-sm font-semibold text-violet-600 hover:bg-violet-100">Manage Storage</button>
           </div>
 
           {/* Quick Actions */}
@@ -417,43 +492,32 @@ export function DocumentsClient() {
             </div>
           </div>
 
-          {/* Expiring Soon */}
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="font-semibold text-ink">Expiring Soon</h3>
-              <button className="text-xs font-medium text-violet-600 hover:underline">View All</button>
-            </div>
-            <div className="space-y-3">
-              {expiringDocs.map((e) => (
-                <div key={e.id} className="flex items-center gap-2.5">
-                  <div className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-lg", toneBg[e.tone])}><FileText className="h-4 w-4" /></div>
-                  <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-ink">{e.name}</p><p className="truncate text-xs text-faint">{e.date}</p></div>
-                  <span className={cn("shrink-0 text-xs font-semibold", subToneText[e.tone] ?? "text-muted")}>{e.days}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Recent Activity */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="font-semibold text-ink">Recent Activity</h3>
-              <button className="text-xs font-medium text-violet-600 hover:underline">View All</button>
-            </div>
-            <div className="space-y-3">
-              {docActivity.map((a) => (
-                <div key={a.id} className="flex items-center gap-2.5">
-                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg" style={{ background: `${a.color}1a`, color: a.color }}><FileText className="h-4 w-4" /></div>
-                  <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-ink">{a.name}</p><p className="truncate text-xs text-faint">{a.action}</p></div>
-                  <span className="shrink-0 text-xs text-faint">{a.time}</span>
-                </div>
-              ))}
-            </div>
+            <h3 className="mb-3 font-semibold text-ink">Recent Activity</h3>
+            {recentActivity.length === 0 ? (
+              <p className="py-6 text-center text-xs text-faint">No activity yet. Upload a document to get started.</p>
+            ) : (
+              <div className="space-y-3">
+                {recentActivity.map((a) => (
+                  <div key={a.id} className="flex items-center gap-2.5">
+                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg" style={{ background: `${catColor(a.category)}1a`, color: catColor(a.category) }}>
+                      {a.kind === "image" ? <ImageIcon className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+                    </div>
+                    <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-ink">{a.name}</p><p className="truncate text-xs text-faint">Uploaded · {a.category}</p></div>
+                    <span className="flex shrink-0 items-center gap-1 text-xs text-faint"><Clock className="h-3 w-3" />{relTime(docTime(a.id))}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </aside>
       </div>
 
-      <input ref={fileRef} type="file" multiple className="hidden" onChange={(e) => { onUpload(e.target.files); e.target.value = ""; }} />
+      {/* hidden inputs: separate document + photo + replace pickers */}
+      <input ref={docInputRef} type="file" multiple accept={DOC_ACCEPT} className="hidden" onChange={(e) => { onUpload(e.target.files, false); e.target.value = ""; }} />
+      <input ref={photoInputRef} type="file" multiple accept={IMAGE_ACCEPT} className="hidden" onChange={(e) => { onUpload(e.target.files, true); e.target.value = ""; }} />
+      <input ref={replaceInputRef} type="file" className="hidden" onChange={(e) => { onReplace(e.target.files); e.target.value = ""; }} />
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-white shadow-card-lg">
@@ -470,21 +534,15 @@ export function DocumentsClient() {
 }
 
 /* ------------------------------------------------------------------ doc card */
-function DocCard({ doc, onDelete, onCopy }: { doc: DocItem; onDelete: () => void; onCopy: () => void }) {
+function DocCard({ doc, onDelete, onDownload, onShare, onReplace }: {
+  doc: DocItem; onDelete: () => void; onDownload: () => void; onShare: () => void; onReplace: () => void;
+}) {
   const Icon = catIconFor(doc.category);
-  const handleDownload = () => {
-    if (!doc.url) return;
-    const a = document.createElement("a");
-    a.href = doc.url;
-    a.download = doc.name;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    a.click();
-  };
+  const open = () => doc.url && window.open(doc.url, "_blank");
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card transition-shadow hover:shadow-card-lg">
+    <div className="rounded-2xl border border-border bg-card shadow-card transition-shadow hover:shadow-card-lg">
       {/* preview */}
-      <div className="relative h-36 overflow-hidden">
+      <button onClick={open} className="relative block h-36 w-full overflow-hidden rounded-t-2xl">
         {doc.kind === "image" ? (
           doc.thumb || doc.url ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -499,7 +557,7 @@ function DocCard({ doc, onDelete, onCopy }: { doc: DocItem; onDelete: () => void
           </div>
         )}
         <span className={cn("absolute left-2 top-2 rounded px-1.5 py-0.5 text-[10px] font-semibold", badgeCls(doc.ext))}>{doc.ext}</span>
-      </div>
+      </button>
       {/* meta */}
       <div className="p-3">
         <div className="flex items-start justify-between gap-2">
@@ -508,8 +566,10 @@ function DocCard({ doc, onDelete, onCopy }: { doc: DocItem; onDelete: () => void
             <span className="mt-1 inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-medium" style={{ background: `${catColor(doc.category)}1a`, color: catColor(doc.category) }}>{doc.category}</span>
           </div>
           <Menu items={[
-            { label: "Download", icon: Download, onClick: handleDownload },
-            { label: "Share", icon: Share2, onClick: onCopy },
+            { label: "Open", icon: FileText, onClick: open },
+            { label: "Download", icon: Download, onClick: onDownload },
+            { label: "Replace file", icon: Replace, onClick: onReplace },
+            { label: "Share", icon: Share2, onClick: onShare },
             { label: "Delete", icon: Trash2, danger: true, onClick: onDelete },
           ]} />
         </div>

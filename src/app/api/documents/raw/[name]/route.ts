@@ -20,12 +20,13 @@ const MIME: Record<string, string> = {
 // Streams a stored document from the private Supabase bucket. Checks the live
 // path first, then the trash prefix (so trashed files still preview/restore).
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ name: string }> }
 ) {
   try {
     const { name } = await params;
     const filename = path.basename(decodeURIComponent(name)); // block traversal
+    const download = req.nextUrl.searchParams.get("dl") === "1";
     const sb = admin();
 
     let blob = (await sb.storage.from(DOC_BUCKET).download(filename)).data;
@@ -41,7 +42,7 @@ export async function GET(
     return new NextResponse(new Uint8Array(buf), {
       headers: {
         "Content-Type": type,
-        "Content-Disposition": `inline; filename="${filename}"`,
+        "Content-Disposition": `${download ? "attachment" : "inline"}; filename="${filename}"`,
         "Cache-Control": "private, max-age=0, must-revalidate",
       },
     });
