@@ -438,7 +438,7 @@ export type DocItem = {
   id: string;
   name: string;
   category: string;
-  ext: "PDF" | "JPG" | "PNG" | "DOCX";
+  ext: string;
   size: string;
   date: string;
   kind: "doc" | "image";

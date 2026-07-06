@@ -5,7 +5,7 @@ import {
   uid,
   fmtSize,
   getUploadDir,
-  getBaseUrl,
+  getFileUrl,
   sanitize,
   readManifest,
   writeManifest,
@@ -77,18 +77,17 @@ export async function POST(request: NextRequest) {
       const bytes = await file.arrayBuffer();
       await writeFile(filePath, Buffer.from(bytes));
 
-      const isImg = file.type.startsWith("image/");
-      const displayExt = ext.toUpperCase() as StoredDoc["ext"];
+      const isImg = ["jpg", "png", "webp"].includes(ext);
       const doc: StoredDoc = {
         id,
         name: baseName,
         filename,
         category,
-        ext: displayExt,
+        ext: ext.toUpperCase(),
         size: fmtSize(file.size),
         date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
         kind: isImg ? "image" : "doc",
-        url: `${getBaseUrl()}/${filename}`,
+        url: getFileUrl(filename),
       };
 
       saved.push(doc);

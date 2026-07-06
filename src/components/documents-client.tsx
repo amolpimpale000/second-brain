@@ -29,9 +29,12 @@ const subToneText: Record<string, string> = {
   green: "text-green-600", muted: "text-faint", violet: "text-violet-600",
 };
 const extBadge: Record<string, string> = {
-  PDF: "bg-red-50 text-red-600", JPG: "bg-blue-50 text-blue-600",
-  PNG: "bg-blue-50 text-blue-600", DOCX: "bg-indigo-50 text-indigo-600",
+  PDF: "bg-red-50 text-red-600", JPG: "bg-blue-50 text-blue-600", JPEG: "bg-blue-50 text-blue-600",
+  PNG: "bg-blue-50 text-blue-600", WEBP: "bg-blue-50 text-blue-600", DOCX: "bg-indigo-50 text-indigo-600",
+  DOC: "bg-indigo-50 text-indigo-600", XLSX: "bg-green-50 text-green-600", XLS: "bg-green-50 text-green-600",
+  TXT: "bg-slate-100 text-slate-600",
 };
+const badgeCls = (ext: string) => extBadge[ext] ?? "bg-slate-100 text-slate-600";
 const uid = () => Math.random().toString(36).slice(2, 9);
 
 function catColor(name: string) {
@@ -344,7 +347,7 @@ export function DocumentsClient() {
                     <div key={d.id} className="flex items-center gap-3 border-b border-border p-3 last:border-0 hover:bg-surface-2/50">
                       <div className="grid h-10 w-10 place-items-center rounded-lg" style={{ background: `${catColor(d.category)}1a`, color: catColor(d.category) }}><Icon className="h-5 w-5" /></div>
                       <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-ink">{d.name}</p><p className="text-xs text-faint">{d.category}</p></div>
-                      <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-semibold", extBadge[d.ext])}>{d.ext}</span>
+                      <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-semibold", badgeCls(d.ext))}>{d.ext}</span>
                       <span className="hidden text-xs text-muted sm:block">{d.size}</span>
                       <span className="hidden text-xs text-faint md:block">{d.date}</span>
                       <Menu items={[{ label: "Download", icon: Download, onClick: () => { if (d.url) { const a=document.createElement("a"); a.href=d.url; a.download=d.name; a.target="_blank"; a.rel="noopener noreferrer"; a.click(); } } }, { label: "Share", icon: Share2, onClick: () => flash("Link copied") }, { label: "Delete", icon: Trash2, danger: true, onClick: () => removeDoc(d.id) }]} />
@@ -495,7 +498,7 @@ function DocCard({ doc, onDelete, onCopy }: { doc: DocItem; onDelete: () => void
             <span className="rounded-md bg-white/80 px-2 py-0.5 text-[10px] font-semibold text-muted">{doc.ext} Document</span>
           </div>
         )}
-        <span className={cn("absolute left-2 top-2 rounded px-1.5 py-0.5 text-[10px] font-semibold", extBadge[doc.ext])}>{doc.ext}</span>
+        <span className={cn("absolute left-2 top-2 rounded px-1.5 py-0.5 text-[10px] font-semibold", badgeCls(doc.ext))}>{doc.ext}</span>
       </div>
       {/* meta */}
       <div className="p-3">
