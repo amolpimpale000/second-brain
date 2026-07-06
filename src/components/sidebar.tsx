@@ -9,11 +9,9 @@ import {
   TrendingUp,
   Landmark,
   Target,
-  Briefcase,
   StickyNote,
   CheckSquare,
   KeyRound,
-  BarChart3,
   Settings,
   Sparkles,
   ChevronsLeft,
@@ -38,7 +36,6 @@ type NavSection = {
 const nav: NavSection[] = [
   { section: "Overview", items: [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/analytics", label: "Business Analytics", icon: BarChart3 },
   ]},
   { section: "Money", items: [
     { href: "/finances", label: "Personal Finances", icon: Wallet },
@@ -47,7 +44,6 @@ const nav: NavSection[] = [
     { href: "/goals", label: "Savings Goals", icon: Target },
   ]},
   { section: "Business", items: [
-    { href: "/businesses", label: "Journals", icon: Briefcase },
     { href: "/journal-management", label: "Journal Management", icon: BookOpen,
       children: [
         { href: "/journals/ijps", label: "IJPS" },

@@ -638,7 +638,7 @@ function FinancialHealth() {
           ))}
         </div>
       </div>
-      <Link href="/analytics" className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-brand hover:underline">
+      <Link href="/finances" className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-brand hover:underline">
         View Full Report <ArrowRight className="h-3 w-3" />
       </Link>
     </Card>
@@ -797,7 +797,7 @@ function TotalNetWorth() {
               <p className="text-xs text-muted">Monthly Growth</p>
               <p className="text-sm font-semibold text-green-600">+₹ 42,500</p>
             </div>
-            <Link href="/analytics" className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline">
+            <Link href="/finances" className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline">
               Details <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
