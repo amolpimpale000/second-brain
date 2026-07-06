@@ -84,7 +84,7 @@ function Card({ children, className }: { children: React.ReactNode; className?: 
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border bg-card p-5 shadow-[0_2px_8px_rgba(16,24,40,0.04),0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-200 hover:shadow-[0_8px_24px_rgba(16,24,40,0.08)] hover:-translate-y-0.5",
+        "rounded-2xl border border-border bg-card p-4 shadow-[0_2px_8px_rgba(16,24,40,0.04),0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-200 hover:shadow-[0_8px_24px_rgba(16,24,40,0.08)] hover:-translate-y-0.5",
         className
       )}
     >
@@ -95,8 +95,8 @@ function Card({ children, className }: { children: React.ReactNode; className?: 
 
 function Head({ title, right }: { title: string; right?: React.ReactNode }) {
   return (
-    <div className="mb-4 flex items-center justify-between">
-      <h3 className="text-[15px] font-bold tracking-tight text-ink">{title}</h3>
+    <div className="mb-3 flex items-center justify-between">
+      <h3 className="text-[15px] font-semibold tracking-tight text-ink">{title}</h3>
       {right}
     </div>
   );
@@ -260,10 +260,10 @@ function KpiCards() {
               </div>
               <p className="text-[11px] font-medium text-muted leading-tight">{k.label}</p>
             </div>
-            <p className="mt-2.5 text-[18px] font-bold leading-none text-ink">₹ {k.value.toLocaleString("en-IN")}</p>
+            <p className="mt-2.5 text-[18px] font-semibold leading-none text-ink">₹ {k.value.toLocaleString("en-IN")}</p>
             <div className="mt-2 flex items-center gap-1">
               {up ? <ArrowUpRight className="h-3 w-3 text-green-500" /> : <ArrowDownRight className="h-3 w-3 text-red-500" />}
-              <span className={cn("text-[10px] font-semibold", up ? "text-green-500" : "text-red-500")}>{Math.abs(k.delta)}%</span>
+              <span className={cn("text-[10px] font-medium", up ? "text-green-500" : "text-red-500")}>{Math.abs(k.delta)}%</span>
               <span className="text-[10px] text-faint">{k.vs}</span>
             </div>
             <div className="-mx-1.5 mt-1.5">
@@ -357,24 +357,24 @@ function SavingsGoals() {
   return (
     <Card>
       <Head title="Savings Goals" right={<ViewAll href="/goals" />} />
-      <div className="space-y-4">
+      <div className="space-y-3">
         {savingsGoals.map((g) => {
           const GI = goalIcon[g.icon] ?? PiggyBank;
           return (
             <div key={g.id} className="flex items-start gap-3">
               <div
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px]"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px]"
                 style={{ background: `linear-gradient(135deg, ${g.color}20, ${g.color}08)` }}
               >
-                <GI className="h-4 w-4" style={{ color: g.color }} />
+                <GI className="h-3.5 w-3.5" style={{ color: g.color }} />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
-                  <p className="text-[13px] font-semibold text-ink">{g.name}</p>
-                  <span className="text-[12px] font-bold text-ink">{g.pct}%</span>
+                  <p className="text-[12px] font-medium text-ink">{g.name}</p>
+                  <span className="text-[11px] font-semibold text-ink">{g.pct}%</span>
                 </div>
-                <p className="mt-0.5 text-[11px] text-muted">₹ {g.saved.toLocaleString("en-IN")} of ₹ {g.target.toLocaleString("en-IN")}</p>
-                <div className="mt-2 h-2 w-full rounded-full bg-surface-2 overflow-hidden">
+                <p className="mt-0.5 text-[10px] text-muted">₹ {g.saved.toLocaleString("en-IN")} of ₹ {g.target.toLocaleString("en-IN")}</p>
+                <div className="mt-1.5 h-1.5 w-full rounded-full bg-surface-2 overflow-hidden">
                   <div className="h-full rounded-full" style={{ width: `${g.pct}%`, background: `linear-gradient(90deg, ${g.color}, ${g.color}cc)` }} />
                 </div>
               </div>
@@ -391,7 +391,7 @@ function AddButton({ label, onClick }: { label: string; onClick?: () => void }) 
   return (
     <button
       onClick={onClick}
-      className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-surface-2/50 py-2.5 text-[11px] font-semibold text-muted hover:border-brand/40 hover:bg-brand-soft/30 hover:text-brand-ink transition-all"
+      className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-surface-2/50 py-2 text-[11px] font-medium text-muted hover:border-brand/40 hover:bg-brand-soft/30 hover:text-brand-ink transition-all"
     >
       <Plus className="h-3.5 w-3.5" /> {label}
     </button>
@@ -409,16 +409,16 @@ function RecentTransactions() {
           const Icon = s.icon;
           const credit = t.type === "credit";
           return (
-            <div key={t.id} className="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-surface-2/50 transition-colors -mx-2">
-              <div className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-[10px]", s.bg)}>
-                <Icon className={cn("h-[18px] w-[18px]", s.fg)} />
+            <div key={t.id} className="flex items-center gap-3 rounded-lg px-1.5 py-1.5 hover:bg-surface-2/50 transition-colors -mx-1.5">
+              <div className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-[10px]", s.bg)}>
+                <Icon className={cn("h-4 w-4", s.fg)} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-semibold text-ink">{t.name}</p>
+                <p className="text-[12px] font-medium text-ink">{t.name}</p>
                 <p className="text-[10px] text-muted">{t.category}</p>
               </div>
               <div className="text-right shrink-0">
-                <p className={cn("text-[13px] font-bold", credit ? "text-green-600" : "text-red-500")}>
+                <p className={cn("text-[12px] font-semibold", credit ? "text-green-600" : "text-red-500")}>
                   {credit ? "+" : "-"} ₹ {t.amount.toLocaleString("en-IN")}
                 </p>
                 <p className="text-[10px] text-faint">{t.date}</p>
@@ -435,25 +435,25 @@ function BudgetVsActual() {
   return (
     <Card>
       <Head title="Budget vs Actual" right={<MonthDropdown />} />
-      <div className="mb-3 grid grid-cols-[1fr_58px_58px_54px] gap-1 text-[10px] font-semibold uppercase tracking-wide text-faint">
+      <div className="mb-2 grid grid-cols-[1fr_52px_52px_48px] gap-1 text-[10px] font-medium uppercase tracking-wide text-faint">
         <span>Category</span><span className="text-right">Budget</span><span className="text-right">Actual</span><span className="text-right">Status</span>
       </div>
-      <div className="space-y-3">
+      <div className="space-y-2">
         {budgetVsActual.map((b) => (
-          <div key={b.category} className="grid grid-cols-[1fr_58px_58px_54px] items-center gap-1">
-            <span className="truncate text-[12px] font-semibold text-ink">{b.category}</span>
-            <span className="text-right text-[11px] text-muted">₹ {b.budget.toLocaleString("en-IN")}</span>
-            <span className="text-right text-[11px] font-bold text-ink">₹ {b.actual.toLocaleString("en-IN")}</span>
-            <div className="flex items-center justify-end gap-1.5">
-              <div className="h-1.5 w-8 overflow-hidden rounded-full bg-surface-2">
+          <div key={b.category} className="grid grid-cols-[1fr_52px_52px_48px] items-center gap-1">
+            <span className="truncate text-[11px] font-medium text-ink">{b.category}</span>
+            <span className="text-right text-[10px] text-muted">₹ {b.budget.toLocaleString("en-IN")}</span>
+            <span className="text-right text-[10px] font-semibold text-ink">₹ {b.actual.toLocaleString("en-IN")}</span>
+            <div className="flex items-center justify-end gap-1">
+              <div className="h-1.5 w-6 overflow-hidden rounded-full bg-surface-2">
                 <div className="h-full rounded-full bg-gradient-to-r from-green-500 to-emerald-400" style={{ width: `${b.pct}%` }} />
               </div>
-              <span className="w-[26px] text-right text-[10px] font-bold text-muted">{b.pct}%</span>
+              <span className="w-[22px] text-right text-[10px] font-medium text-muted">{b.pct}%</span>
             </div>
           </div>
         ))}
       </div>
-      <Link href="/finances" className="mt-4 inline-flex items-center gap-1 text-[11px] font-semibold text-brand hover:underline">
+      <Link href="/finances" className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-brand hover:underline">
         View Full Budget Report <ArrowRight className="h-3 w-3" />
       </Link>
     </Card>
@@ -464,20 +464,20 @@ function TopSpending() {
   return (
     <Card>
       <Head title="Top Spending Categories" right={<MonthDropdown />} />
-      <div className="space-y-3">
+      <div className="space-y-2">
         {topSpending.map((c) => {
           const s = spendIcon[c.name] ?? { icon: LayoutGrid, bg: "bg-slate-100", fg: "text-slate-500" };
           const Icon = s.icon;
           return (
-            <div key={c.name} className="flex items-center gap-3">
-              <div className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-[10px]", s.bg)}>
-                <Icon className={cn("h-[18px] w-[18px]", s.fg)} />
+            <div key={c.name} className="flex items-center gap-2.5">
+              <div className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-[10px]", s.bg)}>
+                <Icon className={cn("h-4 w-4", s.fg)} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-semibold text-ink">{c.name}</p>
+                <p className="text-[12px] font-medium text-ink">{c.name}</p>
                 <p className="text-[10px] text-muted">{c.pct}% of total</p>
               </div>
-              <span className="text-[13px] font-bold text-ink">₹ {c.value.toLocaleString("en-IN")}</span>
+              <span className="text-[12px] font-semibold text-ink">₹ {c.value.toLocaleString("en-IN")}</span>
             </div>
           );
         })}
@@ -490,22 +490,22 @@ function AccountsOverview() {
   return (
     <Card>
       <Head title="Accounts Overview" right={<ViewAll href="/finances" />} />
-      <div className="space-y-3">
+      <div className="space-y-2">
         {accounts.map((a) => {
           const Icon = a.icon === "cash" ? Wallet : Landmark;
           return (
-            <div key={a.id} className="flex items-center gap-3 rounded-xl p-2 -mx-2 hover:bg-surface-2/50 transition-colors">
+            <div key={a.id} className="flex items-center gap-2.5 rounded-lg p-1.5 -mx-1.5 hover:bg-surface-2/50 transition-colors">
               <div
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-full"
-                style={{ background: `linear-gradient(135deg, ${a.color}20, ${a.color}08)` }}
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-full"
+                style={{ background: `linear-gradient(135deg, ${a.color}18, ${a.color}06)` }}
               >
-                <Icon className="h-[18px] w-[18px]" style={{ color: a.color }} />
+                <Icon className="h-4 w-4" style={{ color: a.color }} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[12px] font-semibold text-ink">{a.name}</p>
+                <p className="text-[12px] font-medium text-ink">{a.name}</p>
                 {a.type && <p className="text-[10px] text-muted">{a.type}</p>}
               </div>
-              <p className="shrink-0 text-[13px] font-bold text-ink">₹ {a.balance.toLocaleString("en-IN")}</p>
+              <p className="shrink-0 text-[12px] font-semibold text-ink">₹ {a.balance.toLocaleString("en-IN")}</p>
             </div>
           );
         })}
@@ -519,20 +519,20 @@ function UpcomingBills() {
   return (
     <Card>
       <Head title="Upcoming Bills & Subscriptions" right={<ViewAll href="/finances" />} />
-      <div className="space-y-3">
+      <div className="space-y-2">
         {upcomingBills.map((b) => {
           const Icon = billIcon[b.icon] ?? Receipt;
           return (
-            <div key={b.id} className="flex items-center gap-3 rounded-xl p-2 -mx-2 hover:bg-surface-2/50 transition-colors">
+            <div key={b.id} className="flex items-center gap-2.5 rounded-lg p-1.5 -mx-1.5 hover:bg-surface-2/50 transition-colors">
               <div
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px]"
-                style={{ background: `linear-gradient(135deg, ${b.color}18, ${b.color}06)` }}
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px]"
+                style={{ background: `linear-gradient(135deg, ${b.color}16, ${b.color}05)` }}
               >
-                <Icon className="h-[18px] w-[18px]" style={{ color: b.color }} />
+                <Icon className="h-4 w-4" style={{ color: b.color }} />
               </div>
-              <p className="flex-1 truncate text-[12px] font-semibold text-ink">{b.name}</p>
+              <p className="flex-1 truncate text-[12px] font-medium text-ink">{b.name}</p>
               <div className="shrink-0 text-right">
-                <p className="text-[13px] font-bold text-ink">₹ {b.amount.toLocaleString("en-IN")}</p>
+                <p className="text-[12px] font-semibold text-ink">₹ {b.amount.toLocaleString("en-IN")}</p>
                 <p className="text-[10px] text-faint">{b.date}</p>
               </div>
             </div>
@@ -547,37 +547,37 @@ function LoansOverview() {
   return (
     <Card>
       <Head title="Loans Overview" right={<ViewAll href="/loans" />} />
-      <div className="space-y-4">
+      <div className="space-y-3">
         {loans.map((l) => {
           const Icon = l.icon === "home" ? Home : User;
           const paidPct = Math.round(((l.principal - l.remaining) / l.principal) * 100);
           return (
             <div key={l.id}>
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-2.5">
                 <div
-                  className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px]"
-                  style={{ background: `linear-gradient(135deg, ${l.color}18, ${l.color}06)` }}
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px]"
+                  style={{ background: `linear-gradient(135deg, ${l.color}16, ${l.color}05)` }}
                 >
-                  <Icon className="h-5 w-5" style={{ color: l.color }} />
+                  <Icon className="h-4 w-4" style={{ color: l.color }} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold text-ink">{l.name}</p>
-                  <p className="text-[15px] font-bold text-ink">₹ {l.principal.toLocaleString("en-IN")}</p>
+                  <p className="text-[12px] font-medium text-ink">{l.name}</p>
+                  <p className="text-[14px] font-semibold text-ink">₹ {l.principal.toLocaleString("en-IN")}</p>
                   <p className="text-[10px] text-muted">Interest Rate {l.rate}%</p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-[10px] text-muted">Remaining</p>
-                  <p className="text-[13px] font-bold text-ink">₹ {l.remaining.toLocaleString("en-IN")}</p>
+                  <p className="text-[12px] font-semibold text-ink">₹ {l.remaining.toLocaleString("en-IN")}</p>
                 </div>
               </div>
-              <div className="mt-2.5 h-2 w-full rounded-full bg-surface-2 overflow-hidden">
+              <div className="mt-2 h-1.5 w-full rounded-full bg-surface-2 overflow-hidden">
                 <div className="h-full rounded-full bg-gradient-to-r from-green-500 to-emerald-400" style={{ width: `${paidPct}%` }} />
               </div>
             </div>
           );
         })}
       </div>
-      <Link href="/loans" className="mt-4 inline-flex items-center gap-1 text-[11px] font-semibold text-brand hover:underline">
+      <Link href="/loans" className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-brand hover:underline">
         View All Loans <ArrowRight className="h-3 w-3" />
       </Link>
     </Card>
@@ -588,19 +588,19 @@ function MoneyDueToOthers() {
   return (
     <Card>
       <Head title="Money due to others" right={<ViewAll href="/finances" />} />
-      <div className="space-y-2">
+      <div className="space-y-1">
         {iOwe.map((o) => (
-          <div key={o.id} className="flex items-center gap-3 rounded-xl p-2 -mx-2 hover:bg-surface-2/50 transition-colors">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-emerald-50 to-emerald-100/50">
+          <div key={o.id} className="flex items-center gap-2.5 rounded-lg p-1.5 -mx-1.5 hover:bg-surface-2/50 transition-colors">
+            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-emerald-50 to-emerald-100/50">
               <Check className="h-4 w-4 text-emerald-600" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-semibold text-ink">{o.name}</p>
+              <p className="text-[12px] font-medium text-ink">{o.name}</p>
               <p className="text-[10px] text-muted">Due on {o.due}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <p className="text-[13px] font-bold text-ink">₹ {o.amount.toLocaleString("en-IN")}</p>
-              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-600">{o.status}</span>
+              <p className="text-[12px] font-semibold text-ink">₹ {o.amount.toLocaleString("en-IN")}</p>
+              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600">{o.status}</span>
             </div>
           </div>
         ))}
@@ -614,22 +614,77 @@ function FinancialHealth() {
   return (
     <Card>
       <Head title="Financial Health Score" />
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <HealthGauge score={healthScore.score} max={healthScore.max} />
-        <div className="flex-1 space-y-2.5">
+        <div className="flex-1 space-y-2">
           {healthScore.metrics.map((m) => (
             <div key={m.name} className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-1.5 text-[11px] text-muted">
                 <CheckCircle2 className="h-3.5 w-3.5 text-green-500" /> {m.name}
               </span>
-              <span className={cn("text-[11px] font-bold", m.status === "Excellent" ? "text-green-600" : "text-amber-500")}>{m.status}</span>
+              <span className={cn("text-[11px] font-semibold", m.status === "Excellent" ? "text-green-600" : "text-amber-500")}>{m.status}</span>
             </div>
           ))}
         </div>
       </div>
-      <Link href="/analytics" className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-brand hover:underline">
+      <Link href="/analytics" className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-brand hover:underline">
         View Full Report <ArrowRight className="h-3 w-3" />
       </Link>
+    </Card>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Total Net Worth premium card
+   ═══════════════════════════════════════════════════════════════════════════ */
+function TotalNetWorth() {
+  const netWorth = kpis.find((k) => k.label === "Net Worth")!;
+  const assets = 2202950;
+  const liabilities = 327000;
+  return (
+    <Card className="!p-0 overflow-hidden">
+      <div className="flex flex-col md:flex-row">
+        <div className="flex-1 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 text-white">
+          <div className="flex items-center gap-2">
+            <div className="grid h-8 w-8 place-items-center rounded-lg bg-white/10">
+              <Home className="h-4 w-4 text-brand" />
+            </div>
+            <span className="text-sm font-medium text-slate-300">Total Net Worth</span>
+          </div>
+          <p className="mt-3 text-3xl font-semibold tracking-tight">₹ {netWorth.value.toLocaleString("en-IN")}</p>
+          <div className="mt-2 flex items-center gap-2 text-sm">
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-300">
+              <ArrowUpRight className="h-3 w-3" /> {netWorth.delta}%
+            </span>
+            <span className="text-slate-400">{netWorth.vs}</span>
+          </div>
+          <div className="mt-5 grid grid-cols-2 gap-4">
+            <div className="rounded-xl bg-white/5 p-3">
+              <p className="text-xs text-slate-400">Total Assets</p>
+              <p className="mt-1 text-base font-semibold">₹ {assets.toLocaleString("en-IN")}</p>
+            </div>
+            <div className="rounded-xl bg-white/5 p-3">
+              <p className="text-xs text-slate-400">Total Liabilities</p>
+              <p className="mt-1 text-base font-semibold">₹ {liabilities.toLocaleString("en-IN")}</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex-1 p-6">
+          <p className="text-sm font-medium text-muted">Net Worth Trend</p>
+          <div className="mt-2 h-[120px]">
+            <Spark data={netWorth.spark} color="#22c55e" />
+          </div>
+          <div className="mt-4 flex items-center justify-between rounded-xl bg-surface-2/60 p-3">
+            <div>
+              <p className="text-xs text-muted">Monthly Growth</p>
+              <p className="text-sm font-semibold text-green-600">+₹ 42,500</p>
+            </div>
+            <Link href="/analytics" className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline">
+              Details <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+        </div>
+      </div>
     </Card>
   );
 }
@@ -641,14 +696,15 @@ export function FinancesClient() {
   return (
     <div className="animate-fade-up space-y-4">
       <KpiCards />
+      <TotalNetWorth />
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_1fr_300px]">
+      <div className="grid items-start gap-4 xl:grid-cols-[1fr_1fr_300px]">
         <CashFlow />
         <ExpenseBreakdown />
         <SavingsGoals />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_1fr_1fr_300px]">
+      <div className="grid items-start gap-4 xl:grid-cols-[1fr_1fr_1fr_300px]">
         <RecentTransactions />
         <BudgetVsActual />
         <TopSpending />
@@ -658,7 +714,7 @@ export function FinancesClient() {
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid items-start gap-4 xl:grid-cols-3">
         <LoansOverview />
         <MoneyDueToOthers />
         <FinancialHealth />
