@@ -6,10 +6,6 @@ import { existsSync } from "fs";
 const MANIFEST = "documents.json";
 const TRASH_DIR = ".trashed";
 
-// Hostinger deployment: files must live in <domain>/public_html/Documents so they
-// (a) show up in the File Manager and (b) survive every git redeploy of the app.
-const HOSTINGER_DOMAIN = "lightgreen-locust-357153.hostingersite.com";
-
 export type StoredDoc = {
   id: string;
   name: string;
@@ -40,19 +36,20 @@ export function fmtSize(bytes: number) {
  */
 function candidateDirs(): string[] {
   const cwd = process.cwd().replace(/\\/g, "/");
+  const home = (process.env.HOME || os.homedir()).replace(/\\/g, "/");
   const list: string[] = [];
 
   // App launched from inside public_html (…/public_html or …/public_html/sub).
   const m = cwd.match(/^(.*\/public_html)(\/.*)?$/);
   if (m) list.push(path.join(m[1], "Documents"));
 
+  // Hostinger managed Next.js: the app runs from <domain>/nodejs and the web root
+  // is its sibling <domain>/public_html. HOME is set to the <domain> dir.
+  list.push(path.join(cwd, "..", "public_html", "Documents"));
+  list.push(path.join(home, "public_html", "Documents"));
+
   // public_html sitting directly under the cwd.
   list.push(path.join(cwd, "public_html", "Documents"));
-
-  // Standard Hostinger layout: /home/<user>/domains/<domain>/public_html.
-  const home = process.env.HOME || os.homedir();
-  const domain = process.env.APP_DOMAIN || HOSTINGER_DOMAIN;
-  if (home) list.push(path.join(home, "domains", domain, "public_html", "Documents"));
 
   return list;
 }
