@@ -43,7 +43,7 @@ export const recentTxns = [
   { id: "t2", name: "BigBasket", category: "Groceries", amount: 1250, type: "debit", date: "30 May 2025", icon: "grocery" },
   { id: "t3", name: "Uber Ride", category: "Transport", amount: 320, type: "debit", date: "29 May 2025", icon: "transport" },
   { id: "t4", name: "Electricity Bill", category: "Utilities", amount: 2450, type: "debit", date: "28 May 2025", icon: "bill" },
-  { id: "t5", name: "Netflix", category: "Entertainment", amount: 649, type: "debit", date: "27 May 2025", icon: "entertainment" },
+  { id: "t5", name: "Netflix", category: "Entertainment", amount: 649, type: "debit", date: "27 May 2025", icon: "netflix" },
 ];
 
 /* ── Budget vs actual ─────────────────────────────────────────────────────── */
@@ -75,9 +75,9 @@ export const accounts = [
 
 /* ── Upcoming bills ───────────────────────────────────────────────────────── */
 export const upcomingBills = [
-  { id: "b1", name: "Netflix Subscription", amount: 649, date: "05 Jun 2025", icon: "netflix", color: "#e50914" },
-  { id: "b2", name: "Amazon Prime", amount: 179, date: "07 Jun 2025", icon: "amazon", color: "#ff9900" },
-  { id: "b3", name: "Spotify Premium", amount: 119, date: "15 Jun 2025", icon: "spotify", color: "#1db954" },
+  { id: "b1", name: "Netflix Subscription", amount: 649, date: "05 Jun 2025", icon: "netflix", color: "#e50914", brand: true },
+  { id: "b2", name: "Amazon Prime", amount: 179, date: "07 Jun 2025", icon: "amazon", color: "#ff9900", brand: true },
+  { id: "b3", name: "Spotify Premium", amount: 119, date: "15 Jun 2025", icon: "spotify", color: "#1db954", brand: true },
   { id: "b4", name: "Mobile Postpaid", amount: 799, date: "20 Jun 2025", icon: "mobile", color: "#3b82f6" },
   { id: "b5", name: "Internet Bill", amount: 999, date: "25 Jun 2025", icon: "internet", color: "#6366f1" },
 ];
