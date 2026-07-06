@@ -52,11 +52,13 @@ let _client: SupabaseClient | null = null;
 
 export function admin(): SupabaseClient {
   if (_client) return _client;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  // At server runtime Hostinger exposes the project URL as SUPABASE_URL;
+  // NEXT_PUBLIC_* names only exist at build time (inlined into the bundle).
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {
     throw new Error(
-      "Document storage is not configured: set SUPABASE_SERVICE_ROLE_KEY in the environment."
+      `Document storage is not configured (url:${!!url} key:${!!key}). Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.`
     );
   }
   _client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
