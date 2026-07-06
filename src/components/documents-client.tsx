@@ -135,6 +135,7 @@ export function DocumentsClient() {
   const photoInputRef = useRef<HTMLInputElement>(null);
   const replaceInputRef = useRef<HTMLInputElement>(null);
   const replacingId = useRef<string | null>(null);
+  const directUploadCat = useRef<string | null>(null);
 
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(null), 2200); };
 
@@ -254,9 +255,15 @@ export function DocumentsClient() {
 
   const handleDocFiles = (files: FileList | null) => {
     if (!files?.length) return;
-    setPendingFiles(files);
-    setPendingPhoto(false);
-    setModal("upload-category");
+    const direct = directUploadCat.current;
+    directUploadCat.current = null;
+    if (direct) {
+      onUpload(files, false, direct);
+    } else {
+      setPendingFiles(files);
+      setPendingPhoto(false);
+      setModal("upload-category");
+    }
   };
 
   const handlePhotoFiles = (files: FileList | null) => {
@@ -482,7 +489,7 @@ export function DocumentsClient() {
                 )}
                 {tab === "all" && activeCat && shown.length > 0 && (
                   <button
-                    onClick={() => docInputRef.current?.click()}
+                    onClick={() => { directUploadCat.current = activeCat; docInputRef.current?.click(); }}
                     className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card p-4 text-sm font-medium text-violet-600 shadow-card transition-colors hover:bg-violet-50"
                   >
                     <Plus className="h-6 w-6" />

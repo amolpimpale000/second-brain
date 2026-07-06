@@ -85,9 +85,9 @@ export function Modal({
   const width = { sm: "max-w-md", md: "max-w-lg", lg: "max-w-2xl", xl: "max-w-4xl" }[size];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-6">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 sm:p-6">
       <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
-      <div className={cn("relative my-8 w-full rounded-2xl border border-border bg-card shadow-card-lg animate-fade-up", width)}>
+      <div className={cn("relative my-auto max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-border bg-card shadow-card-lg animate-fade-up", width)}>
         <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
           <div>
             <h3 className="font-semibold text-ink">{title}</h3>
