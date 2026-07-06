@@ -661,13 +661,13 @@ function Modal({
   children: React.ReactNode;
 }) {
   useEffect(() => {
-    if (open) {
-      const original = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = original;
-      };
-    }
+    if (typeof window === "undefined" || !open) return;
+    const html = document.documentElement;
+    const original = html.style.overflow;
+    html.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = original;
+    };
   }, [open]);
 
   if (!open) return null;
