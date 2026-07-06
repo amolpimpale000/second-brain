@@ -5,7 +5,7 @@ import {
   FolderOpen, LayoutGrid, HardDrive, Plus, FileText, Award, GraduationCap,
   CreditCard, BadgeCheck, Image as ImageIcon, ShieldCheck, User, Upload, FolderPlus, ScanLine,
   Share2, MoreVertical, Download, Trash2, List, RotateCcw, Check, Folder, Users,
-  ImagePlus, FileUp, Replace, Clock,
+  ImagePlus, FileUp, Replace, Clock, X,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import type { DocItem } from "@/lib/data";
@@ -122,9 +122,11 @@ export function DocumentsClient() {
   const [view, setView] = useState<"grid" | "list">("grid");
   const [page, setPage] = useState(1);
   const [toast, setToast] = useState<string | null>(null);
-  const [modal, setModal] = useState<null | "category" | "folder">(null);
+  const [modal, setModal] = useState<null | "category" | "folder" | "rename">(null);
+  const [renamingDoc, setRenamingDoc] = useState<DocItem | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const replaceInputRef = useRef<HTMLInputElement>(null);
@@ -214,6 +216,18 @@ export function DocumentsClient() {
       if (!res.ok) throw new Error("Purge failed");
       flash("Deleted permanently");
     } catch (err) { console.error(err); flash("Delete failed"); if (prev) setDocs((p) => [...p, prev]); }
+  };
+
+  const renameDoc = async (id: string, newName: string) => {
+    const prev = docs.find((d) => d.id === id);
+    setDocs((p) => p.map((d) => (d.id === id ? { ...d, name: newName.trim() } : d)));
+    try {
+      const res = await fetch("/api/documents/rename", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, name: newName }) });
+      if (!res.ok) throw new Error("Rename failed");
+      const data = await res.json();
+      if (data.doc) setDocs((p) => p.map((d) => (d.id === id ? data.doc : d)));
+      flash("Renamed successfully");
+    } catch (err) { console.error(err); flash("Rename failed"); if (prev) setDocs((p) => p.map((d) => (d.id === id ? prev : d))); }
   };
 
   const onUpload = async (files: FileList | null, asPhoto: boolean) => {
@@ -404,10 +418,30 @@ export function DocumentsClient() {
                 )}
               </div>
             ) : view === "grid" ? (
-              <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
-                {shown.map((d) => (
-                  <DocCard key={d.id} doc={d} onDelete={() => removeDoc(d.id)} onDownload={() => download(d)} onShare={() => share(d)} onReplace={() => startReplace(d.id)} />
-                ))}
+              <div className={cn("mt-4 grid gap-4", tab === "photos" ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5" : "grid-cols-2 lg:grid-cols-3 xl:grid-cols-4")}>
+                {shown.map((d) =>
+                  tab === "photos" ? (
+                    <PhotoCard
+                      key={d.id}
+                      doc={d}
+                      onPreview={() => setPreviewUrl(d.url ?? null)}
+                      onDelete={() => removeDoc(d.id)}
+                      onRename={() => { setRenamingDoc(d); setModal("rename"); }}
+                      onDownload={() => download(d)}
+                      onShare={() => share(d)}
+                    />
+                  ) : (
+                    <DocCard
+                      key={d.id}
+                      doc={d}
+                      onDelete={() => removeDoc(d.id)}
+                      onDownload={() => download(d)}
+                      onShare={() => share(d)}
+                      onReplace={() => startReplace(d.id)}
+                      onRename={() => { setRenamingDoc(d); setModal("rename"); }}
+                    />
+                  )
+                )}
               </div>
             ) : (
               <div className="mt-4 rounded-2xl border border-border bg-card shadow-card">
@@ -423,6 +457,7 @@ export function DocumentsClient() {
                       <Menu items={[
                         { label: "Open", icon: FileText, onClick: () => d.url && window.open(d.url, "_blank") },
                         { label: "Download", icon: Download, onClick: () => download(d) },
+                        { label: "Rename", icon: FileText, onClick: () => { setRenamingDoc(d); setModal("rename"); } },
                         { label: "Replace file", icon: Replace, onClick: () => startReplace(d.id) },
                         { label: "Share", icon: Share2, onClick: () => share(d) },
                         { label: "Delete", icon: Trash2, danger: true, onClick: () => removeDoc(d.id) },
@@ -529,13 +564,23 @@ export function DocumentsClient() {
       {modal === "folder" && (
         <AddFolderModal onClose={() => setModal(null)} onCreate={(name) => { setFolders((p) => [...p, { id: uid(), name, count: 0, color: "#8b5cf6" }]); setModal(null); setTab("folders"); flash("Folder created"); }} />
       )}
+      {modal === "rename" && renamingDoc && (
+        <RenameModal
+          initial={renamingDoc.name}
+          onClose={() => { setModal(null); setRenamingDoc(null); }}
+          onDone={(name) => { renameDoc(renamingDoc.id, name); setModal(null); setRenamingDoc(null); }}
+        />
+      )}
+      {previewUrl && (
+        <ImagePreview url={previewUrl} onClose={() => setPreviewUrl(null)} />
+      )}
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ doc card */
-function DocCard({ doc, onDelete, onDownload, onShare, onReplace }: {
-  doc: DocItem; onDelete: () => void; onDownload: () => void; onShare: () => void; onReplace: () => void;
+function DocCard({ doc, onDelete, onDownload, onShare, onReplace, onRename }: {
+  doc: DocItem; onDelete: () => void; onDownload: () => void; onShare: () => void; onReplace: () => void; onRename: () => void;
 }) {
   const Icon = catIconFor(doc.category);
   const open = () => doc.url && window.open(doc.url, "_blank");
@@ -568,6 +613,7 @@ function DocCard({ doc, onDelete, onDownload, onShare, onReplace }: {
           <Menu items={[
             { label: "Open", icon: FileText, onClick: open },
             { label: "Download", icon: Download, onClick: onDownload },
+            { label: "Rename", icon: FileText, onClick: onRename },
             { label: "Replace file", icon: Replace, onClick: onReplace },
             { label: "Share", icon: Share2, onClick: onShare },
             { label: "Delete", icon: Trash2, danger: true, onClick: onDelete },
@@ -578,6 +624,61 @@ function DocCard({ doc, onDelete, onDownload, onShare, onReplace }: {
           <span className="ml-auto">{doc.date}</span>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------- photo card */
+function PhotoCard({ doc, onPreview, onDelete, onRename, onDownload, onShare }: {
+  doc: DocItem;
+  onPreview: () => void;
+  onDelete: () => void;
+  onRename: () => void;
+  onDownload: () => void;
+  onShare: () => void;
+}) {
+  return (
+    <div className="group overflow-hidden rounded-2xl border border-border bg-card shadow-card transition-shadow hover:shadow-card-lg">
+      <button onClick={onPreview} className="relative block aspect-square w-full overflow-hidden bg-surface-2">
+        {doc.thumb || doc.url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={doc.thumb || doc.url} alt={doc.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+        ) : (
+          <div className={cn("h-full w-full bg-gradient-to-br", doc.gradient ?? "from-violet-300 to-sky-200")} />
+        )}
+        <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100">
+          <Menu items={[
+            { label: "Preview", icon: ImageIcon, onClick: onPreview },
+            { label: "Download", icon: Download, onClick: onDownload },
+            { label: "Rename", icon: FileText, onClick: onRename },
+            { label: "Share", icon: Share2, onClick: onShare },
+            { label: "Delete", icon: Trash2, danger: true, onClick: onDelete },
+          ]} />
+        </div>
+      </button>
+      <div className="p-3">
+        <p className="break-words text-sm font-medium text-ink leading-snug">{doc.name}</p>
+        <p className="mt-1 text-[11px] text-faint">{doc.ext} · {doc.size}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------- image preview */
+function ImagePreview({ url, onClose }: { url: string; onClose: () => void }) {
+  useEffect(() => {
+    document.documentElement.classList.add("overflow-hidden");
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => { document.documentElement.classList.remove("overflow-hidden"); document.removeEventListener("keydown", onKey); };
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4" onClick={onClose}>
+      <button onClick={onClose} className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20">
+        <X className="h-5 w-5" />
+      </button>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt="Preview" className="max-h-full max-w-full rounded-lg object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
     </div>
   );
 }
@@ -612,6 +713,28 @@ function AddFolderModal({ onClose, onCreate }: { onClose: () => void; onCreate: 
       <div className="mt-5 flex justify-end gap-2">
         <button onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted hover:bg-surface-2">Cancel</button>
         <button onClick={() => name.trim() && onCreate(name.trim())} className="rounded-xl bg-violet-500 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-600">Create Folder</button>
+      </div>
+    </Modal>
+  );
+}
+
+function RenameModal({ initial, onClose, onDone }: { initial: string; onClose: () => void; onDone: (name: string) => void }) {
+  const [name, setName] = useState(initial);
+  return (
+    <Modal open title="Rename Document" onClose={onClose} size="sm">
+      <Field label="Name">
+        <input
+          className={inputCls}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Document name"
+          autoFocus
+          onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) onDone(name.trim()); }}
+        />
+      </Field>
+      <div className="mt-5 flex justify-end gap-2">
+        <button onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted hover:bg-surface-2">Cancel</button>
+        <button onClick={() => name.trim() && onDone(name.trim())} disabled={!name.trim()} className="rounded-xl bg-violet-500 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-600 disabled:opacity-60">Rename</button>
       </div>
     </Modal>
   );
