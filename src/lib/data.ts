@@ -444,6 +444,7 @@ export type DocItem = {
   kind: "doc" | "image";
   gradient?: string;
   thumb?: string;
+  url?: string;
   trashed?: boolean;
 };
 

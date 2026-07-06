@@ -86,7 +86,7 @@ const PAGE_SIZE = 12;
 
 /* =========================================================================== */
 export function DocumentsClient() {
-  const [docs, setDocs] = usePersist<DocItem[]>("sb.docs", sampleDocs);
+  const [docs, setDocs] = useState<DocItem[]>(sampleDocs);
   const [folders, setFolders] = usePersist("sb.docs.folders", docFolders);
   const [tab, setTab] = useState<"all" | "folders" | "trash">("all");
   const [activeCat, setActiveCat] = useState<string | null>(null);
@@ -96,9 +96,24 @@ export function DocumentsClient() {
   const [page, setPage] = useState(1);
   const [toast, setToast] = useState<string | null>(null);
   const [modal, setModal] = useState<null | "category" | "folder">(null);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const flash = (m: string) => { setToast(m); setTimeout(() => setToast(null), 1600); };
+  const flash = (m: string) => { setToast(m); setTimeout(() => setToast(null), 2000); };
+
+  useEffect(() => {
+    setLoading(true);
+    fetch("/api/documents")
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Failed to load documents"))))
+      .then((data) => {
+        if (Array.isArray(data.docs)) {
+          setDocs((prev) => (data.docs.length ? data.docs : prev));
+        }
+      })
+      .catch((err) => { console.error(err); flash("Could not load documents"); })
+      .finally(() => setLoading(false));
+  }, []);
 
   const live = docs.filter((d) => !d.trashed);
   const trashed = docs.filter((d) => d.trashed);
@@ -120,25 +135,30 @@ export function DocumentsClient() {
   const restoreDoc = (id: string) => setDocs((p) => p.map((d) => (d.id === id ? { ...d, trashed: false } : d)));
   const purgeDoc = (id: string) => setDocs((p) => p.filter((d) => d.id !== id));
 
-  const onUpload = (files: FileList | null) => {
+  const onUpload = async (files: FileList | null) => {
     if (!files?.length) return;
-    const added: DocItem[] = Array.from(files).map((f) => {
-      const ext = (f.name.split(".").pop() || "").toUpperCase();
-      const isImg = f.type.startsWith("image/");
-      return {
-        id: uid(),
-        name: f.name.replace(/\.[^.]+$/, ""),
-        category: isImg ? "Images / Photos" : "Important Docs",
-        ext: (["PDF", "JPG", "PNG", "DOCX"].includes(ext) ? ext : "PDF") as DocItem["ext"],
-        size: fmtSize(f.size),
-        date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
-        kind: isImg ? "image" : "doc",
-        thumb: isImg ? URL.createObjectURL(f) : undefined,
-        gradient: isImg ? "from-violet-300 via-fuchsia-200 to-sky-200" : undefined,
-      };
-    });
-    setDocs((p) => [...added, ...p]);
-    flash(`${added.length} document${added.length > 1 ? "s" : ""} uploaded`);
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      Array.from(files).forEach((f) => formData.append("files", f));
+      formData.append("category", activeCat || "Important Docs");
+
+      const res = await fetch("/api/documents", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+
+      const uploaded: DocItem[] = data.docs.map((d: DocItem) => ({
+        ...d,
+        thumb: d.kind === "image" ? d.url : undefined,
+      }));
+      setDocs((p) => [...uploaded, ...p]);
+      flash(`${uploaded.length} document${uploaded.length > 1 ? "s" : ""} uploaded`);
+    } catch (err: any) {
+      console.error(err);
+      flash(err.message || "Upload failed");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const quickActions = [
@@ -280,7 +300,7 @@ export function DocumentsClient() {
                       <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-semibold", extBadge[d.ext])}>{d.ext}</span>
                       <span className="hidden text-xs text-muted sm:block">{d.size}</span>
                       <span className="hidden text-xs text-faint md:block">{d.date}</span>
-                      <Menu items={[{ label: "Download", icon: Download, onClick: () => flash("Downloading…") }, { label: "Share", icon: Share2, onClick: () => flash("Link copied") }, { label: "Delete", icon: Trash2, danger: true, onClick: () => removeDoc(d.id) }]} />
+                      <Menu items={[{ label: "Download", icon: Download, onClick: () => { if (d.url) { const a=document.createElement("a"); a.href=d.url; a.download=d.name; a.target="_blank"; a.rel="noopener noreferrer"; a.click(); } } }, { label: "Share", icon: Share2, onClick: () => flash("Link copied") }, { label: "Delete", icon: Trash2, danger: true, onClick: () => removeDoc(d.id) }]} />
                     </div>
                   );
                 })}
@@ -402,14 +422,23 @@ export function DocumentsClient() {
 /* ------------------------------------------------------------------ doc card */
 function DocCard({ doc, onDelete, onCopy }: { doc: DocItem; onDelete: () => void; onCopy: () => void }) {
   const Icon = catIconFor(doc.category);
+  const handleDownload = () => {
+    if (!doc.url) return;
+    const a = document.createElement("a");
+    a.href = doc.url;
+    a.download = doc.name;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.click();
+  };
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card transition-shadow hover:shadow-card-lg">
       {/* preview */}
       <div className="relative h-36 overflow-hidden">
         {doc.kind === "image" ? (
-          doc.thumb ? (
+          doc.thumb || doc.url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={doc.thumb} alt={doc.name} className="h-full w-full object-cover" />
+            <img src={doc.thumb || doc.url} alt={doc.name} className="h-full w-full object-cover" />
           ) : (
             <div className={cn("h-full w-full bg-gradient-to-br", doc.gradient ?? "from-violet-300 to-sky-200")} />
           )
@@ -429,7 +458,7 @@ function DocCard({ doc, onDelete, onCopy }: { doc: DocItem; onDelete: () => void
             <span className="mt-1 inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-medium" style={{ background: `${catColor(doc.category)}1a`, color: catColor(doc.category) }}>{doc.category}</span>
           </div>
           <Menu items={[
-            { label: "Download", icon: Download, onClick: () => {} },
+            { label: "Download", icon: Download, onClick: handleDownload },
             { label: "Share", icon: Share2, onClick: onCopy },
             { label: "Delete", icon: Trash2, danger: true, onClick: onDelete },
           ]} />
