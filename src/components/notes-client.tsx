@@ -10,7 +10,7 @@ import type { RichNote, ChecklistItem, Reminder } from "@/lib/data";
 import { sampleNotes, sampleReminders, sampleNoteTrash, noteCategories, noteTags } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import { Modal, Field, inputCls, Dropdown } from "@/components/vault-ui";
-import { createClient } from "@/utils/supabase/client";
+import { createClient, hasSupabaseEnv } from "@/utils/supabase/client";
 
 /* helpers -------------------------------------------------------------------*/
 const catIconMap: Record<string, React.ElementType> = {
@@ -104,31 +104,37 @@ export function NotesClient() {
   const [reminders, setReminders] = useState<Reminder[]>(sampleReminders);
 
   // Load from Supabase; seed the tables on first run so the DB matches the UI.
+  // If Supabase is unavailable the page keeps the sample data (never crashes).
   useEffect(() => {
+    if (!hasSupabaseEnv) return;
     let active = true;
     (async () => {
-      const { data: nd, error: ne } = await supabase.from("user_notes").select("*").order("sort", { ascending: true });
-      if (!active) return;
-      if (!ne && nd) {
-        if (nd.length === 0) {
-          const seed = sampleNotes.map((n, i) => noteToRow({ ...n, sort: i + 1 }, false))
-            .concat(sampleNoteTrash.map((n, i) => noteToRow({ ...n, sort: 1000 + i }, true)));
-          await supabase.from("user_notes").insert(seed);
-          setNotes(sampleNotes); setTrash(sampleNoteTrash);
-        } else {
-          setNotes(nd.filter((r) => !r.trashed).map(noteFromRow));
-          setTrash(nd.filter((r) => r.trashed).map(noteFromRow));
+      try {
+        const { data: nd, error: ne } = await supabase.from("user_notes").select("*").order("sort", { ascending: true });
+        if (!active) return;
+        if (!ne && nd) {
+          if (nd.length === 0) {
+            const seed = sampleNotes.map((n, i) => noteToRow({ ...n, sort: i + 1 }, false))
+              .concat(sampleNoteTrash.map((n, i) => noteToRow({ ...n, sort: 1000 + i }, true)));
+            await supabase.from("user_notes").insert(seed);
+            setNotes(sampleNotes); setTrash(sampleNoteTrash);
+          } else {
+            setNotes(nd.filter((r) => !r.trashed).map(noteFromRow));
+            setTrash(nd.filter((r) => r.trashed).map(noteFromRow));
+          }
         }
-      }
-      const { data: rd, error: re } = await supabase.from("note_reminders").select("*").order("sort", { ascending: true });
-      if (!active) return;
-      if (!re && rd) {
-        if (rd.length === 0) {
-          await supabase.from("note_reminders").insert(sampleReminders.map((r, i) => reminderToRow({ ...r, sort: i + 1 })));
-          setReminders(sampleReminders);
-        } else {
-          setReminders(rd.map(reminderFromRow));
+        const { data: rd, error: re } = await supabase.from("note_reminders").select("*").order("sort", { ascending: true });
+        if (!active) return;
+        if (!re && rd) {
+          if (rd.length === 0) {
+            await supabase.from("note_reminders").insert(sampleReminders.map((r, i) => reminderToRow({ ...r, sort: i + 1 })));
+            setReminders(sampleReminders);
+          } else {
+            setReminders(rd.map(reminderFromRow));
+          }
         }
+      } catch {
+        // keep sample data on any failure
       }
     })();
     return () => { active = false; };
