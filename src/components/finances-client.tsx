@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   Wallet,
@@ -660,20 +661,23 @@ function Modal({
   title: string;
   children: React.ReactNode;
 }) {
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
-    if (typeof window === "undefined" || !open) return;
-    const html = document.documentElement;
-    html.classList.add("overflow-hidden");
+    setMounted(true);
+    if (open) {
+      document.documentElement.classList.add("overflow-hidden");
+    }
     return () => {
-      html.classList.remove("overflow-hidden");
+      document.documentElement.classList.remove("overflow-hidden");
     };
   }, [open]);
 
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+  if (!mounted || !open) return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-card-lg animate-fade-up">
+      <div className="relative max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-card-lg animate-fade-up">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-ink">{title}</h3>
           <button onClick={onClose} className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-ink">
@@ -682,7 +686,8 @@ function Modal({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
