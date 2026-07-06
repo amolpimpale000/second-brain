@@ -399,3 +399,81 @@ export const sampleNoteTrash: RichNote[] = [
   { id: "tn2", title: "Draft Ideas", color: "yellow", body: "Rough app concepts to revisit.", category: "Ideas", tags: [], time: "08 May, 01:20 PM", pinned: false, starred: false },
   { id: "tn3", title: "Shopping List", color: "white", listStyle: "bullet", items: [ci("Milk"), ci("Eggs"), ci("Coffee")], category: "Others", tags: [], time: "05 May, 09:00 AM", pinned: false, starred: false },
 ];
+
+// -------------------------------- DOCUMENTS --------------------------------
+
+export type DocCategory = { name: string; count: number; icon: string; color: string };
+
+export const docStats = [
+  { label: "Total Documents", value: "568", sub: "+36 this month", subTone: "green", icon: "folder", tone: "violet" },
+  { label: "Categories", value: "12", sub: "No change", subTone: "muted", icon: "grid", tone: "amber" },
+  { label: "Total Size", value: "12.4 GB", sub: "1.2 GB this month", subTone: "green", icon: "drive", tone: "green" },
+  { label: "Shared with Family", value: "28", sub: "5 this month", subTone: "green", icon: "users", tone: "blue" },
+  { label: "Expiring Soon", value: "7", sub: "View all", subTone: "violet", icon: "clock", tone: "red" },
+] as const;
+
+export const docCategories: DocCategory[] = [
+  { name: "Important Docs", count: 45, icon: "folder", color: "#8b5cf6" },
+  { name: "Personal Docs", count: 86, icon: "user", color: "#22c55e" },
+  { name: "Certificates", count: 72, icon: "award", color: "#f59e0b" },
+  { name: "Educational Docs", count: 68, icon: "cap", color: "#3b82f6" },
+  { name: "ID Cards", count: 56, icon: "id", color: "#f43f5e" },
+  { name: "Family - ID Cards", count: 48, icon: "users", color: "#06b6d4" },
+  { name: "Family - Certificates", count: 62, icon: "badge", color: "#8b5cf6" },
+  { name: "Images / Photos", count: 131, icon: "image", color: "#eab308" },
+  { name: "Insurance Docs", count: 24, icon: "shield", color: "#ef4444" },
+];
+
+export const storageOverview = {
+  usedLabel: "12.4 GB",
+  totalLabel: "50 GB",
+  breakdown: [
+    { name: "Documents", value: 8.2, color: "#8b5cf6" },
+    { name: "Images", value: 3.1, color: "#3b82f6" },
+    { name: "Others", value: 1.1, color: "#f59e0b" },
+  ],
+};
+
+export type DocItem = {
+  id: string;
+  name: string;
+  category: string;
+  ext: "PDF" | "JPG" | "PNG" | "DOCX";
+  size: string;
+  date: string;
+  kind: "doc" | "image";
+  gradient?: string;
+  thumb?: string;
+  trashed?: boolean;
+};
+
+export const sampleDocs: DocItem[] = [
+  { id: "d1", name: "Aadhaar Card", category: "ID Cards", ext: "PDF", size: "1.2 MB", date: "20 May 2025", kind: "doc" },
+  { id: "d2", name: "PAN Card", category: "ID Cards", ext: "PDF", size: "780 KB", date: "18 May 2025", kind: "doc" },
+  { id: "d3", name: "Passport", category: "ID Cards", ext: "PDF", size: "2.3 MB", date: "10 May 2025", kind: "doc" },
+  { id: "d4", name: "Income Certificate", category: "Personal Docs", ext: "PDF", size: "890 KB", date: "18 May 2025", kind: "doc" },
+  { id: "d5", name: "10th Marksheet", category: "Educational Docs", ext: "PDF", size: "1.5 MB", date: "15 May 2025", kind: "doc" },
+  { id: "d6", name: "Family Photo", category: "Images / Photos", ext: "JPG", size: "2.4 MB", date: "12 May 2025", kind: "image", gradient: "from-orange-300 via-rose-300 to-purple-300" },
+  { id: "d7", name: "Caste Certificate", category: "Personal Docs", ext: "PDF", size: "1.1 MB", date: "16 May 2025", kind: "doc" },
+  { id: "d8", name: "Goa Trip", category: "Images / Photos", ext: "JPG", size: "3.6 MB", date: "09 May 2025", kind: "image", gradient: "from-sky-300 via-cyan-200 to-emerald-200" },
+];
+
+export const expiringDocs = [
+  { id: "e1", name: "Passport.pdf", date: "Expires on 09 May 2030", days: "5 days", tone: "red" },
+  { id: "e2", name: "Income Certificate.pdf", date: "Expires on 18 May 2026", days: "14 days", tone: "amber" },
+  { id: "e3", name: "Insurance Policy.pdf", date: "Expires on 01 Jun 2026", days: "28 days", tone: "green" },
+];
+
+export const docActivity = [
+  { id: "act1", name: "Aadhaar Card.pdf", action: "Uploaded by you", time: "2 hours ago", color: "#f43f5e" },
+  { id: "act2", name: "Family Photo.jpg", action: "Shared with Family", time: "5 hours ago", color: "#22c55e" },
+  { id: "act3", name: "Caste Certificate.pdf", action: "Uploaded by you", time: "1 day ago", color: "#f59e0b" },
+  { id: "act4", name: "10th Marksheet.pdf", action: "Uploaded by you", time: "2 days ago", color: "#3b82f6" },
+];
+
+export const docFolders = [
+  { id: "f1", name: "Bank Documents", count: 24, color: "#8b5cf6" },
+  { id: "f2", name: "Property Papers", count: 12, color: "#22c55e" },
+  { id: "f3", name: "Medical Records", count: 31, color: "#ef4444" },
+  { id: "f4", name: "Tax Filings", count: 18, color: "#f59e0b" },
+];

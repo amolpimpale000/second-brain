@@ -17,6 +17,7 @@ import {
   Settings,
   Sparkles,
   ChevronsLeft,
+  FolderOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +38,7 @@ const nav = [
   { section: "Life", items: [
     { href: "/tasks", label: "Tasks", icon: CheckSquare },
     { href: "/notes", label: "Notes", icon: StickyNote },
+    { href: "/documents", label: "Documents", icon: FolderOpen },
     { href: "/vault", label: "Password Vault", icon: KeyRound },
   ]},
 ];
