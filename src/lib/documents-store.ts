@@ -1,10 +1,15 @@
-import { writeFile, mkdir, readFile, stat, rename, unlink } from "fs/promises";
-import path from "path";
-import os from "os";
-import { existsSync } from "fs";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
+/**
+ * Documents are stored in a private Supabase Storage bucket so they survive
+ * Hostinger redeploys (which wipe public_html). File bytes and a small
+ * `documents.json` manifest both live in the bucket. Files are streamed back
+ * to the browser through /api/documents/raw/[name], keeping them private.
+ */
+
+export const DOC_BUCKET = "documents";
 const MANIFEST = "documents.json";
-const TRASH_DIR = ".trashed";
+export const TRASH_PREFIX = ".trashed";
 
 export type StoredDoc = {
   id: string;
@@ -29,77 +34,64 @@ export function fmtSize(bytes: number) {
   return `${bytes} B`;
 }
 
-/**
- * Ordered list of candidate `Documents` directories. The first one whose parent
- * `public_html` actually exists on disk wins. This makes storage resilient to how
- * Hostinger happens to launch the Node process (its cwd is not public_html).
- */
-function candidateDirs(): string[] {
-  const cwd = process.cwd().replace(/\\/g, "/");
-  const home = (process.env.HOME || os.homedir()).replace(/\\/g, "/");
-  const list: string[] = [];
-
-  // App launched from inside public_html (…/public_html or …/public_html/sub).
-  const m = cwd.match(/^(.*\/public_html)(\/.*)?$/);
-  if (m) list.push(path.join(m[1], "Documents"));
-
-  // Hostinger managed Next.js: the app runs from <domain>/nodejs and the web root
-  // is its sibling <domain>/public_html. HOME is set to the <domain> dir.
-  list.push(path.join(cwd, "..", "public_html", "Documents"));
-  list.push(path.join(home, "public_html", "Documents"));
-
-  // public_html sitting directly under the cwd.
-  list.push(path.join(cwd, "public_html", "Documents"));
-
-  return list;
-}
-
-export function getUploadDir() {
-  const envPath = process.env.DOCUMENTS_UPLOAD_PATH;
-  if (envPath) return path.resolve(envPath);
-
-  for (const dir of candidateDirs()) {
-    if (existsSync(path.dirname(dir))) return dir; // parent public_html exists
-  }
-  // Local dev fallback (Next serves this via /public automatically).
-  return path.join(process.cwd(), "public", "uploads", "documents");
-}
-
-export function getTrashDir(uploadDir: string) {
-  return path.join(uploadDir, TRASH_DIR);
-}
-
-/**
- * Public URL for a stored file. Documents live outside the Next `public/` dir
- * (in public_html/Documents), and the whole domain is served by the Node app,
- * so files are streamed back through an API route rather than served statically.
- */
-export function getFileUrl(filename: string) {
-  return `/api/documents/raw/${encodeURIComponent(filename)}`;
-}
-
 export function sanitize(name: string) {
   return name.replace(/[^a-zA-Z0-9.-]/g, "_").replace(/_{2,}/g, "_");
 }
 
-export async function readManifest(uploadDir: string): Promise<StoredDoc[]> {
+/** Public path (streamed via the API route, not a raw Supabase URL). */
+export function getFileUrl(filename: string) {
+  return `/api/documents/raw/${encodeURIComponent(filename)}`;
+}
+
+export function trashPath(filename: string) {
+  return `${TRASH_PREFIX}/${filename}`;
+}
+
+/* ── Supabase admin (service role, server-only) ───────────────────────────── */
+let _client: SupabaseClient | null = null;
+
+export function admin(): SupabaseClient {
+  if (_client) return _client;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error(
+      "Document storage is not configured: set SUPABASE_SERVICE_ROLE_KEY in the environment."
+    );
+  }
+  _client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  return _client;
+}
+
+/** Create the private bucket on first use. */
+export async function ensureBucket() {
+  const sb = admin();
+  const { data } = await sb.storage.getBucket(DOC_BUCKET);
+  if (!data) {
+    await sb.storage.createBucket(DOC_BUCKET, {
+      public: false,
+      fileSizeLimit: "50MB",
+    });
+  }
+}
+
+/* ── Manifest (stored as an object in the bucket) ─────────────────────────── */
+export async function readManifest(): Promise<StoredDoc[]> {
+  const sb = admin();
+  const { data, error } = await sb.storage.from(DOC_BUCKET).download(MANIFEST);
+  if (error || !data) return [];
   try {
-    const raw = await readFile(path.join(uploadDir, MANIFEST), "utf-8");
-    return JSON.parse(raw);
+    return JSON.parse(await data.text());
   } catch {
     return [];
   }
 }
 
-export async function writeManifest(uploadDir: string, docs: StoredDoc[]) {
-  await writeFile(path.join(uploadDir, MANIFEST), JSON.stringify(docs, null, 2));
-}
-
-export async function fileExists(p: string) {
-  try {
-    await stat(p);
-    return true;
-  } catch {
-    return false;
-  }
+export async function writeManifest(docs: StoredDoc[]) {
+  const sb = admin();
+  const body = new Blob([JSON.stringify(docs, null, 2)], { type: "application/json" });
+  const { error } = await sb.storage
+    .from(DOC_BUCKET)
+    .upload(MANIFEST, body, { upsert: true, contentType: "application/json" });
+  if (error) throw error;
 }

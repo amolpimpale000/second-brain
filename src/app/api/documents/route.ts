@@ -1,41 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
-import { mkdir, writeFile } from "fs/promises";
 import {
   StoredDoc,
   uid,
   fmtSize,
-  getUploadDir,
   getFileUrl,
   sanitize,
+  admin,
+  ensureBucket,
   readManifest,
   writeManifest,
-  fileExists,
+  DOC_BUCKET,
 } from "@/lib/documents-store";
 import path from "path";
+
+export const dynamic = "force-dynamic";
 
 const ALLOWED_EXTS = ["pdf", "jpg", "jpeg", "png", "docx", "doc", "xlsx", "xls", "txt", "webp"];
 const MAX_SIZE_MB = 50;
 
+const MIME: Record<string, string> = {
+  pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
+  webp: "image/webp", txt: "text/plain",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+};
+
 export async function GET() {
   try {
-    const uploadDir = getUploadDir();
-    await mkdir(uploadDir, { recursive: true });
-    const docs = await readManifest(uploadDir);
-
-    // Verify files still exist; drop missing ones and rewrite manifest if needed.
-    const existing: StoredDoc[] = [];
-    let changed = false;
-    for (const d of docs) {
-      const filePath = path.join(uploadDir, d.trashed ? ".trashed" : "", d.filename);
-      if (await fileExists(filePath)) {
-        existing.push(d);
-      } else {
-        changed = true;
-      }
-    }
-    if (changed) await writeManifest(uploadDir, existing);
-
-    return NextResponse.json({ docs: existing });
+    await ensureBucket();
+    const docs = await readManifest();
+    return NextResponse.json({ docs });
   } catch (err) {
     console.error("Documents list error:", err);
     return NextResponse.json({ error: "Failed to list documents" }, { status: 500 });
@@ -52,10 +48,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No files provided" }, { status: 400 });
     }
 
-    const uploadDir = getUploadDir();
-    await mkdir(uploadDir, { recursive: true });
-
-    const manifest = await readManifest(uploadDir);
+    await ensureBucket();
+    const sb = admin();
+    const manifest = await readManifest();
     const saved: StoredDoc[] = [];
 
     for (const file of files) {
@@ -72,10 +67,12 @@ export async function POST(request: NextRequest) {
       const safeName = sanitize(baseName);
       const id = `${Date.now()}-${uid()}`;
       const filename = `${id}-${safeName}.${ext}`;
-      const filePath = path.join(uploadDir, filename);
 
-      const bytes = await file.arrayBuffer();
-      await writeFile(filePath, Buffer.from(bytes));
+      const bytes = Buffer.from(await file.arrayBuffer());
+      const { error } = await sb.storage
+        .from(DOC_BUCKET)
+        .upload(filename, bytes, { contentType: MIME[ext] || "application/octet-stream", upsert: false });
+      if (error) throw error;
 
       const isImg = ["jpg", "png", "webp"].includes(ext);
       const doc: StoredDoc = {
@@ -94,10 +91,11 @@ export async function POST(request: NextRequest) {
       manifest.unshift(doc);
     }
 
-    await writeManifest(uploadDir, manifest);
+    await writeManifest(manifest);
     return NextResponse.json({ docs: saved });
   } catch (err) {
     console.error("Upload error:", err);
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    const msg = err instanceof Error ? err.message : "Upload failed";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

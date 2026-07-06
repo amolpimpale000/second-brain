@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile } from "fs/promises";
 import path from "path";
-import { getUploadDir, getTrashDir, fileExists } from "@/lib/documents-store";
+import { admin, DOC_BUCKET, trashPath } from "@/lib/documents-store";
+
+export const dynamic = "force-dynamic";
 
 const MIME: Record<string, string> = {
   pdf: "application/pdf",
@@ -16,27 +17,24 @@ const MIME: Record<string, string> = {
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 };
 
-// Streams a stored document back to the browser. Files live in
-// public_html/Documents (outside Next's own /public dir), so we read them off
-// disk here instead of relying on static serving.
+// Streams a stored document from the private Supabase bucket. Checks the live
+// path first, then the trash prefix (so trashed files still preview/restore).
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ name: string }> }
 ) {
   try {
     const { name } = await params;
-    // basename() strips any "../" — prevents path traversal outside the dir.
-    const filename = path.basename(decodeURIComponent(name));
-    const uploadDir = getUploadDir();
+    const filename = path.basename(decodeURIComponent(name)); // block traversal
+    const sb = admin();
 
-    let filePath = path.join(uploadDir, filename);
-    if (!(await fileExists(filePath))) {
-      const trashPath = path.join(getTrashDir(uploadDir), filename);
-      if (await fileExists(trashPath)) filePath = trashPath;
-      else return NextResponse.json({ error: "File not found" }, { status: 404 });
+    let blob = (await sb.storage.from(DOC_BUCKET).download(filename)).data;
+    if (!blob) {
+      blob = (await sb.storage.from(DOC_BUCKET).download(trashPath(filename))).data;
     }
+    if (!blob) return NextResponse.json({ error: "File not found" }, { status: 404 });
 
-    const buf = await readFile(filePath);
+    const buf = Buffer.from(await blob.arrayBuffer());
     const ext = path.extname(filename).slice(1).toLowerCase();
     const type = MIME[ext] || "application/octet-stream";
 
@@ -44,7 +42,6 @@ export async function GET(
       headers: {
         "Content-Type": type,
         "Content-Disposition": `inline; filename="${filename}"`,
-        // Documents can be deleted/replaced, so avoid shared-CDN caching.
         "Cache-Control": "private, max-age=0, must-revalidate",
       },
     });

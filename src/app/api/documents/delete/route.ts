@@ -1,48 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getUploadDir,
-  getTrashDir,
-  readManifest,
-  writeManifest,
-  fileExists,
-} from "@/lib/documents-store";
-import path from "path";
-import { mkdir, rename, unlink } from "fs/promises";
+import { admin, DOC_BUCKET, trashPath, readManifest, writeManifest } from "@/lib/documents-store";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { id, mode = "soft" } = body;
-
+    const { id, mode = "soft" } = await request.json();
     if (!id || typeof id !== "string") {
       return NextResponse.json({ error: "Missing document id" }, { status: 400 });
     }
 
-    const uploadDir = getUploadDir();
-    const manifest = await readManifest(uploadDir);
+    const sb = admin();
+    const manifest = await readManifest();
     const idx = manifest.findIndex((d) => d.id === id);
     if (idx === -1) {
       return NextResponse.json({ error: "Document not found" }, { status: 404 });
     }
 
     const doc = manifest[idx];
-    const filePath = path.join(uploadDir, doc.filename);
-    const trashedPath = path.join(getTrashDir(uploadDir), doc.filename);
 
     if (mode === "hard") {
-      try {
-        await unlink(doc.trashed ? trashedPath : filePath);
-      } catch {}
+      const target = doc.trashed ? trashPath(doc.filename) : doc.filename;
+      await sb.storage.from(DOC_BUCKET).remove([target]);
       manifest.splice(idx, 1);
     } else {
-      await mkdir(getTrashDir(uploadDir), { recursive: true });
-      if (await fileExists(filePath)) {
-        await rename(filePath, trashedPath);
-      }
+      // soft delete: move object into the trash prefix
+      await sb.storage.from(DOC_BUCKET).move(doc.filename, trashPath(doc.filename));
       manifest[idx] = { ...doc, trashed: true };
     }
 
-    await writeManifest(uploadDir, manifest);
+    await writeManifest(manifest);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("Delete error:", err);

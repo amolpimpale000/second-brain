@@ -1,40 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getUploadDir,
-  getTrashDir,
-  readManifest,
-  writeManifest,
-  fileExists,
-} from "@/lib/documents-store";
-import path from "path";
-import { rename } from "fs/promises";
+import { admin, DOC_BUCKET, trashPath, readManifest, writeManifest } from "@/lib/documents-store";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { id } = body;
-
+    const { id } = await request.json();
     if (!id || typeof id !== "string") {
       return NextResponse.json({ error: "Missing document id" }, { status: 400 });
     }
 
-    const uploadDir = getUploadDir();
-    const manifest = await readManifest(uploadDir);
+    const sb = admin();
+    const manifest = await readManifest();
     const idx = manifest.findIndex((d) => d.id === id);
     if (idx === -1) {
       return NextResponse.json({ error: "Document not found" }, { status: 404 });
     }
 
     const doc = manifest[idx];
-    const filePath = path.join(uploadDir, doc.filename);
-    const trashedPath = path.join(getTrashDir(uploadDir), doc.filename);
-
-    if (await fileExists(trashedPath)) {
-      await rename(trashedPath, filePath);
-    }
+    // move object back out of the trash prefix
+    await sb.storage.from(DOC_BUCKET).move(trashPath(doc.filename), doc.filename);
 
     manifest[idx] = { ...doc, trashed: false };
-    await writeManifest(uploadDir, manifest);
+    await writeManifest(manifest);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("Restore error:", err);
