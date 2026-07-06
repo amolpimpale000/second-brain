@@ -1,5 +1,11 @@
-import { DashboardClient } from "@/components/dashboard-client";
+import type { Metadata } from "next";
+import { FinancesClient } from "@/components/finances-client";
+
+export const metadata: Metadata = {
+  title: "My Finances — Second Brain",
+  description: "Every rupee in and out — income, expenses, and cash flow.",
+};
 
 export default function FinancesPage() {
-  return <DashboardClient />;
+  return <FinancesClient />;
 }
