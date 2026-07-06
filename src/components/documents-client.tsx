@@ -333,7 +333,7 @@ export function DocumentsClient() {
                 const Icon = catIconMap[c.icon] ?? FileText;
                 const active = activeCat === c.name;
                 return (
-                  <button key={c.name} onClick={() => { setTab("all"); setActiveCat(active ? null : c.name); }}
+                  <button key={c.name} onClick={() => { if (c.name === PHOTO_CATEGORY) { setTab("photos"); setActiveCat(null); } else { setTab("all"); setActiveCat(active ? null : c.name); } }}
                     className={cn("flex items-center gap-3 rounded-2xl border bg-card p-3 text-left shadow-card transition-colors hover:border-violet-200", active ? "border-violet-300 ring-1 ring-violet-200" : "border-border")}>
                     <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: `${c.color}1a`, color: c.color }}>
                       <Icon className="h-5 w-5" />
@@ -638,27 +638,23 @@ function PhotoCard({ doc, onPreview, onDelete, onRename, onDownload, onShare }: 
   onShare: () => void;
 }) {
   return (
-    <div className="group overflow-hidden rounded-2xl border border-border bg-card shadow-card transition-shadow hover:shadow-card-lg">
+    <div className="group relative overflow-hidden rounded-2xl border border-border bg-card shadow-card transition-shadow hover:shadow-card-lg">
       <button onClick={onPreview} className="relative block aspect-square w-full overflow-hidden bg-surface-2">
         {doc.thumb || doc.url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={doc.thumb || doc.url} alt={doc.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+          <img src={doc.thumb || doc.url} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
         ) : (
           <div className={cn("h-full w-full bg-gradient-to-br", doc.gradient ?? "from-violet-300 to-sky-200")} />
         )}
-        <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100">
-          <Menu items={[
-            { label: "Preview", icon: ImageIcon, onClick: onPreview },
-            { label: "Download", icon: Download, onClick: onDownload },
-            { label: "Rename", icon: FileText, onClick: onRename },
-            { label: "Share", icon: Share2, onClick: onShare },
-            { label: "Delete", icon: Trash2, danger: true, onClick: onDelete },
-          ]} />
-        </div>
       </button>
-      <div className="p-3">
-        <p className="break-words text-sm font-medium text-ink leading-snug">{doc.name}</p>
-        <p className="mt-1 text-[11px] text-faint">{doc.ext} · {doc.size}</p>
+      <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100">
+        <Menu items={[
+          { label: "Preview", icon: ImageIcon, onClick: onPreview },
+          { label: "Download", icon: Download, onClick: onDownload },
+          { label: "Rename", icon: FileText, onClick: onRename },
+          { label: "Share", icon: Share2, onClick: onShare },
+          { label: "Delete", icon: Trash2, danger: true, onClick: onDelete },
+        ]} />
       </div>
     </div>
   );
@@ -678,7 +674,7 @@ function ImagePreview({ url, onClose }: { url: string; onClose: () => void }) {
         <X className="h-5 w-5" />
       </button>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt="Preview" className="max-h-full max-w-full rounded-lg object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
+      <img src={url} alt="" className="max-h-full max-w-full rounded-lg object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
     </div>
   );
 }
