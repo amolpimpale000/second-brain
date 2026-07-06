@@ -8,8 +8,8 @@ import {
   ImagePlus, FileUp, Replace, Clock, X,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-import type { DocItem } from "@/lib/data";
-import { docCategories, docFolders } from "@/lib/data";
+import type { DocItem, DocCategory } from "@/lib/data";
+import { docCategories as defaultCategories, docFolders } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import { Modal, Field, inputCls, Dropdown } from "@/components/vault-ui";
 
@@ -33,13 +33,13 @@ const badgeCls = (ext: string) => extBadge[ext] ?? "bg-slate-100 text-slate-600"
 const uid = () => Math.random().toString(36).slice(2, 9);
 const PHOTO_CATEGORY = "Images / Photos";
 const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp";
-const DOC_ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.txt";
+const DOC_ACCEPT = "*/*";
 
-function catColor(name: string) {
-  return docCategories.find((c) => c.name === name)?.color ?? "#8b5cf6";
+function catColor(name: string, cats: DocCategory[] = defaultCategories) {
+  return cats.find((c) => c.name === name)?.color ?? "#8b5cf6";
 }
-function catIconFor(name: string) {
-  const icon = docCategories.find((c) => c.name === name)?.icon ?? "folder";
+function catIconFor(name: string, cats: DocCategory[] = defaultCategories) {
+  const icon = cats.find((c) => c.name === name)?.icon ?? "folder";
   return catIconMap[icon] ?? FileText;
 }
 function fmtSize(bytes: number) {
@@ -115,6 +115,7 @@ const PAGE_SIZE = 12;
 export function DocumentsClient() {
   const [docs, setDocs] = useState<DocItem[]>([]);
   const [folders, setFolders] = usePersist("sb.docs.folders", docFolders);
+  const [categories, setCategories] = usePersist<DocCategory[]>("sb.docs.categories", defaultCategories);
   const [tab, setTab] = useState<"all" | "photos" | "folders" | "trash">("all");
   const [activeCat, setActiveCat] = useState<string | null>(null);
   const [sort, setSort] = useState("Recently Added");
@@ -122,8 +123,11 @@ export function DocumentsClient() {
   const [view, setView] = useState<"grid" | "list">("grid");
   const [page, setPage] = useState(1);
   const [toast, setToast] = useState<string | null>(null);
-  const [modal, setModal] = useState<null | "category" | "folder" | "rename">(null);
+  const [modal, setModal] = useState<null | "category" | "folder" | "rename" | "upload-category" | "change-category">(null);
   const [renamingDoc, setRenamingDoc] = useState<DocItem | null>(null);
+  const [categoryDoc, setCategoryDoc] = useState<DocItem | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<FileList | null>(null);
+  const [pendingPhoto, setPendingPhoto] = useState(false);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -153,13 +157,14 @@ export function DocumentsClient() {
   const usedBytes = live.reduce((s, d) => s + parseSize(d.size), 0);
   const imageBytes = photos.reduce((s, d) => s + parseSize(d.size), 0);
   const docBytes = usedBytes - imageBytes;
-  const nonEmptyCats = docCategories.filter((c) => categoryCount(c.name) > 0).length;
+  const categoryList = categories.map((c) => ({ ...c, count: categoryCount(c.name) }));
+  const nonEmptyCats = categoryList.filter((c) => c.count > 0).length;
 
   const stats = [
     { label: "Total Documents", value: String(live.length), sub: `${photos.length} photos`, tone: "violet", Icon: FolderOpen },
     { label: "Photos", value: String(photos.length), sub: "Images only", tone: "blue", Icon: ImageIcon },
     { label: "Total Size", value: fmtSize(usedBytes), sub: "Across all files", tone: "green", Icon: HardDrive },
-    { label: "Categories", value: String(nonEmptyCats), sub: `${docCategories.length} available`, tone: "amber", Icon: LayoutGrid },
+    { label: "Categories", value: String(nonEmptyCats), sub: `${categories.length} available`, tone: "amber", Icon: LayoutGrid },
     { label: "In Trash", value: String(trashed.length), sub: "Recoverable", tone: "red", Icon: Trash2 },
   ];
 
@@ -230,13 +235,13 @@ export function DocumentsClient() {
     } catch (err) { console.error(err); flash("Rename failed"); if (prev) setDocs((p) => p.map((d) => (d.id === id ? prev : d))); }
   };
 
-  const onUpload = async (files: FileList | null, asPhoto: boolean) => {
+  const onUpload = async (files: FileList | null, asPhoto: boolean, chosenCategory?: string) => {
     if (!files?.length) return;
     setUploading(true);
     try {
       const formData = new FormData();
       Array.from(files).forEach((f) => formData.append("files", f));
-      formData.append("category", asPhoto ? PHOTO_CATEGORY : activeCat || "Important Docs");
+      formData.append("category", asPhoto ? PHOTO_CATEGORY : (chosenCategory || activeCat || "Important Docs"));
       const res = await fetch("/api/documents", { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Upload failed");
@@ -245,6 +250,36 @@ export function DocumentsClient() {
       flash(`${uploaded.length} ${asPhoto ? "photo" : "document"}${uploaded.length > 1 ? "s" : ""} uploaded`);
     } catch (err) { console.error(err); flash(err instanceof Error ? err.message : "Upload failed"); }
     finally { setUploading(false); }
+  };
+
+  const handleDocFiles = (files: FileList | null) => {
+    if (!files?.length) return;
+    setPendingFiles(files);
+    setPendingPhoto(false);
+    setModal("upload-category");
+  };
+
+  const handlePhotoFiles = (files: FileList | null) => {
+    if (!files?.length) return;
+    onUpload(files, true);
+  };
+
+  const changeCategory = async (id: string, newCategory: string) => {
+    const prev = docs.find((d) => d.id === id);
+    setDocs((p) => p.map((d) => (d.id === id ? { ...d, category: newCategory } : d)));
+    try {
+      const res = await fetch("/api/documents/category", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, category: newCategory }),
+      });
+      if (!res.ok) throw new Error("Change category failed");
+      flash("Category updated");
+    } catch (err) {
+      console.error(err);
+      flash("Category update failed");
+      if (prev) setDocs((p) => p.map((d) => (d.id === id ? prev : d)));
+    }
   };
 
   const startReplace = (id: string) => { replacingId.current = id; replaceInputRef.current?.click(); };
@@ -285,6 +320,8 @@ export function DocumentsClient() {
     { label: "Scan Document", icon: ScanLine, onClick: () => docInputRef.current?.click() },
     { label: "Share with Family", icon: Share2, onClick: () => flash("Sharing link copied") },
   ];
+
+  const docCategoriesForUpload = categoryList.filter((c) => c.name !== PHOTO_CATEGORY);
 
   return (
     <div className="animate-fade-up space-y-5">
@@ -329,7 +366,7 @@ export function DocumentsClient() {
               <button onClick={() => setActiveCat(null)} className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-600 hover:bg-violet-100">View All</button>
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-              {docCategories.map((c) => {
+              {categoryList.map((c) => {
                 const Icon = catIconMap[c.icon] ?? FileText;
                 const active = activeCat === c.name;
                 return (
@@ -439,8 +476,18 @@ export function DocumentsClient() {
                       onShare={() => share(d)}
                       onReplace={() => startReplace(d.id)}
                       onRename={() => { setRenamingDoc(d); setModal("rename"); }}
+                      onChangeCategory={() => { setCategoryDoc(d); setModal("change-category"); }}
                     />
                   )
+                )}
+                {tab === "all" && activeCat && shown.length > 0 && (
+                  <button
+                    onClick={() => docInputRef.current?.click()}
+                    className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card p-4 text-sm font-medium text-violet-600 shadow-card transition-colors hover:bg-violet-50"
+                  >
+                    <Plus className="h-6 w-6" />
+                    Upload to {activeCat}
+                  </button>
                 )}
               </div>
             ) : (
@@ -458,6 +505,7 @@ export function DocumentsClient() {
                         { label: "Open", icon: FileText, onClick: () => d.url && window.open(d.url, "_blank") },
                         { label: "Download", icon: Download, onClick: () => download(d) },
                         { label: "Rename", icon: FileText, onClick: () => { setRenamingDoc(d); setModal("rename"); } },
+                        { label: "Change category", icon: FolderOpen, onClick: () => { setCategoryDoc(d); setModal("change-category"); } },
                         { label: "Replace file", icon: Replace, onClick: () => startReplace(d.id) },
                         { label: "Share", icon: Share2, onClick: () => share(d) },
                         { label: "Delete", icon: Trash2, danger: true, onClick: () => removeDoc(d.id) },
@@ -550,8 +598,8 @@ export function DocumentsClient() {
       </div>
 
       {/* hidden inputs: separate document + photo + replace pickers */}
-      <input ref={docInputRef} type="file" multiple accept={DOC_ACCEPT} className="hidden" onChange={(e) => { onUpload(e.target.files, false); e.target.value = ""; }} />
-      <input ref={photoInputRef} type="file" multiple accept={IMAGE_ACCEPT} className="hidden" onChange={(e) => { onUpload(e.target.files, true); e.target.value = ""; }} />
+      <input ref={docInputRef} type="file" multiple accept={DOC_ACCEPT} className="hidden" onChange={(e) => { handleDocFiles(e.target.files); e.target.value = ""; }} />
+      <input ref={photoInputRef} type="file" multiple accept={IMAGE_ACCEPT} className="hidden" onChange={(e) => { handlePhotoFiles(e.target.files); e.target.value = ""; }} />
       <input ref={replaceInputRef} type="file" className="hidden" onChange={(e) => { onReplace(e.target.files); e.target.value = ""; }} />
 
       {toast && (
@@ -560,7 +608,16 @@ export function DocumentsClient() {
         </div>
       )}
 
-      {modal === "category" && <AddCategoryModal onClose={() => setModal(null)} onDone={() => { setModal(null); flash("Category added"); }} />}
+      {modal === "category" && (
+        <AddCategoryModal
+          onClose={() => setModal(null)}
+          onDone={(name, icon, color) => {
+            setCategories((p) => [...p, { name, count: 0, icon, color }]);
+            setModal(null);
+            flash("Category added");
+          }}
+        />
+      )}
       {modal === "folder" && (
         <AddFolderModal onClose={() => setModal(null)} onCreate={(name) => { setFolders((p) => [...p, { id: uid(), name, count: 0, color: "#8b5cf6" }]); setModal(null); setTab("folders"); flash("Folder created"); }} />
       )}
@@ -571,6 +628,31 @@ export function DocumentsClient() {
           onDone={(name) => { renameDoc(renamingDoc.id, name); setModal(null); setRenamingDoc(null); }}
         />
       )}
+      {modal === "upload-category" && pendingFiles && (
+        <CategoryPickerModal
+          title="Choose category"
+          categories={docCategoriesForUpload}
+          onClose={() => { setModal(null); setPendingFiles(null); }}
+          onSelect={(category) => {
+            onUpload(pendingFiles, pendingPhoto, category);
+            setModal(null);
+            setPendingFiles(null);
+          }}
+        />
+      )}
+      {modal === "change-category" && categoryDoc && (
+        <CategoryPickerModal
+          title="Change category"
+          categories={categoryList.filter((c) => c.name !== PHOTO_CATEGORY)}
+          selected={categoryDoc.category}
+          onClose={() => { setModal(null); setCategoryDoc(null); }}
+          onSelect={(category) => {
+            changeCategory(categoryDoc.id, category);
+            setModal(null);
+            setCategoryDoc(null);
+          }}
+        />
+      )}
       {previewUrl && (
         <ImagePreview url={previewUrl} onClose={() => setPreviewUrl(null)} />
       )}
@@ -579,8 +661,8 @@ export function DocumentsClient() {
 }
 
 /* ------------------------------------------------------------------ doc card */
-function DocCard({ doc, onDelete, onDownload, onShare, onReplace, onRename }: {
-  doc: DocItem; onDelete: () => void; onDownload: () => void; onShare: () => void; onReplace: () => void; onRename: () => void;
+function DocCard({ doc, onDelete, onDownload, onShare, onReplace, onRename, onChangeCategory }: {
+  doc: DocItem; onDelete: () => void; onDownload: () => void; onShare: () => void; onReplace: () => void; onRename: () => void; onChangeCategory: () => void;
 }) {
   const Icon = catIconFor(doc.category);
   const open = () => doc.url && window.open(doc.url, "_blank");
@@ -614,6 +696,7 @@ function DocCard({ doc, onDelete, onDownload, onShare, onReplace, onRename }: {
             { label: "Open", icon: FileText, onClick: open },
             { label: "Download", icon: Download, onClick: onDownload },
             { label: "Rename", icon: FileText, onClick: onRename },
+            { label: "Change category", icon: FolderOpen, onClick: onChangeCategory },
             { label: "Replace file", icon: Replace, onClick: onReplace },
             { label: "Share", icon: Share2, onClick: onShare },
             { label: "Delete", icon: Trash2, danger: true, onClick: onDelete },
@@ -688,14 +771,47 @@ function PageBtn({ children, active, disabled, onClick }: { children: React.Reac
   );
 }
 
-function AddCategoryModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+function AddCategoryModal({ onClose, onDone }: { onClose: () => void; onDone: (name: string, icon: string, color: string) => void }) {
   const [name, setName] = useState("");
+  const [icon, setIcon] = useState("folder");
+  const [color, setColor] = useState("#8b5cf6");
+  const iconOptions = [
+    { key: "folder", Icon: FolderOpen },
+    { key: "user", Icon: User },
+    { key: "award", Icon: Award },
+    { key: "cap", Icon: GraduationCap },
+    { key: "id", Icon: CreditCard },
+    { key: "users", Icon: Users },
+    { key: "badge", Icon: BadgeCheck },
+    { key: "shield", Icon: ShieldCheck },
+  ];
+  const colorOptions = ["#8b5cf6", "#22c55e", "#f59e0b", "#3b82f6", "#f43f5e", "#06b6d4", "#ef4444", "#eab308"];
   return (
     <Modal open title="Add Category" onClose={onClose} size="sm">
-      <Field label="Category name"><input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Vehicle Docs" autoFocus /></Field>
+      <Field label="Category name">
+        <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Vehicle Docs" autoFocus />
+      </Field>
+      <div className="mt-3 space-y-2">
+        <label className="text-xs font-medium text-muted">Icon</label>
+        <div className="flex flex-wrap gap-2">
+          {iconOptions.map(({ key, Icon }) => (
+            <button key={key} onClick={() => setIcon(key)} className={cn("grid h-9 w-9 place-items-center rounded-lg border", icon === key ? "border-violet-500 bg-violet-50 text-violet-600" : "border-border bg-surface text-muted hover:bg-surface-2")}>
+              <Icon className="h-4 w-4" />
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="mt-3 space-y-2">
+        <label className="text-xs font-medium text-muted">Color</label>
+        <div className="flex flex-wrap gap-2">
+          {colorOptions.map((c) => (
+            <button key={c} onClick={() => setColor(c)} className={cn("h-7 w-7 rounded-full border-2", color === c ? "border-ink" : "border-transparent")} style={{ background: c }} />
+          ))}
+        </div>
+      </div>
       <div className="mt-5 flex justify-end gap-2">
         <button onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted hover:bg-surface-2">Cancel</button>
-        <button onClick={() => name.trim() && onDone()} className="rounded-xl bg-violet-500 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-600">Add Category</button>
+        <button onClick={() => name.trim() && onDone(name.trim(), icon, color)} disabled={!name.trim()} className="rounded-xl bg-violet-500 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-600 disabled:opacity-60">Add Category</button>
       </div>
     </Modal>
   );
@@ -731,6 +847,44 @@ function RenameModal({ initial, onClose, onDone }: { initial: string; onClose: (
       <div className="mt-5 flex justify-end gap-2">
         <button onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted hover:bg-surface-2">Cancel</button>
         <button onClick={() => name.trim() && onDone(name.trim())} disabled={!name.trim()} className="rounded-xl bg-violet-500 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-600 disabled:opacity-60">Rename</button>
+      </div>
+    </Modal>
+  );
+}
+
+function CategoryPickerModal({ title, categories, selected, onClose, onSelect }: {
+  title: string;
+  categories: DocCategory[];
+  selected?: string;
+  onClose: () => void;
+  onSelect: (category: string) => void;
+}) {
+  return (
+    <Modal open title={title} onClose={onClose} size="sm">
+      <div className="max-h-[60vh] space-y-1 overflow-y-auto pr-1">
+        {categories.map((c) => {
+          const Icon = catIconMap[c.icon] ?? FileText;
+          const isSelected = selected === c.name;
+          return (
+            <button
+              key={c.name}
+              onClick={() => onSelect(c.name)}
+              className={cn(
+                "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors",
+                isSelected ? "bg-violet-50 text-violet-700 ring-1 ring-violet-200" : "text-ink hover:bg-surface-2"
+              )}
+            >
+              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg" style={{ background: `${c.color}1a`, color: c.color }}>
+                <Icon className="h-4 w-4" />
+              </div>
+              <span className="flex-1">{c.name}</span>
+              {isSelected && <Check className="h-4 w-4 text-violet-600" />}
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-4 flex justify-end">
+        <button onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted hover:bg-surface-2">Cancel</button>
       </div>
     </Modal>
   );

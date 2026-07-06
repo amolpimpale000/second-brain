@@ -15,16 +15,19 @@ import path from "path";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED_EXTS = ["pdf", "jpg", "jpeg", "png", "docx", "doc", "xlsx", "xls", "txt", "webp"];
 const MAX_SIZE_MB = 50;
 
 const MIME: Record<string, string> = {
   pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
-  webp: "image/webp", txt: "text/plain",
+  webp: "image/webp", gif: "image/gif", bmp: "image/bmp", tiff: "image/tiff", tif: "image/tiff",
+  svg: "image/svg+xml", txt: "text/plain",
   doc: "application/msword",
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   xls: "application/vnd.ms-excel",
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  zip: "application/zip", rar: "application/vnd.rar", "7z": "application/x-7z-compressed",
 };
 
 export async function GET() {
@@ -55,10 +58,7 @@ export async function POST(request: NextRequest) {
 
     for (const file of files) {
       const originalExt = path.extname(file.name).slice(1).toLowerCase();
-      const ext = originalExt === "jpeg" ? "jpg" : originalExt;
-      if (!ALLOWED_EXTS.includes(ext)) {
-        return NextResponse.json({ error: `File type not allowed: ${ext}` }, { status: 400 });
-      }
+      const ext = originalExt === "jpeg" ? "jpg" : originalExt || "bin";
       if (file.size > MAX_SIZE_MB * 1024 * 1024) {
         return NextResponse.json({ error: `File too large (max ${MAX_SIZE_MB}MB): ${file.name}` }, { status: 400 });
       }
@@ -69,12 +69,13 @@ export async function POST(request: NextRequest) {
       const filename = `${id}-${safeName}.${ext}`;
 
       const bytes = Buffer.from(await file.arrayBuffer());
+      const contentType = MIME[ext] || file.type || "application/octet-stream";
       const { error } = await sb.storage
         .from(DOC_BUCKET)
-        .upload(filename, bytes, { contentType: MIME[ext] || "application/octet-stream", upsert: false });
+        .upload(filename, bytes, { contentType, upsert: false });
       if (error) throw error;
 
-      const isImg = ["jpg", "png", "webp"].includes(ext);
+      const isImg = file.type.startsWith("image/") || ["jpg", "jpeg", "png", "webp", "gif", "bmp", "tiff", "tif", "svg", "raw", "cr2", "nef", "arw"].includes(ext);
       const doc: StoredDoc = {
         id,
         name: baseName,
