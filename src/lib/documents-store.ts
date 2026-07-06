@@ -28,8 +28,17 @@ export function fmtSize(bytes: number) {
   return `${bytes} B`;
 }
 
-function isHostingerCwd(cwd: string) {
-  return existsSync(path.join(cwd, "public_html"));
+function resolveHostingerDocDir(cwd: string): string | null {
+  const normalized = cwd.replace(/\\/g, "/");
+  // If app runs directly inside public_html, Documents is a sibling.
+  if (normalized.endsWith("/public_html") || normalized.endsWith("/public_html/")) {
+    return path.join(cwd, "Documents");
+  }
+  // If app runs one level above public_html (common on Hostinger Node.js hosting).
+  if (existsSync(path.join(cwd, "public_html"))) {
+    return path.join(cwd, "public_html", "Documents");
+  }
+  return null;
 }
 
 export function getUploadDir() {
@@ -37,9 +46,8 @@ export function getUploadDir() {
   if (envPath) return path.resolve(envPath);
 
   const cwd = process.cwd();
-  if (isHostingerCwd(cwd)) {
-    return path.join(cwd, "public_html", "Documents");
-  }
+  const hostingerDir = resolveHostingerDocDir(cwd);
+  if (hostingerDir) return hostingerDir;
   return path.join(cwd, "public", "uploads", "documents");
 }
 
@@ -52,7 +60,7 @@ export function getBaseUrl() {
     return process.env.NEXT_PUBLIC_DOCUMENTS_BASE_URL.replace(/\/$/, "");
   }
   const cwd = process.cwd();
-  if (isHostingerCwd(cwd)) {
+  if (resolveHostingerDocDir(cwd)) {
     return "/Documents";
   }
   return "/uploads/documents";
