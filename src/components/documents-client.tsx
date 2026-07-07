@@ -165,7 +165,10 @@ export function DocumentsClient() {
 
   const live = useMemo(() => docs.filter((d) => !d.trashed), [docs]);
   const trashed = useMemo(() => docs.filter((d) => d.trashed), [docs]);
-  const photos = useMemo(() => live.filter((d) => d.kind === "image"), [live]);
+  // Photos tab = only what was actually uploaded via "Upload Photos" (tagged
+  // with the Images/Photos category), not every image-typed file that happens
+  // to live inside a regular document category.
+  const photos = useMemo(() => live.filter((d) => d.category === PHOTO_CATEGORY), [live]);
 
   /* accurate, computed data --------------------------------------------------*/
   const safeCategories = Array.isArray(categories) ? categories : defaultCategories;
@@ -308,6 +311,36 @@ export function DocumentsClient() {
     }
   };
 
+  const PROTECTED_CATEGORIES = ["Important Docs", PHOTO_CATEGORY];
+  const deleteCategory = async (name: string) => {
+    if (PROTECTED_CATEGORIES.includes(name)) {
+      flash(`"${name}" can't be deleted`);
+      return;
+    }
+    const affected = live.filter((d) => d.category === name);
+    if (affected.length > 0) {
+      const ok = window.confirm(
+        `${affected.length} document${affected.length > 1 ? "s" : ""} in "${name}" will be moved to "Important Docs". Delete this category?`
+      );
+      if (!ok) return;
+    }
+    setCategories((p) => p.filter((c) => c.name !== name));
+    if (activeCat === name) setActiveCat(null);
+    if (affected.length > 0) {
+      setDocs((p) => p.map((d) => (d.category === name ? { ...d, category: "Important Docs" } : d)));
+      await Promise.all(
+        affected.map((d) =>
+          fetch("/api/documents/category", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: d.id, category: "Important Docs" }),
+          }).catch(() => {})
+        )
+      );
+    }
+    flash(`Category "${name}" deleted`);
+  };
+
   const startReplace = (id: string) => { replacingId.current = id; replaceInputRef.current?.click(); };
   const onReplace = async (files: FileList | null) => {
     const id = replacingId.current;
@@ -395,17 +428,30 @@ export function DocumentsClient() {
               {categoryList.map((c) => {
                 const Icon = catIconMap[c.icon] ?? FileText;
                 const active = activeCat === c.name;
+                const protectedCat = PROTECTED_CATEGORIES.includes(c.name);
                 return (
-                  <button key={c.name} onClick={() => { if (c.name === PHOTO_CATEGORY) { setTab("photos"); setActiveCat(null); } else { setTab("all"); setActiveCat(active ? null : c.name); } }}
-                    className={cn("flex items-center gap-3 rounded-2xl border bg-card p-3 text-left shadow-card transition-colors hover:border-violet-200", active ? "border-violet-300 ring-1 ring-violet-200" : "border-border")}>
-                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: `${c.color}1a`, color: c.color }}>
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-ink">{c.name}</p>
-                      <p className="text-xs text-muted">{categoryCount(c.name)} files</p>
-                    </div>
-                  </button>
+                  <div key={c.name}
+                    className={cn("group relative flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-card transition-colors hover:border-violet-200", active ? "border-violet-300 ring-1 ring-violet-200" : "border-border")}>
+                    <button onClick={() => { if (c.name === PHOTO_CATEGORY) { setTab("photos"); setActiveCat(null); } else { setTab("all"); setActiveCat(active ? null : c.name); } }}
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: `${c.color}1a`, color: c.color }}>
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-ink">{c.name}</p>
+                        <p className="text-xs text-muted">{categoryCount(c.name)} files</p>
+                      </div>
+                    </button>
+                    {!protectedCat && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteCategory(c.name); }}
+                        title={`Delete ${c.name}`}
+                        className="absolute right-2 top-2 grid h-6 w-6 shrink-0 place-items-center rounded-lg text-faint opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                 );
               })}
               <button onClick={() => setModal("category")} className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border p-3 text-sm font-medium text-violet-600 hover:bg-violet-50">
@@ -710,6 +756,17 @@ function DocCard({ doc, onDelete, onDownload, onShare, onReplace, onRename, onCh
           ) : (
             <div className={cn("h-full w-full bg-gradient-to-br", doc.gradient ?? "from-violet-300 to-sky-200")} />
           )
+        ) : doc.ext === "PDF" && doc.url ? (
+          <div className="h-full w-full bg-white">
+            {/* Native browser PDF renderer gives a real first-page preview with no extra deps. */}
+            <iframe
+              src={`${doc.url}#toolbar=0&navpanes=0&scrollbar=0&view=Fit`}
+              className="pointer-events-none h-full w-full"
+              loading="lazy"
+              tabIndex={-1}
+              title={doc.name}
+            />
+          </div>
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2" style={{ background: `${catColor(doc.category)}12` }}>
             <div className="grid h-12 w-12 place-items-center rounded-xl bg-white shadow-sm" style={{ color: catColor(doc.category) }}><Icon className="h-6 w-6" /></div>
