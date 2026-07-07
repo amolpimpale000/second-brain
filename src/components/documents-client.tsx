@@ -74,15 +74,29 @@ function relTime(ms: number) {
   return `${Math.floor(d / 30)}mo ago`;
 }
 
-function usePersist<T>(key: string, seed: T) {
+function usePersist<T>(key: string, seed: T, validate?: (v: unknown) => v is T) {
   const [val, setVal] = useState<T>(seed);
   const ready = useRef(false);
   useEffect(() => {
-    try { const raw = localStorage.getItem(key); if (raw) setVal(JSON.parse(raw)); } catch {}
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (!validate || validate(parsed)) setVal(parsed);
+      }
+    } catch {}
     ready.current = true;
-  }, [key]);
+  }, [key, validate]);
   useEffect(() => { if (ready.current) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} } }, [key, val]);
   return [val, setVal] as const;
+}
+
+function isDocCategoryArray(v: unknown): v is DocCategory[] {
+  return Array.isArray(v) && v.every((c) => c && typeof c === "object" && typeof c.name === "string" && typeof c.icon === "string" && typeof c.color === "string");
+}
+
+function isDocFolderArray(v: unknown): v is typeof docFolders {
+  return Array.isArray(v) && v.every((f) => f && typeof f === "object" && typeof f.id === "string" && typeof f.name === "string");
 }
 
 function Menu({ items }: { items: { label: string; icon: React.ElementType; onClick: () => void; danger?: boolean }[] }) {
@@ -114,8 +128,8 @@ const PAGE_SIZE = 12;
 /* =========================================================================== */
 export function DocumentsClient() {
   const [docs, setDocs] = useState<DocItem[]>([]);
-  const [folders, setFolders] = usePersist("sb.docs.folders", docFolders);
-  const [categories, setCategories] = usePersist<DocCategory[]>("sb.docs.categories", defaultCategories);
+  const [folders, setFolders] = usePersist("sb.docs.folders", docFolders, isDocFolderArray);
+  const [categories, setCategories] = usePersist<DocCategory[]>("sb.docs.categories", defaultCategories, isDocCategoryArray);
   const [tab, setTab] = useState<"all" | "photos" | "folders" | "trash">("all");
   const [activeCat, setActiveCat] = useState<string | null>(null);
   const [sort, setSort] = useState("Recently Added");
@@ -154,11 +168,12 @@ export function DocumentsClient() {
   const photos = useMemo(() => live.filter((d) => d.kind === "image"), [live]);
 
   /* accurate, computed data --------------------------------------------------*/
+  const safeCategories = Array.isArray(categories) ? categories : defaultCategories;
   const categoryCount = (name: string) => live.filter((d) => d.category === name).length;
   const usedBytes = live.reduce((s, d) => s + parseSize(d.size), 0);
   const imageBytes = photos.reduce((s, d) => s + parseSize(d.size), 0);
   const docBytes = usedBytes - imageBytes;
-  const categoryList = categories.map((c) => ({ ...c, count: categoryCount(c.name) }));
+  const categoryList = safeCategories.map((c) => ({ ...c, count: categoryCount(c.name) }));
   const nonEmptyCats = categoryList.filter((c) => c.count > 0).length;
 
   const stats = [
