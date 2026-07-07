@@ -4,14 +4,7 @@ import {
   manuscriptsByStatus as sampleManuscriptsByStatus,
   quickActions as sampleQuickActions,
   revenueData as sampleRevenueData,
-  revenueBreakdownIjps as sampleRevenueBreakdownIjps,
   razorpayIncome as sampleRazorpayIncome,
-  googleAds as sampleGoogleAds,
-  expensesBreakdownIjps as sampleExpensesBreakdownIjps,
-  expenseTrend as sampleExpenseTrend,
-  profitabilityData as sampleProfitabilityData,
-  recentTransactions as sampleRecentTransactions,
-  expensesTable as sampleExpensesTable,
 } from "./ijps-data";
 import {
   getJournalCounts,
@@ -20,13 +13,19 @@ import {
   getJournalPaymentMethods,
   getJournalRecentTransactions,
 } from "./journal-queries";
+import { listExpenses, type JournalExpense } from "./journal-expenses-store";
 
 // ---------------------------------------------------------------------------
 // Generic data layer for any single-journal page (/journals/<code>).
-// All values are read-only. Expenses / Google Ads are not tracked in any of
-// these journal databases, so those sections keep sample placeholders until
-// a real expense-tracking data source is connected.
+// Manuscript/revenue figures are read-only, live from each journal's MySQL
+// database. Expenses aren't tracked in any journal database at all, so they
+// come from this app's own Supabase-backed expense tracker instead (see
+// journal-expenses-store.ts) — real once entered, honestly zero until then.
+// Google Ads has no connected data source, so that section is marked
+// unconnected rather than showing an invented number.
 // ---------------------------------------------------------------------------
+
+const EXPENSE_COLORS = ["#6366f1", "#3b82f6", "#ef4444", "#f59e0b", "#8b5cf6", "#94a3b8", "#14b8a6", "#ec4899"];
 
 export type JournalPageData = {
   ijpsKpis: typeof sampleIjpsKpis;
@@ -34,14 +33,20 @@ export type JournalPageData = {
   manuscriptsByStatus: typeof sampleManuscriptsByStatus;
   quickActions: typeof sampleQuickActions;
   revenueData: typeof sampleRevenueData;
-  revenueBreakdownIjps: typeof sampleRevenueBreakdownIjps;
+  revenueBreakdownIjps: { name: string; value: number; pct: number; color: string }[];
   razorpayIncome: typeof sampleRazorpayIncome;
-  googleAds: typeof sampleGoogleAds;
-  expensesBreakdownIjps: typeof sampleExpensesBreakdownIjps;
-  expenseTrend: typeof sampleExpenseTrend;
-  profitabilityData: typeof sampleProfitabilityData;
-  recentTransactions: typeof sampleRecentTransactions;
-  expensesTable: typeof sampleExpensesTable;
+  googleAds: { connected: false; totalSpend: 0; delta: 0; metrics: [] };
+  expensesBreakdownIjps: { name: string; value: number; pct: number; color: string }[];
+  expenseTrend: { label: string; value: number }[];
+  profitabilityData: { label: string; revenue: number; expenses: number; profit: number }[];
+  recentTransactions: Awaited<ReturnType<typeof getJournalRecentTransactions>>;
+  expensesTable: {
+    id: string; date: string; category: string; description: string;
+    amount: number; mode: string; paymentTo: string; bill: string; billUrl?: string;
+  }[];
+  totalExpenses: number;
+  netProfit: number;
+  journalCode: string;
 };
 
 const STATUS_COLORS = {
@@ -51,22 +56,37 @@ const STATUS_COLORS = {
   Revisions: "#f59e0b",
 };
 
+function fmtShortDate(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 export async function getJournalPageData(code: string, prefix: string): Promise<JournalPageData> {
-  const counts = await getJournalCounts(code, prefix);
-  const revenue = await getJournalRevenue(code, prefix);
-  const monthly = await getJournalMonthlyTrends(code, prefix);
-  const paymentMethods = await getJournalPaymentMethods(code, prefix);
-  const recentTransactions = await getJournalRecentTransactions(code, prefix, 8);
+  // The core manuscript/revenue numbers come from each journal's read-only
+  // MySQL database and must load correctly for the page to be useful at all,
+  // so those failures are allowed to propagate. Expenses live in a separate
+  // Supabase store this app owns — if that's misconfigured or briefly
+  // unavailable, the page should still render with real manuscript/revenue
+  // data and simply show zero expenses, not crash entirely.
+  const [counts, revenue, monthly, paymentMethods, recentTransactions] = await Promise.all([
+    getJournalCounts(code, prefix),
+    getJournalRevenue(code, prefix),
+    getJournalMonthlyTrends(code, prefix),
+    getJournalPaymentMethods(code, prefix),
+    getJournalRecentTransactions(code, prefix, 30),
+  ]);
+  const expenses = await listExpenses(code).catch((err) => {
+    console.error(`${code} expenses failed to load:`, err instanceof Error ? err.message : err);
+    return [];
+  });
+
+  // --- real expense totals (this journal's Supabase-tracked expenses) ---
+  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+  const netProfit = revenue.total - totalExpenses;
 
   // --- KPI cards ---
   const acceptanceRate = (counts.publishedArticles / Math.max(counts.totalManuscripts, 1)) * 100;
-
-  // Expenses are not tracked in the DB; keep sample ratio relative to real revenue.
-  const sampleRevenue = 625450;
-  const sampleExpenses = 182340;
-  const expenseRatio = sampleExpenses / sampleRevenue;
-  const totalExpenses = Math.round(revenue.total * expenseRatio);
-  const netProfit = revenue.total - totalExpenses;
 
   const ijpsKpis = sampleIjpsKpis.map((k) => {
     switch (k.label) {
@@ -131,12 +151,6 @@ export async function getJournalPageData(code: string, prefix: string): Promise<
       pct: revenue.total ? Math.round((revenue.plagiarism / revenue.total) * 100) : 0,
       color: "#f59e0b",
     },
-    {
-      name: "Subscription Fees",
-      value: Math.max(0, revenue.total - revenue.apc - revenue.plagiarism),
-      pct: 0,
-      color: "#22c55e",
-    },
   ];
   normalizePercentages(revenueBreakdownIjps);
 
@@ -147,8 +161,52 @@ export async function getJournalPageData(code: string, prefix: string): Promise<
     delta: sampleRazorpayIncome.delta,
     sources: paymentMethods.length > 0
       ? paymentMethods.map((m) => ({ name: m.name, pct: m.pct, amount: m.amount }))
-      : sampleRazorpayIncome.sources,
+      : [],
   };
+
+  // --- real expenses breakdown (by category) ---
+  const catMap = new Map<string, number>();
+  for (const e of expenses) catMap.set(e.category, (catMap.get(e.category) ?? 0) + e.amount);
+  const expensesBreakdownIjps = Array.from(catMap.entries())
+    .sort(([, a], [, b]) => b - a)
+    .map(([name, value], i) => ({
+      name,
+      value,
+      pct: totalExpenses ? Math.round((value / totalExpenses) * 100) : 0,
+      color: EXPENSE_COLORS[i % EXPENSE_COLORS.length],
+    }));
+
+  // --- real expense trend (by month, from actual entered expenses) ---
+  const trendMap = new Map<string, number>();
+  for (const e of expenses) {
+    const monthKey = e.date.slice(0, 7); // yyyy-mm
+    trendMap.set(monthKey, (trendMap.get(monthKey) ?? 0) + e.amount);
+  }
+  const expenseTrend = Array.from(trendMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([label, value]) => ({ label, value }));
+
+  // --- real profitability (revenue is all-time-to-date, so shown as a single current bar) ---
+  const profitabilityData = expenseTrend.length
+    ? expenseTrend.map((t) => ({ label: t.label, revenue: 0, expenses: t.value, profit: -t.value }))
+    : [];
+  if (profitabilityData.length) {
+    profitabilityData[profitabilityData.length - 1].revenue = revenue.total;
+    profitabilityData[profitabilityData.length - 1].profit = revenue.total - profitabilityData[profitabilityData.length - 1].expenses;
+  }
+
+  // --- real expenses table ---
+  const expensesTable = expenses.map((e) => ({
+    id: e.id,
+    date: fmtShortDate(e.date),
+    category: e.category,
+    description: e.description,
+    amount: e.amount,
+    mode: e.mode,
+    paymentTo: e.paymentTo,
+    bill: e.billName || (e.billUrl ? "Attachment" : "—"),
+    billUrl: e.billUrl,
+  }));
 
   return {
     ijpsKpis,
@@ -158,12 +216,15 @@ export async function getJournalPageData(code: string, prefix: string): Promise<
     revenueData: revenueData.length ? revenueData : sampleRevenueData,
     revenueBreakdownIjps,
     razorpayIncome,
-    googleAds: sampleGoogleAds,
-    expensesBreakdownIjps: sampleExpensesBreakdownIjps,
-    expenseTrend: sampleExpenseTrend,
-    profitabilityData: sampleProfitabilityData,
-    recentTransactions: recentTransactions.length > 0 ? recentTransactions : sampleRecentTransactions,
-    expensesTable: sampleExpensesTable,
+    googleAds: { connected: false, totalSpend: 0, delta: 0, metrics: [] },
+    expensesBreakdownIjps,
+    expenseTrend,
+    profitabilityData,
+    recentTransactions,
+    expensesTable,
+    totalExpenses,
+    netProfit,
+    journalCode: code,
   };
 }
 
