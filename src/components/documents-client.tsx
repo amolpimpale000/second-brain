@@ -169,6 +169,8 @@ export function DocumentsClient() {
   // with the Images/Photos category), not every image-typed file that happens
   // to live inside a regular document category.
   const photos = useMemo(() => live.filter((d) => d.category === PHOTO_CATEGORY), [live]);
+  // "All Documents" is the documents-only view — photos live exclusively under the Photos tab.
+  const documentsOnly = useMemo(() => live.filter((d) => d.category !== PHOTO_CATEGORY), [live]);
 
   /* accurate, computed data --------------------------------------------------*/
   const safeCategories = Array.isArray(categories) ? categories : defaultCategories;
@@ -199,7 +201,7 @@ export function DocumentsClient() {
 
   /* current-tab list + pagination -------------------------------------------*/
   const filtered = useMemo(() => {
-    const source = tab === "photos" ? photos : live;
+    const source = tab === "photos" ? photos : documentsOnly;
     let list = source.filter(
       (d) => (tab === "photos" || !activeCat || d.category === activeCat) &&
              (typeFilter === "All Types" || d.ext === typeFilter)
@@ -208,7 +210,7 @@ export function DocumentsClient() {
     else if (sort === "Size") list = [...list].sort((a, b) => parseSize(b.size) - parseSize(a.size));
     else list = [...list].sort((a, b) => docTime(b.id) - docTime(a.id));
     return list;
-  }, [tab, live, photos, activeCat, typeFilter, sort]);
+  }, [tab, documentsOnly, photos, activeCat, typeFilter, sort]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pages);
