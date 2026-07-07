@@ -5,6 +5,8 @@ import { portfolio, portfolioAllocation, portfolioGrowth } from "@/lib/data";
 import { getHoldings } from "@/lib/queries";
 import { inr } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
+
 export default async function InvestmentsPage() {
   const holdings = await getHoldings();
   const gain = portfolio.current - portfolio.invested;

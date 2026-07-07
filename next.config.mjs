@@ -7,20 +7,8 @@ const nextConfig = {
       { source: "/analytics", destination: "/", permanent: true },
     ];
   },
-  async headers() {
-    return [
-      {
-        // Keep HTML pages fresh so Hostinger CDN doesn't serve stale builds after deploy.
-        source: "/:path*",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=0, must-revalidate, s-maxage=60",
-          },
-        ],
-      },
-    ];
-  },
+  // HTML cache-control is handled by src/middleware.ts so static assets
+  // under /_next/ keep Next.js' immutable long-term caching.
 };
 
 export default nextConfig;

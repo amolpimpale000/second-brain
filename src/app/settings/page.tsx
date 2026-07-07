@@ -2,6 +2,8 @@ import { Database, Bell, Shield, User, Palette } from "lucide-react";
 import { Card, CardHeader, PageHeader } from "@/components/ui";
 import { owner } from "@/lib/data";
 
+export const dynamic = "force-dynamic";
+
 const rows = [
   { icon: <User className="h-5 w-5" />, title: "Profile", desc: "Name, email, and role", value: owner.email },
   { icon: <Database className="h-5 w-5" />, title: "Data Source", desc: "Connect your database to replace sample data", value: "Not connected" },

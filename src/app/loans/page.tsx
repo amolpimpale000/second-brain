@@ -3,6 +3,8 @@ import { Card, CardHeader, PageHeader, ProgressBar, StatCard } from "@/component
 import { getLoans } from "@/lib/queries";
 import { inr } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
+
 export default async function LoansPage() {
   const loans = await getLoans();
   const outstanding = loans.reduce((s, l) => s + l.outstanding, 0);

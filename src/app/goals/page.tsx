@@ -3,6 +3,8 @@ import { Card, CardHeader, PageHeader, ProgressBar, StatCard } from "@/component
 import { getGoals } from "@/lib/queries";
 import { inr } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
+
 const icons: Record<string, React.ReactNode> = {
   car: <Car className="h-5 w-5" />,
   heart: <Heart className="h-5 w-5" />,
