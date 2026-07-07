@@ -9,11 +9,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { MultiLineChart, StackedBars, Sparkline } from "@/components/charts";
 import { Dropdown } from "@/components/vault-ui";
 import { cn, inr } from "@/lib/utils";
-import {
-  jmStats, submissionsTrend, submissionsByJournal, jmActivities, journalPerformance,
-  revenueBreakdown, articleStatus, submissionSource, financialSummary, keyMetrics,
-  subjectAreas, subscription, publicationTrend, jmAlerts, quickActionsJM, employees,
-} from "@/lib/data";
+import { type JournalDashboardData } from "@/lib/journal-dashboard";
 
 const statTone: Record<string, string> = {
   indigo: "bg-indigo-100 text-indigo-600", blue: "bg-blue-100 text-blue-600",
@@ -89,15 +85,26 @@ function Legend({ items }: { items: { name: string; value: number; pct?: number;
   );
 }
 
-export function JournalManagementClient() {
+export function JournalManagementClient({ data }: { data: JournalDashboardData }) {
   const [sortKey, setSortKey] = useState<"score" | "handled" | "turnaround">("score");
-  const sortedEmployees = [...employees].sort((a, b) =>
+  const sortedEmployees = [...data.employees].sort((a, b) =>
     sortKey === "turnaround" ? a.turnaround - b.turnaround : b[sortKey] - a[sortKey]
   );
-  const totalHandled = employees.reduce((s, e) => s + e.handled, 0);
-  const totalCompleted = employees.reduce((s, e) => s + e.completed, 0);
-  const avgTurn = (employees.reduce((s, e) => s + e.turnaround, 0) / employees.length).toFixed(1);
-  const avgScore = Math.round(employees.reduce((s, e) => s + e.score, 0) / employees.length);
+  const totalHandled = data.employees.reduce((s, e) => s + e.handled, 0);
+  const totalCompleted = data.employees.reduce((s, e) => s + e.completed, 0);
+  const avgTurn = (data.employees.reduce((s, e) => s + e.turnaround, 0) / data.employees.length).toFixed(1);
+  const avgScore = Math.round(data.employees.reduce((s, e) => s + e.score, 0) / data.employees.length);
+
+  // Aggregates computed from real + placeholder journal data.
+  const totalJournalManuscripts = data.journalPerformance.reduce((s, j) => s + j.manuscripts, 0);
+  const totalJournalPublished = data.journalPerformance.reduce((s, j) => s + j.published, 0);
+  const avgAcceptance = data.journalPerformance.reduce((s, j) => s + j.acceptance, 0) / data.journalPerformance.length || 0;
+  const avgImpact = data.journalPerformance.reduce((s, j) => s + j.impact, 0) / data.journalPerformance.length || 0;
+  const totalJournalRevenue = data.journalPerformance.reduce((s, j) => s + j.revenue, 0);
+  const avgGrowth = data.journalPerformance.reduce((s, j) => s + j.growth, 0) / data.journalPerformance.length || 0;
+  const totalSubmissionsByJournal = data.submissionsByJournal.reduce((s, j) => s + j.value, 0);
+  const totalArticleStatus = data.articleStatus.reduce((s, a) => s + a.value, 0);
+  const totalSubmissionSource = data.submissionSource.reduce((s, a) => s + a.value, 0);
 
   return (
     <div className="animate-fade-up space-y-5">
@@ -108,7 +115,7 @@ export function JournalManagementClient() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {jmStats.map((s) => {
+        {data.jmStats.map((s) => {
           const Icon = statIcon[s.icon];
           return (
             <div key={s.label} className="rounded-2xl border border-border bg-card p-4 shadow-card">
@@ -136,7 +143,7 @@ export function JournalManagementClient() {
               <span key={n} className="flex items-center gap-1.5 text-muted"><span className="h-2 w-2 rounded-full" style={{ background: c }} />{n}</span>
             ))}
           </div>
-          <MultiLineChart data={submissionsTrend} series={[
+          <MultiLineChart data={data.submissionsTrend} series={[
             { key: "total", name: "Total Submitted", color: "#6366f1" },
             { key: "review", name: "Under Review", color: "#3b82f6" },
             { key: "accepted", name: "Accepted", color: "#22c55e" },
@@ -146,14 +153,14 @@ export function JournalManagementClient() {
 
         <Panel title="Manuscripts by Journal">
           <div className="flex items-center gap-4">
-            <Donut data={submissionsByJournal} center="1,248" sub="Total" />
-            <Legend items={submissionsByJournal} />
+            <Donut data={data.submissionsByJournal} center={totalSubmissionsByJournal.toLocaleString("en-IN")} sub="Total" />
+            <Legend items={data.submissionsByJournal} />
           </div>
         </Panel>
 
         <Panel title="Recent Activities" action={viewAll}>
           <div className="space-y-3.5">
-            {jmActivities.map((a) => {
+            {data.jmActivities.map((a) => {
               const Icon = actIcon[a.icon];
               return (
                 <div key={a.id} className="flex items-start gap-2.5">
@@ -187,7 +194,7 @@ export function JournalManagementClient() {
                 </tr>
               </thead>
               <tbody>
-                {journalPerformance.map((j) => (
+                {data.journalPerformance.map((j) => (
                   <tr key={j.code} className="border-b border-border last:border-0">
                     <td className="py-3">
                       <div className="flex items-center gap-2.5">
@@ -208,12 +215,12 @@ export function JournalManagementClient() {
                 ))}
                 <tr className="border-t-2 border-border font-semibold">
                   <td className="py-3 text-ink">Total / Average</td>
-                  <td className="py-3 text-right text-ink">1,248</td>
-                  <td className="py-3 text-right text-ink">842</td>
-                  <td className="py-3 text-right text-muted">67.5%</td>
-                  <td className="py-3 text-right text-ink">3.196</td>
-                  <td className="py-3 text-right text-ink">{inr(1875450)}</td>
-                  <td className="py-3 text-right"><Delta v={24.8} /></td>
+                  <td className="py-3 text-right text-ink">{totalJournalManuscripts.toLocaleString("en-IN")}</td>
+                  <td className="py-3 text-right text-ink">{totalJournalPublished.toLocaleString("en-IN")}</td>
+                  <td className="py-3 text-right text-muted">{avgAcceptance.toFixed(1)}%</td>
+                  <td className="py-3 text-right text-ink">{avgImpact.toFixed(3)}</td>
+                  <td className="py-3 text-right text-ink">{inr(totalJournalRevenue)}</td>
+                  <td className="py-3 text-right"><Delta v={avgGrowth} /></td>
                 </tr>
               </tbody>
             </table>
@@ -227,9 +234,9 @@ export function JournalManagementClient() {
             <Delta v={24.8} />
           </div>
           <div className="mt-3 flex items-center gap-3">
-            <Donut data={revenueBreakdown} center="" sub="" />
+            <Donut data={data.revenueBreakdown} center="" sub="" />
             <div className="flex-1 space-y-2.5">
-              {revenueBreakdown.map((r) => (
+              {data.revenueBreakdown.map((r) => (
                 <div key={r.name} className="text-sm">
                   <div className="flex items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-full" style={{ background: r.color }} />
@@ -248,14 +255,14 @@ export function JournalManagementClient() {
       <div className="grid gap-5 xl:grid-cols-3">
         <Panel title="Article Status Overview" action={period}>
           <div className="flex items-center gap-4">
-            <Donut data={articleStatus} center="1,248" sub="Total" />
-            <Legend items={articleStatus} />
+            <Donut data={data.articleStatus} center={totalArticleStatus.toLocaleString("en-IN")} sub="Total" />
+            <Legend items={data.articleStatus} />
           </div>
         </Panel>
 
         <Panel title="Financial Overview" action={period}>
           <div className="space-y-3">
-            {financialSummary.map((f) => (
+            {data.financialSummary.map((f) => (
               <div key={f.label} className="flex items-center gap-3 rounded-xl border border-border p-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-muted">{f.label}</p>
@@ -270,7 +277,7 @@ export function JournalManagementClient() {
 
         <Panel title="Quick Actions">
           <div className="space-y-1">
-            {quickActionsJM.map((a) => {
+            {data.quickActionsJM.map((a) => {
               const Icon = qaIcon[a.icon];
               return (
                 <button key={a.label} className="flex w-full items-center gap-3 rounded-xl border border-border px-3 py-2.5 text-left text-sm font-medium text-ink transition-colors hover:bg-surface-2">
@@ -287,7 +294,7 @@ export function JournalManagementClient() {
       <div className="grid gap-5 xl:grid-cols-4">
         <Panel title="Key Metrics Trend" action={period} className="xl:col-span-2">
           <div className="grid grid-cols-2 gap-3">
-            {keyMetrics.map((m) => (
+            {data.keyMetrics.map((m) => (
               <div key={m.label} className="rounded-xl border border-border p-3">
                 <p className="text-xs text-muted">{m.label}</p>
                 <div className="flex items-center gap-2">
@@ -302,7 +309,7 @@ export function JournalManagementClient() {
 
         <Panel title="Top Subject Areas" action={viewAll}>
           <div className="space-y-3">
-            {subjectAreas.map((s) => (
+            {data.subjectAreas.map((s) => (
               <div key={s.name}>
                 <div className="mb-1 flex justify-between text-xs"><span className="text-muted">{s.name}</span><span className="font-medium text-ink">{s.pct}%</span></div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full" style={{ width: `${s.pct}%`, background: s.color }} /></div>
@@ -313,7 +320,7 @@ export function JournalManagementClient() {
 
         <Panel title="Subscription & Membership" action={viewAll}>
           <div className="space-y-3">
-            {subscription.map((s) => {
+            {data.subscription.map((s) => {
               const Icon = subIcon[s.icon];
               return (
                 <div key={s.label} className="flex items-center gap-3 rounded-xl border border-border p-3">
@@ -331,8 +338,8 @@ export function JournalManagementClient() {
       <div className="grid gap-5 xl:grid-cols-3">
         <Panel title="Submission Source">
           <div className="flex items-center gap-4">
-            <Donut data={submissionSource} center="1,248" sub="Total" />
-            <Legend items={submissionSource} />
+            <Donut data={data.submissionSource} center={totalSubmissionSource.toLocaleString("en-IN")} sub="Total" />
+            <Legend items={data.submissionSource} />
           </div>
         </Panel>
 
@@ -341,12 +348,12 @@ export function JournalManagementClient() {
             <span className="flex items-center gap-1.5 text-muted"><span className="h-2 w-2 rounded-full bg-[#22c55e]" />Published</span>
             <span className="flex items-center gap-1.5 text-muted"><span className="h-2 w-2 rounded-full bg-[#3b82f6]" />Accepted</span>
           </div>
-          <StackedBars data={publicationTrend} series={[{ key: "accepted", color: "#3b82f6" }, { key: "published", color: "#22c55e" }]} />
+          <StackedBars data={data.publicationTrend} series={[{ key: "accepted", color: "#3b82f6" }, { key: "published", color: "#22c55e" }]} />
         </Panel>
 
         <Panel title="Alerts & Notifications">
           <div className="space-y-2.5">
-            {jmAlerts.map((a) => (
+            {data.jmAlerts.map((a) => (
               <div key={a.id} className={cn("flex items-center gap-2.5 rounded-xl border p-3 text-sm", alertTone[a.tone])}>
                 <Bell className="h-4 w-4 shrink-0" />
                 <span className="flex-1">{a.text}</span>
@@ -367,7 +374,7 @@ export function JournalManagementClient() {
       >
         <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
           {[
-            { label: "Active Staff", value: `${employees.length}`, icon: Users, tone: "bg-indigo-50 text-indigo-600" },
+            { label: "Active Staff", value: `${data.employees.length}`, icon: Users, tone: "bg-indigo-50 text-indigo-600" },
             { label: "Tasks Completed", value: `${totalCompleted}`, icon: CheckCircle2, tone: "bg-green-50 text-green-600" },
             { label: "Avg Turnaround", value: `${avgTurn} days`, icon: Clock, tone: "bg-amber-50 text-amber-500" },
             { label: "Avg Productivity", value: `${avgScore}%`, icon: TrendingUp, tone: "bg-emerald-50 text-emerald-600" },
