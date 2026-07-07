@@ -1,11 +1,24 @@
 import {
-  createIjpsConnection,
-  type IjpsConnectionConfig,
-} from "./ijps-db";
+  createJournalConnection,
+  type JournalConnectionConfig,
+} from "./journal-db";
+import { type IjpsConnectionConfig } from "./ijps-db";
 
 // ---------------------------------------------------------------------------
 // Journal dashboard data layer — READ-ONLY queries.
 // Every function here uses SELECT statements only. No INSERT/UPDATE/DELETE.
+//
+// All four connected journals (IJPS, IJSRT, IJMPS, IJES) run the same
+// underlying PHP journal-management schema: <prefix>_tblmanuscript,
+// <prefix>_tblarticle, <prefix>_tblauthor, <prefix>_tblsubscriber,
+// <prefix>_tblemployee, <prefix>_tblstatus, <prefix>_tblarticaltype, plus two
+// shared (unprefixed) tables: tbl_check_plagarism and tblactivitylog.
+//
+// The one real structural difference is where article-processing-charge
+// payments live: IJPS/IJSRT have a dedicated <prefix>_tblpayment table;
+// IJMPS/IJES don't, and use the shared tbl_payment_details table instead.
+// Both have the same json_details / article_id / created_date / is_deleted
+// columns, so resolvePaymentTable() picks whichever exists per journal.
 // ---------------------------------------------------------------------------
 
 export type IjpsCounts = {
@@ -56,9 +69,27 @@ export type IjpsEmployee = {
   designation?: string;
 };
 
-// Status IDs observed in ijps_tblstatus:
+export type IjpsPaymentMethod = {
+  name: string;
+  amount: number;
+  pct: number;
+  count: number;
+};
+
+export type IjpsRecentTransaction = {
+  id: string;
+  date: string;
+  type: "Income" | "Expense";
+  category: string;
+  description: string;
+  amount: number;
+  mode: string;
+  source: string;
+};
+
+// Status IDs observed in <prefix>_tblstatus (consistent across all journals):
 // 1 = Received, 2 = Accepted, 3 = Paid, 4 = Published, 5 = Rejected, 6 = Revision Required
-const IJPS_STATUS = {
+const STATUS = {
   RECEIVED: 1,
   ACCEPTED: 2,
   PAID: 3,
@@ -67,12 +98,44 @@ const IJPS_STATUS = {
   REVISION_REQUIRED: 6,
 } as const;
 
-export async function getIjpsCounts(
-  cfg?: IjpsConnectionConfig
-): Promise<IjpsCounts> {
-  const conn = await createIjpsConnection(cfg);
+async function connect(code: string, cfg?: JournalConnectionConfig) {
+  return createJournalConnection(code, cfg);
+}
+
+/** Which payment table this journal actually has real rows in. Cached per journal code. */
+const paymentTableCache = new Map<string, string>();
+
+async function resolvePaymentTable(conn: any, code: string, prefix: string): Promise<string> {
+  const cached = paymentTableCache.get(code);
+  if (cached) return cached;
+
+  // A dedicated <prefix>_tblpayment table can exist but be unused/legacy
+  // (e.g. IJSRT's has 0 rows while its real payments live in
+  // tbl_payment_details), so check for actual data, not just existence.
+  const dedicated = `${prefix}_tblpayment`;
   try {
-    const [[totals]] = await conn.execute<any>(`
+    const result: any = await conn.execute(`SELECT COUNT(*) AS cnt FROM ${dedicated}`);
+    const row = result[0][0];
+    if (Number(row.cnt) > 0) {
+      paymentTableCache.set(code, dedicated);
+      return dedicated;
+    }
+  } catch {
+    // table doesn't exist — fall through to the shared table
+  }
+  paymentTableCache.set(code, "tbl_payment_details");
+  return "tbl_payment_details";
+}
+
+export async function getJournalCounts(
+  code: string,
+  prefix: string,
+  cfg?: JournalConnectionConfig
+): Promise<IjpsCounts> {
+  const conn = await connect(code, cfg);
+  try {
+    const [[totals]] = await conn.execute<any>(
+      `
       SELECT
         COUNT(*) AS totalManuscripts,
         SUM(CASE WHEN statusID = ? THEN 1 ELSE 0 END) AS received,
@@ -81,31 +144,30 @@ export async function getIjpsCounts(
         SUM(CASE WHEN statusID = ? THEN 1 ELSE 0 END) AS published,
         SUM(CASE WHEN statusID = ? THEN 1 ELSE 0 END) AS rejected,
         SUM(CASE WHEN statusID = ? THEN 1 ELSE 0 END) AS revisionRequired
-      FROM ijps_tblmanuscript
+      FROM ${prefix}_tblmanuscript
       WHERE isActive = 1
-    `, [
-      IJPS_STATUS.RECEIVED,
-      IJPS_STATUS.ACCEPTED,
-      IJPS_STATUS.PAID,
-      IJPS_STATUS.PUBLISHED,
-      IJPS_STATUS.REJECTED,
-      IJPS_STATUS.REVISION_REQUIRED,
-    ]);
+    `,
+      [
+        STATUS.RECEIVED,
+        STATUS.ACCEPTED,
+        STATUS.PAID,
+        STATUS.PUBLISHED,
+        STATUS.REJECTED,
+        STATUS.REVISION_REQUIRED,
+      ]
+    );
 
     const [[articles]] = await conn.execute<any>(
-      "SELECT COUNT(*) AS cnt FROM ijps_tblarticle WHERE isActive = 1"
+      `SELECT COUNT(*) AS cnt FROM ${prefix}_tblarticle WHERE isActive = 1`
     );
-
     const [[authors]] = await conn.execute<any>(
-      "SELECT COUNT(*) AS cnt FROM ijps_tblauthor WHERE isActive = 1"
+      `SELECT COUNT(*) AS cnt FROM ${prefix}_tblauthor WHERE isActive = 1`
     );
-
     const [[subscribers]] = await conn.execute<any>(
-      "SELECT COUNT(*) AS cnt FROM ijps_tblsubscriber WHERE isActive = 1"
+      `SELECT COUNT(*) AS cnt FROM ${prefix}_tblsubscriber WHERE isActive = 1`
     );
-
     const [[employees]] = await conn.execute<any>(
-      "SELECT COUNT(*) AS cnt FROM ijps_tblemployee WHERE isActive = 1"
+      `SELECT COUNT(*) AS cnt FROM ${prefix}_tblemployee WHERE isActive = 1`
     );
 
     const received = Number(totals.received ?? 0);
@@ -130,13 +192,16 @@ export async function getIjpsCounts(
   }
 }
 
-export async function getIjpsRevenue(
-  cfg?: IjpsConnectionConfig
+export async function getJournalRevenue(
+  code: string,
+  prefix: string,
+  cfg?: JournalConnectionConfig
 ): Promise<IjpsRevenue> {
-  const conn = await createIjpsConnection(cfg);
+  const conn = await connect(code, cfg);
   try {
+    const paymentTable = await resolvePaymentTable(conn, code, prefix);
     const [apcRows] = await conn.execute<any>(
-      "SELECT json_details FROM ijps_tblpayment WHERE is_deleted = 0"
+      `SELECT json_details FROM ${paymentTable} WHERE is_deleted = 0`
     );
 
     let apc = 0;
@@ -179,117 +244,113 @@ export async function getIjpsRevenue(
   }
 }
 
-export async function getIjpsMonthlyTrends(
-  cfg?: IjpsConnectionConfig,
+export async function getJournalMonthlyTrends(
+  code: string,
+  prefix: string,
+  cfg?: JournalConnectionConfig,
   months = 12
 ): Promise<MonthlyPoint[]> {
-  const conn = await createIjpsConnection(cfg);
+  const conn = await connect(code, cfg);
   try {
-    const [submissionRows] = await conn.execute<any>(`
+    const [submissionRows] = await conn.execute<any>(
+      `
       SELECT DATE_FORMAT(createdDate, '%Y-%m') AS month, COUNT(*) AS cnt
-      FROM ijps_tblmanuscript
+      FROM ${prefix}_tblmanuscript
       WHERE isActive = 1 AND createdDate >= DATE_SUB(NOW(), INTERVAL ? MONTH)
       GROUP BY month
       ORDER BY month
-    `, [months]);
+    `,
+      [months]
+    );
 
-    const [articleRows] = await conn.execute<any>(`
+    const [articleRows] = await conn.execute<any>(
+      `
       SELECT DATE_FORMAT(createdDate, '%Y-%m') AS month, COUNT(*) AS cnt
-      FROM ijps_tblarticle
+      FROM ${prefix}_tblarticle
       WHERE isActive = 1 AND createdDate >= DATE_SUB(NOW(), INTERVAL ? MONTH)
       GROUP BY month
       ORDER BY month
-    `, [months]);
+    `,
+      [months]
+    );
 
-    const [acceptedRows] = await conn.execute<any>(`
+    const [acceptedRows] = await conn.execute<any>(
+      `
       SELECT DATE_FORMAT(acceptedDate, '%Y-%m') AS month, COUNT(*) AS cnt
-      FROM ijps_tblarticle
+      FROM ${prefix}_tblarticle
       WHERE isActive = 1 AND acceptedDate >= DATE_SUB(NOW(), INTERVAL ? MONTH)
       GROUP BY month
       ORDER BY month
-    `, [months]);
+    `,
+      [months]
+    );
 
     const map = new Map<string, MonthlyPoint>();
 
     for (const r of submissionRows) {
-      map.set(r.month, {
-        month: r.month,
-        submissions: Number(r.cnt),
-        articles: 0,
-        accepted: 0,
-      });
+      map.set(r.month, { month: r.month, submissions: Number(r.cnt), articles: 0, accepted: 0 });
     }
-
     for (const r of articleRows) {
-      const existing = map.get(r.month) ?? {
-        month: r.month,
-        submissions: 0,
-        articles: 0,
-        accepted: 0,
-      };
+      const existing = map.get(r.month) ?? { month: r.month, submissions: 0, articles: 0, accepted: 0 };
       existing.articles = Number(r.cnt);
       map.set(r.month, existing);
     }
-
     for (const r of acceptedRows) {
-      const existing = map.get(r.month) ?? {
-        month: r.month,
-        submissions: 0,
-        articles: 0,
-        accepted: 0,
-      };
+      const existing = map.get(r.month) ?? { month: r.month, submissions: 0, articles: 0, accepted: 0 };
       existing.accepted = Number(r.cnt);
       map.set(r.month, existing);
     }
 
-    return Array.from(map.values()).sort((a, b) =>
-      a.month.localeCompare(b.month)
-    );
+    return Array.from(map.values()).sort((a, b) => a.month.localeCompare(b.month));
   } finally {
     await conn.end();
   }
 }
 
-export async function getIjpsArticleTypes(
-  cfg?: IjpsConnectionConfig
+export async function getJournalArticleTypes(
+  code: string,
+  prefix: string,
+  cfg?: JournalConnectionConfig
 ): Promise<ArticleTypeStat[]> {
-  const conn = await createIjpsConnection(cfg);
+  const conn = await connect(code, cfg);
   try {
     const [rows] = await conn.execute<any>(`
       SELECT at.articalTypeName AS name, COUNT(a.articleID) AS count
-      FROM ijps_tblarticaltype at
-      LEFT JOIN ijps_tblarticle a ON a.articalTypeID = at.articalTypeID AND a.isActive = 1
+      FROM ${prefix}_tblarticaltype at
+      LEFT JOIN ${prefix}_tblarticle a ON a.articalTypeID = at.articalTypeID AND a.isActive = 1
       GROUP BY at.articalTypeID, at.articalTypeName
       ORDER BY count DESC
     `);
 
-    return rows.map((r: any) => ({
-      name: r.name,
-      count: Number(r.count ?? 0),
-    }));
+    return rows.map((r: any) => ({ name: r.name, count: Number(r.count ?? 0) }));
   } finally {
     await conn.end();
   }
 }
 
-export async function getIjpsRecentActivity(
-  cfg?: IjpsConnectionConfig,
+export async function getJournalRecentActivity(
+  code: string,
+  prefix: string,
+  cfg?: JournalConnectionConfig,
   limit = 8
 ): Promise<IjpsActivity[]> {
-  const conn = await createIjpsConnection(cfg);
+  const conn = await connect(code, cfg);
   try {
-    const [rows] = await conn.execute<any>(`
+    const [rows] = await conn.execute<any>(
+      `
       SELECT description, createdDate
       FROM tblactivitylog
       WHERE isActive = 1
       ORDER BY createdDate DESC
       LIMIT ?
-    `, [limit]);
+    `,
+      [limit]
+    );
 
     return rows.map((r: any, idx: number) => ({
-      id: `ijps-act-${idx}`,
+      id: `${code.toLowerCase()}-act-${idx}`,
       text: r.description?.slice(0, 80) || "Activity",
-      meta: "IJPS",
+      meta: code,
       time: formatRelativeTime(r.createdDate),
     }));
   } finally {
@@ -297,14 +358,18 @@ export async function getIjpsRecentActivity(
   }
 }
 
-export async function getIjpsEmployees(
-  cfg?: IjpsConnectionConfig
+export async function getJournalEmployees(
+  code: string,
+  prefix: string,
+  cfg?: JournalConnectionConfig
 ): Promise<IjpsEmployee[]> {
-  const conn = await createIjpsConnection(cfg);
+  const conn = await connect(code, cfg);
   try {
+    // Role/title column naming varies per journal (designation, position,
+    // role, ...), so select everything and read defensively below.
     const [rows] = await conn.execute<any>(`
-      SELECT employeeID, name, email, designation, role
-      FROM ijps_tblemployee
+      SELECT *
+      FROM ${prefix}_tblemployee
       WHERE isActive = 1
       ORDER BY employeeID
     `);
@@ -313,50 +378,23 @@ export async function getIjpsEmployees(
       id: Number(r.employeeID),
       name: r.name,
       email: r.email,
-      role: r.role || r.designation || "Staff",
-      designation: r.designation,
+      role: r.role || r.designation || r.position || "Staff",
+      designation: r.designation ?? r.position,
     }));
   } finally {
     await conn.end();
   }
 }
 
-function formatRelativeTime(dateInput: string | Date): string {
-  const date = new Date(dateInput);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSec = Math.floor(diffMs / 1000);
-  const diffMin = Math.floor(diffSec / 60);
-  const diffHour = Math.floor(diffMin / 60);
-  const diffDay = Math.floor(diffHour / 24);
-
-  if (diffMin < 1) return "just now";
-  if (diffMin < 60) return `${diffMin} min ago`;
-  if (diffHour < 24) return `${diffHour} hour${diffHour > 1 ? "s" : ""} ago`;
-  if (diffDay < 30) return `${diffDay} day${diffDay > 1 ? "s" : ""} ago`;
-  return date.toLocaleDateString("en-IN");
-}
-
-
-// ---------------------------------------------------------------------------
-// IJPS-specific page (/journals/ijps) data
-// ---------------------------------------------------------------------------
-
-export type IjpsPaymentMethod = {
-  name: string;
-  amount: number;
-  pct: number;
-  count: number;
-};
-
-export async function getIjpsPaymentMethods(
-  cfg?: IjpsConnectionConfig
+export async function getJournalPaymentMethods(
+  code: string,
+  prefix: string,
+  cfg?: JournalConnectionConfig
 ): Promise<IjpsPaymentMethod[]> {
-  const conn = await createIjpsConnection(cfg);
+  const conn = await connect(code, cfg);
   try {
-    const [rows] = await conn.execute<any>(
-      "SELECT json_details FROM ijps_tblpayment WHERE is_deleted = 0"
-    );
+    const paymentTable = await resolvePaymentTable(conn, code, prefix);
+    const [rows] = await conn.execute<any>(`SELECT json_details FROM ${paymentTable} WHERE is_deleted = 0`);
 
     const methods = new Map<string, { amount: number; count: number }>();
     let total = 0;
@@ -396,30 +434,28 @@ export async function getIjpsPaymentMethods(
   }
 }
 
-export type IjpsRecentTransaction = {
-  id: string;
-  date: string;
-  type: "Income" | "Expense";
-  category: string;
-  description: string;
-  amount: number;
-  mode: string;
-  source: string;
-};
-
-export async function getIjpsRecentTransactions(
+export async function getJournalRecentTransactions(
+  code: string,
+  prefix: string,
   limit = 10,
-  cfg?: IjpsConnectionConfig
+  cfg?: JournalConnectionConfig
 ): Promise<IjpsRecentTransaction[]> {
-  const conn = await createIjpsConnection(cfg);
+  const conn = await connect(code, cfg);
   try {
-    const [rows] = await conn.execute<any>(`
-      SELECT json_details, created_date, article_id
-      FROM ijps_tblpayment
+    const paymentTable = await resolvePaymentTable(conn, code, prefix);
+    // Column naming for the article reference differs between journals'
+    // payment tables (article_id vs articleId), so select everything and
+    // read defensively below instead of hardcoding one name.
+    const [rows] = await conn.execute<any>(
+      `
+      SELECT *
+      FROM ${paymentTable}
       WHERE is_deleted = 0
       ORDER BY created_date DESC
       LIMIT ?
-    `, [limit]);
+    `,
+      [limit]
+    );
 
     return rows.map((r: any, idx: number) => {
       let amount = 0;
@@ -435,7 +471,7 @@ export async function getIjpsRecentTransactions(
       }
 
       return {
-        id: `ijps-txn-${idx}`,
+        id: `${code.toLowerCase()}-txn-${idx}`,
         date: new Date(r.created_date).toLocaleDateString("en-IN", {
           day: "2-digit",
           month: "short",
@@ -443,7 +479,7 @@ export async function getIjpsRecentTransactions(
         }),
         type: "Income" as const,
         category: "Article Processing",
-        description: `Article ID: ${r.article_id || "N/A"}`,
+        description: `Article ID: ${r.article_id ?? r.articleId ?? r.manuscriptID ?? "N/A"}`,
         amount: Math.round(amount),
         mode: method,
         source: "Razorpay",
@@ -452,4 +488,49 @@ export async function getIjpsRecentTransactions(
   } finally {
     await conn.end();
   }
+}
+
+function formatRelativeTime(dateInput: string | Date): string {
+  const date = new Date(dateInput);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin} min ago`;
+  if (diffHour < 24) return `${diffHour} hour${diffHour > 1 ? "s" : ""} ago`;
+  if (diffDay < 30) return `${diffDay} day${diffDay > 1 ? "s" : ""} ago`;
+  return date.toLocaleDateString("en-IN");
+}
+
+// ---------------------------------------------------------------------------
+// IJPS-specific wrappers (backward compatible with existing callers)
+// ---------------------------------------------------------------------------
+
+export async function getIjpsCounts(cfg?: IjpsConnectionConfig) {
+  return getJournalCounts("IJPS", "ijps", cfg);
+}
+export async function getIjpsRevenue(cfg?: IjpsConnectionConfig) {
+  return getJournalRevenue("IJPS", "ijps", cfg);
+}
+export async function getIjpsMonthlyTrends(cfg?: IjpsConnectionConfig, months = 12) {
+  return getJournalMonthlyTrends("IJPS", "ijps", cfg, months);
+}
+export async function getIjpsArticleTypes(cfg?: IjpsConnectionConfig) {
+  return getJournalArticleTypes("IJPS", "ijps", cfg);
+}
+export async function getIjpsRecentActivity(cfg?: IjpsConnectionConfig, limit = 8) {
+  return getJournalRecentActivity("IJPS", "ijps", cfg, limit);
+}
+export async function getIjpsEmployees(cfg?: IjpsConnectionConfig) {
+  return getJournalEmployees("IJPS", "ijps", cfg);
+}
+export async function getIjpsPaymentMethods(cfg?: IjpsConnectionConfig) {
+  return getJournalPaymentMethods("IJPS", "ijps", cfg);
+}
+export async function getIjpsRecentTransactions(limit = 10, cfg?: IjpsConnectionConfig) {
+  return getJournalRecentTransactions("IJPS", "ijps", limit, cfg);
 }

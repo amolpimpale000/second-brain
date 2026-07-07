@@ -20,18 +20,23 @@ import {
   type Employee,
 } from "./data";
 import {
-  getIjpsCounts,
-  getIjpsRevenue,
-  getIjpsMonthlyTrends,
-  getIjpsArticleTypes,
-  getIjpsRecentActivity,
-  getIjpsEmployees,
+  getJournalCounts,
+  getJournalRevenue,
+  getJournalMonthlyTrends,
+  getJournalArticleTypes,
+  getJournalRecentActivity,
+  getJournalEmployees,
+  type IjpsCounts,
+  type IjpsRevenue,
+  type MonthlyPoint,
+  type ArticleTypeStat,
+  type IjpsActivity,
+  type IjpsEmployee,
 } from "./journal-queries";
 
 // ---------------------------------------------------------------------------
-// Aggregates real IJPS data with placeholder data for the other four journals.
-// When credentials for IJSRT / IJMPS / IJES / JPS are added, their sample
-// placeholders can be replaced with real queries without touching the UI.
+// Aggregates real data for every connected journal (IJPS, IJSRT, IJMPS, IJES)
+// with placeholder data for JPS, which isn't wired to a live DB yet.
 // ---------------------------------------------------------------------------
 
 export type JournalDashboardData = {
@@ -53,127 +58,128 @@ export type JournalDashboardData = {
   employees: Employee[];
 };
 
-const IJPS_CODE = "IJPS";
-const IJPS_NAME = "International Journal of Pharmaceutical Sciences";
+const CONNECTED_JOURNALS: { code: string; prefix: string; name: string }[] = [
+  { code: "IJPS", prefix: "ijps", name: "International Journal of Pharmaceutical Sciences" },
+  { code: "IJSRT", prefix: "ijsrt", name: "International Journal of Scientific Research & Technology" },
+  { code: "IJMPS", prefix: "ijmps", name: "International Journal of Medical & Pharmaceutical Sciences" },
+  { code: "IJES", prefix: "ijes", name: "International Journal of Engineering & Science" },
+];
+
+type RealJournalData = {
+  code: string;
+  counts: IjpsCounts;
+  revenue: IjpsRevenue;
+  monthly: MonthlyPoint[];
+  articleTypes: ArticleTypeStat[];
+  recentActivity: IjpsActivity[];
+  employees: IjpsEmployee[];
+};
+
+async function fetchJournal(code: string, prefix: string): Promise<RealJournalData> {
+  // counts + revenue are the core numbers this journal contributes to the
+  // aggregate dashboard, so let those two failures propagate (the journal
+  // falls back to sample data entirely). The rest are supplementary — a
+  // schema quirk in one journal's employee/activity table shouldn't blank
+  // out its otherwise-good manuscript/revenue numbers, so those degrade to
+  // empty arrays independently instead of failing the whole fetch.
+  const [counts, revenue] = await Promise.all([
+    getJournalCounts(code, prefix),
+    getJournalRevenue(code, prefix),
+  ]);
+  const [monthly, articleTypes, recentActivity, employees] = await Promise.all([
+    getJournalMonthlyTrends(code, prefix).catch((err) => { console.error(`${code} monthly trends failed:`, err.message); return []; }),
+    getJournalArticleTypes(code, prefix).catch((err) => { console.error(`${code} article types failed:`, err.message); return []; }),
+    getJournalRecentActivity(code, prefix).catch((err) => { console.error(`${code} recent activity failed:`, err.message); return []; }),
+    getJournalEmployees(code, prefix).catch((err) => { console.error(`${code} employees failed:`, err.message); return []; }),
+  ]);
+  return { code, counts, revenue, monthly, articleTypes, recentActivity, employees };
+}
 
 export async function getJournalDashboardData(): Promise<JournalDashboardData> {
-  const counts = await getIjpsCounts();
-  const revenue = await getIjpsRevenue();
-  const monthly = await getIjpsMonthlyTrends();
-  const articleTypes = await getIjpsArticleTypes();
-  const recentActivity = await getIjpsRecentActivity();
-  const employees = await getIjpsEmployees();
+  const results = await Promise.allSettled(
+    CONNECTED_JOURNALS.map((j) => fetchJournal(j.code, j.prefix))
+  );
+  const real = new Map<string, RealJournalData>();
+  results.forEach((r, idx) => {
+    if (r.status === "fulfilled") real.set(CONNECTED_JOURNALS[idx].code, r.value);
+    else console.error(`Failed to load ${CONNECTED_JOURNALS[idx].code} data:`, r.reason);
+  });
 
-  // --- journal performance table: replace IJPS with real data, keep others sample ---
+  // --- journal performance table: replace every connected journal with real data ---
   const journalPerformance: JournalPerf[] = sampleJournalPerformance.map((j) => {
-    if (j.code === IJPS_CODE) {
-      return {
-        ...j,
-        name: IJPS_NAME,
-        manuscripts: counts.totalManuscripts,
-        published: counts.publishedArticles,
-        acceptance: round1(
-          (counts.publishedArticles / Math.max(counts.totalManuscripts, 1)) * 100
-        ),
-        revenue: revenue.total,
-        growth: j.growth, // keep sample growth until we can compute YoY
-      };
-    }
-    return j;
+    const rj = real.get(j.code);
+    if (!rj) return j;
+    return {
+      ...j,
+      manuscripts: rj.counts.totalManuscripts,
+      published: rj.counts.publishedArticles,
+      acceptance: round1((rj.counts.publishedArticles / Math.max(rj.counts.totalManuscripts, 1)) * 100),
+      revenue: rj.revenue.total,
+      growth: j.growth, // keep sample growth until YoY history is tracked
+    };
   });
 
   // --- submissions by journal donut ---
-  const submissionsByJournal = sampleSubmissionsByJournal.map((j) =>
-    j.name === IJPS_CODE
-      ? { ...j, value: counts.totalManuscripts }
-      : j
-  );
+  const submissionsByJournal = sampleSubmissionsByJournal.map((j) => {
+    const rj = real.get(j.name);
+    return rj ? { ...j, value: rj.counts.totalManuscripts } : j;
+  });
   normalizePercentages(submissionsByJournal);
 
-  // --- article status donut ---
+  // --- article status donut: summed across every connected journal ---
+  const realJournals = Array.from(real.values());
+  const sumCounts = (fn: (c: IjpsCounts) => number) => realJournals.reduce((s, r) => s + fn(r.counts), 0);
+  // Sample JPS contributes its placeholder share alongside the real totals.
+  const jpsSample = sampleArticleStatus;
   const articleStatus = [
-    {
-      name: "Under Review",
-      value: counts.underReview,
-      pct: 0,
-      color: "#22c55e",
-    },
-    {
-      name: "Revision",
-      value: counts.revisionRequired,
-      pct: 0,
-      color: "#3b82f6",
-    },
-    {
-      name: "Accepted",
-      value: counts.accepted + counts.paid,
-      pct: 0,
-      color: "#8b5cf6",
-    },
-    {
-      name: "Published",
-      value: counts.publishedArticles,
-      pct: 0,
-      color: "#f59e0b",
-    },
-    {
-      name: "Rejected",
-      value: counts.rejected,
-      pct: 0,
-      color: "#ef4444",
-    },
+    { name: "Under Review", value: sumCounts((c) => c.underReview) + jpsSample[0].value, pct: 0, color: "#22c55e" },
+    { name: "Revision", value: sumCounts((c) => c.revisionRequired) + 0, pct: 0, color: "#3b82f6" },
+    { name: "Accepted", value: sumCounts((c) => c.accepted + c.paid) + jpsSample[2].value, pct: 0, color: "#8b5cf6" },
+    { name: "Published", value: sumCounts((c) => c.publishedArticles) + jpsSample[3].value, pct: 0, color: "#f59e0b" },
+    { name: "Rejected", value: sumCounts((c) => c.rejected) + jpsSample[4].value, pct: 0, color: "#ef4444" },
   ];
   normalizePercentages(articleStatus);
 
-  // --- monthly submissions trend for chart ---
-  const submissionsTrend = monthly.map((m) => ({
-    label: m.month,
-    total: m.submissions,
-    review: 0,
-    accepted: m.accepted,
-    rejected: 0,
-  }));
+  // --- monthly submissions trend: merged across every connected journal ---
+  const monthlyMap = new Map<string, { total: number; accepted: number }>();
+  for (const rj of realJournals) {
+    for (const m of rj.monthly) {
+      const existing = monthlyMap.get(m.month) ?? { total: 0, accepted: 0 };
+      existing.total += m.submissions;
+      existing.accepted += m.accepted;
+      monthlyMap.set(m.month, existing);
+    }
+  }
+  const mergedTrend = Array.from(monthlyMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([label, v]) => ({ label, total: v.total, review: 0, accepted: v.accepted, rejected: 0 }));
+  const submissionsTrend = mergedTrend.length ? mergedTrend : sampleSubmissionsTrend;
 
-  // If IJPS has fewer than sample months, pad so the chart doesn't look empty.
-  const trend = submissionsTrend.length
-    ? submissionsTrend
-    : sampleSubmissionsTrend;
-
-  // --- recent activities: prepend real IJPS logs, keep sample rest ---
-  const jmActivities = [
-    ...recentActivity.map((a) => ({
+  // --- recent activities: real logs from every connected journal, newest first ---
+  const realActivities = realJournals.flatMap((rj) =>
+    rj.recentActivity.map((a) => ({
       id: a.id,
       text: a.text,
       meta: a.meta,
       time: a.time,
       icon: "file" as const,
-      color: JCOL.IJPS,
-    })),
-    ...sampleJmActivities.slice(0, Math.max(0, 5 - recentActivity.length)),
+      color: JCOL[rj.code as keyof typeof JCOL] ?? JCOL.IJPS,
+    }))
+  );
+  const jmActivities = [
+    ...realActivities.slice(0, 5),
+    ...sampleJmActivities.slice(0, Math.max(0, 5 - realActivities.length)),
   ];
 
-  // --- revenue breakdown ---
+  // --- revenue breakdown: summed APC / plagiarism across connected journals ---
+  const totalApc = realJournals.reduce((s, r) => s + r.revenue.apc, 0);
+  const totalPlagiarism = realJournals.reduce((s, r) => s + r.revenue.plagiarism, 0);
   const revenueBreakdown = [
-    {
-      name: "Article Processing Charges",
-      value: revenue.apc,
-      pct: 0,
-      color: "#6366f1",
-    },
-    {
-      name: "Plagiarism / Other Income",
-      value: revenue.plagiarism,
-      pct: 0,
-      color: "#f59e0b",
-    },
+    { name: "Article Processing Charges", value: totalApc, pct: 0, color: "#6366f1" },
+    { name: "Plagiarism / Other Income", value: totalPlagiarism, pct: 0, color: "#f59e0b" },
     {
       name: "Subscription",
-      value: Math.max(
-        0,
-        sampleRevenueBreakdown.reduce((s, r) => s + r.value, 0) -
-          revenue.apc -
-          revenue.plagiarism
-      ),
+      value: Math.max(0, sampleRevenueBreakdown.reduce((s, r) => s + r.value, 0) - totalApc - totalPlagiarism),
       pct: 0,
       color: "#22c55e",
     },
@@ -181,14 +187,9 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
   normalizePercentages(revenueBreakdown);
 
   // --- financial summary ---
-  const totalRevenue = revenue.total;
-  // Expenses are not tracked in the IJPS DB; keep the sample ratio for now.
-  const sampleRevenueTotal = sampleFinancialSummary.find(
-    (f) => f.label === "Total Revenue"
-  )?.value ?? "₹18,75,450";
-  const sampleExpense = sampleFinancialSummary.find(
-    (f) => f.label === "Total Expenses"
-  )?.value ?? "₹7,25,300";
+  const totalRevenue = realJournals.reduce((s, r) => s + r.revenue.total, 0);
+  const sampleRevenueTotal = sampleFinancialSummary.find((f) => f.label === "Total Revenue")?.value ?? "₹18,75,450";
+  const sampleExpense = sampleFinancialSummary.find((f) => f.label === "Total Expenses")?.value ?? "₹7,25,300";
   const sampleExpenseNum = parseIndianNumber(sampleExpense);
   const sampleRevenueNum = parseIndianNumber(sampleRevenueTotal);
   const expenseRatio = sampleExpenseNum / Math.max(sampleRevenueNum, 1);
@@ -196,68 +197,56 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
   const netProfit = totalRevenue - totalExpenses;
 
   const financialSummary = [
-    {
-      label: "Total Revenue" as const,
-      value: formatInr(totalRevenue),
-      growth: 24.8,
-      color: "var(--c-green)" as const,
-      spark: sampleFinancialSummary[0].spark,
-    },
-    {
-      label: "Total Expenses" as const,
-      value: formatInr(totalExpenses),
-      growth: 9.3,
-      color: "var(--c-rose)" as const,
-      spark: sampleFinancialSummary[1].spark,
-    },
-    {
-      label: "Net Profit" as const,
-      value: formatInr(netProfit),
-      growth: 21.3,
-      color: "var(--c-green)" as const,
-      spark: sampleFinancialSummary[2].spark,
-    },
+    { label: "Total Revenue" as const, value: formatInr(totalRevenue), growth: 24.8, color: "var(--c-green)" as const, spark: sampleFinancialSummary[0].spark },
+    { label: "Total Expenses" as const, value: formatInr(totalExpenses), growth: 9.3, color: "var(--c-rose)" as const, spark: sampleFinancialSummary[1].spark },
+    { label: "Net Profit" as const, value: formatInr(netProfit), growth: 21.3, color: "var(--c-green)" as const, spark: sampleFinancialSummary[2].spark },
   ];
 
-  // --- subject areas from real article types ---
-  const totalTypeCount = articleTypes.reduce((s, t) => s + t.count, 0);
-  const subjectAreas = articleTypes.map((t) => ({
-    name: t.name,
-    pct: Math.round((t.count / Math.max(totalTypeCount, 1)) * 100),
-    color: sampleSubjectAreas.find((s) =>
-      s.name.toLowerCase().includes(t.name.toLowerCase().slice(0, 4))
-    )?.color ?? "#94a3b8",
-  }));
+  // --- subject areas: merged article types across connected journals ---
+  const typeMap = new Map<string, number>();
+  for (const rj of realJournals) {
+    for (const t of rj.articleTypes) {
+      typeMap.set(t.name, (typeMap.get(t.name) ?? 0) + t.count);
+    }
+  }
+  const totalTypeCount = Array.from(typeMap.values()).reduce((s, c) => s + c, 0);
+  const subjectAreas = totalTypeCount
+    ? Array.from(typeMap.entries()).map(([name, count]) => ({
+        name,
+        pct: Math.round((count / totalTypeCount) * 100),
+        color: sampleSubjectAreas.find((s) => s.name.toLowerCase().includes(name.toLowerCase().slice(0, 4)))?.color ?? "#94a3b8",
+      }))
+    : sampleSubjectAreas;
 
-  // --- subscription: use real IJPS subscriber count ---
+  // --- subscription: summed real subscriber counts ---
+  const totalSubscribers = realJournals.reduce((s, r) => s + r.counts.totalSubscribers, 0);
   const subscription = sampleSubscription.map((s) =>
-    s.label === "Active Subscribers"
-      ? { ...s, value: counts.totalSubscribers.toLocaleString("en-IN") }
-      : s
+    s.label === "Active Subscribers" ? { ...s, value: totalSubscribers.toLocaleString("en-IN") } : s
   );
 
   // --- publication trend ---
-  const publicationTrend = monthly.map((m) => ({
-    label: m.month,
-    published: m.articles,
-    accepted: m.accepted,
-  }));
+  const pubMap = new Map<string, { published: number; accepted: number }>();
+  for (const rj of realJournals) {
+    for (const m of rj.monthly) {
+      const existing = pubMap.get(m.month) ?? { published: 0, accepted: 0 };
+      existing.published += m.articles;
+      existing.accepted += m.accepted;
+      pubMap.set(m.month, existing);
+    }
+  }
+  const mergedPubTrend = Array.from(pubMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([label, v]) => ({ label, published: v.published, accepted: v.accepted }));
 
   // --- top stat cards ---
-  const totalManuscripts = journalPerformance.reduce(
-    (s, j) => s + j.manuscripts,
-    0
+  const totalManuscripts = journalPerformance.reduce((s, j) => s + j.manuscripts, 0);
+  const totalPublished = journalPerformance.reduce((s, j) => s + j.published, 0);
+  const totalUnderReview = realJournals.reduce((s, r) => s + r.counts.underReview, 0) + sampleArticleStatus[0].value;
+  const totalAuthors = realJournals.reduce((s, r) => s + r.counts.totalAuthors, 0);
+  const jpsUsersEstimate = Math.round(
+    (sampleJournalPerformance.find((j) => j.code === "JPS")?.manuscripts ?? 0) * 8.5
   );
-  const totalPublished = journalPerformance.reduce(
-    (s, j) => s + j.published,
-    0
-  );
-  const totalUnderReview = counts.underReview + sampleArticleStatus[0].value; // rough until others connected
-  const totalUsers =
-    counts.totalAuthors +
-    sampleJournalPerformance
-      .filter((j) => j.code !== IJPS_CODE)
-      .reduce((s, j) => s + Math.round(j.manuscripts * 8.5), 0);
+  const totalUsers = totalAuthors + jpsUsersEstimate;
   const totalRevenueAll = journalPerformance.reduce((s, j) => s + j.revenue, 0);
 
   const jmStats = sampleJmStats.map((s) => {
@@ -277,28 +266,31 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
     }
   });
 
-  // --- employees: use real IJPS staff with sample productivity metrics ---
-  const employeesOut: Employee[] = employees.map((e, idx) => {
-    const sample = sampleEmployees[idx % sampleEmployees.length];
-    return {
-      id: `ijps-emp-${e.id}`,
-      name: e.name,
-      role: e.role,
-      journal: IJPS_CODE,
-      initials: getInitials(e.name),
-      color: JCOL.IJPS,
-      handled: sample.handled,
-      completed: sample.completed,
-      pending: sample.pending,
-      turnaround: sample.turnaround,
-      score: sample.score,
-      trend: sample.trend,
-    };
-  });
+  // --- employees: real staff from every connected journal, sample productivity metrics ---
+  let sampleIdx = 0;
+  const employeesOut: Employee[] = realJournals.flatMap((rj) =>
+    rj.employees.map((e) => {
+      const sample = sampleEmployees[sampleIdx++ % sampleEmployees.length];
+      return {
+        id: `${rj.code.toLowerCase()}-emp-${e.id}`,
+        name: e.name,
+        role: e.role,
+        journal: rj.code,
+        initials: getInitials(e.name),
+        color: JCOL[rj.code as keyof typeof JCOL] ?? JCOL.IJPS,
+        handled: sample.handled,
+        completed: sample.completed,
+        pending: sample.pending,
+        turnaround: sample.turnaround,
+        score: sample.score,
+        trend: sample.trend,
+      };
+    })
+  );
 
   return {
     jmStats,
-    submissionsTrend: trend,
+    submissionsTrend,
     submissionsByJournal,
     jmActivities,
     journalPerformance,
@@ -309,18 +301,14 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
     keyMetrics: sampleKeyMetrics,
     subjectAreas,
     subscription,
-    publicationTrend: publicationTrend.length
-      ? publicationTrend
-      : samplePublicationTrend,
+    publicationTrend: mergedPubTrend.length ? mergedPubTrend : samplePublicationTrend,
     jmAlerts: sampleJmAlerts,
     quickActionsJM: sampleQuickActionsJM,
-    employees: employeesOut,
+    employees: employeesOut.length ? employeesOut : sampleEmployees,
   };
 }
 
-function normalizePercentages(
-  items: { name: string; value: number; pct: number; color: string }[]
-) {
+function normalizePercentages(items: { name: string; value: number; pct: number; color: string }[]) {
   const total = items.reduce((s, i) => s + i.value, 0);
   for (const item of items) {
     item.pct = total ? Math.round((item.value / total) * 100) : 0;
@@ -336,9 +324,7 @@ function formatInr(n: number): string {
 }
 
 function parseIndianNumber(s: string): number {
-  return Number(
-    s.replace(/[₹,]/g, "").trim()
-  );
+  return Number(s.replace(/[₹,]/g, "").trim());
 }
 
 function getInitials(name: string): string {

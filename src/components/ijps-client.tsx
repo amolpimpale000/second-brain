@@ -70,7 +70,17 @@ function MonthFilter() {
   );
 }
 
-export function IjpsClient({ data }: { data: IjpsPageData }) {
+type IjpsClientProps = {
+  data: IjpsPageData;
+  journalCode?: string;
+  journalName?: string;
+};
+
+export function IjpsClient({
+  data,
+  journalCode = "IJPS",
+  journalName = "International Journal of Pharmaceutical Sciences",
+}: IjpsClientProps) {
   const [expCategory, setExpCategory] = useState("Google Ads");
   const [expAmount, setExpAmount] = useState("0.00");
   const [expDate, setExpDate] = useState("23 May 2025");
@@ -88,12 +98,12 @@ export function IjpsClient({ data }: { data: IjpsPageData }) {
         <div className="flex items-center gap-2 text-sm text-muted mb-1">
           <span>Journal Management</span>
           <ChevronRight className="h-3.5 w-3.5" />
-          <span className="text-ink font-medium">IJPS</span>
+          <span className="text-ink font-medium">{journalCode}</span>
         </div>
         <h1 className="text-2xl font-semibold tracking-tight text-ink">
-          International Journal of Pharmaceutical Sciences
+          {journalName}
         </h1>
-        <p className="mt-1 text-sm text-muted">Complete overview of manuscripts, revenue, expenses, and analytics for IJPS.</p>
+        <p className="mt-1 text-sm text-muted">Complete overview of manuscripts, revenue, expenses, and analytics for {journalCode}.</p>
       </div>
 
       {/* ========== KPI CARDS ========== */}
