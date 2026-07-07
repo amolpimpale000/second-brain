@@ -10,12 +10,7 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   PieChart, Pie, Cell, BarChart, Bar, Area, AreaChart, Legend,
 } from "recharts";
-import {
-  ijpsKpis, manuscriptOverview, manuscriptsByStatus, quickActions,
-  revenueData, revenueBreakdownIjps, razorpayIncome, googleAds,
-  expensesBreakdownIjps, expenseTrend, profitabilityData,
-  recentTransactions, expensesTable,
-} from "@/lib/ijps-data";
+import { type IjpsPageData } from "@/lib/ijps-dashboard";
 import { cn } from "@/lib/utils";
 
 const axis = { tick: { fill: "var(--faint)", fontSize: 11 }, axisLine: false, tickLine: false } as const;
@@ -75,14 +70,16 @@ function MonthFilter() {
   );
 }
 
-export function IjpsClient() {
+export function IjpsClient({ data }: { data: IjpsPageData }) {
   const [expCategory, setExpCategory] = useState("Google Ads");
   const [expAmount, setExpAmount] = useState("0.00");
   const [expDate, setExpDate] = useState("23 May 2025");
   const [expMode, setExpMode] = useState("UPI");
   const [expDesc, setExpDesc] = useState("");
 
-  const totalExpenses = expensesTable.reduce((s, e) => s + e.amount, 0);
+  const totalExpenses = data.expensesTable.reduce((s, e) => s + e.amount, 0);
+  const totalManuscripts = data.manuscriptsByStatus.reduce((s, m) => s + m.value, 0);
+  const totalRevenue = data.revenueBreakdownIjps.reduce((s, r) => s + r.value, 0);
 
   return (
     <div className="animate-fade-up space-y-5">
@@ -101,7 +98,7 @@ export function IjpsClient() {
 
       {/* ========== KPI CARDS ========== */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        {ijpsKpis.map((kpi) => (
+        {data.ijpsKpis.map((kpi) => (
           <div key={kpi.label} className="card card-pad flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted leading-tight">{kpi.label}</p>
@@ -142,7 +139,7 @@ export function IjpsClient() {
             ))}
           </div>
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={manuscriptOverview} margin={{ left: 0, right: 6, top: 5 }}>
+            <LineChart data={data.manuscriptOverview} margin={{ left: 0, right: 6, top: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
               <XAxis dataKey="label" {...axis} />
               <YAxis {...axis} width={36} />
@@ -176,7 +173,7 @@ export function IjpsClient() {
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
                 <Pie
-                  data={manuscriptsByStatus}
+                  data={data.manuscriptsByStatus}
                   dataKey="value"
                   nameKey="name"
                   innerRadius="60%"
@@ -184,14 +181,14 @@ export function IjpsClient() {
                   paddingAngle={2}
                   stroke="none"
                 >
-                  {manuscriptsByStatus.map((d, i) => <Cell key={i} fill={d.color} />)}
+                  {data.manuscriptsByStatus.map((d, i) => <Cell key={i} fill={d.color} />)}
                 </Pie>
                 <Tooltip
                   content={({ active, payload }) =>
                     active && payload?.length ? (
                       <TipBox>
                         <p className="font-medium text-ink">{payload[0].name}</p>
-                        <p className="text-muted">{payload[0].value} ({manuscriptsByStatus.find(m => m.name === payload[0].name)?.pct}%)</p>
+                        <p className="text-muted">{payload[0].value} ({data.manuscriptsByStatus.find(m => m.name === payload[0].name)?.pct}%)</p>
                       </TipBox>
                     ) : null
                   }
@@ -199,12 +196,12 @@ export function IjpsClient() {
               </PieChart>
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <p className="text-3xl font-bold text-ink">437</p>
+              <p className="text-3xl font-bold text-ink">{totalManuscripts.toLocaleString("en-IN")}</p>
               <p className="text-xs text-muted">Total</p>
             </div>
           </div>
           <div className="mt-3 space-y-2">
-            {manuscriptsByStatus.map((s) => (
+            {data.manuscriptsByStatus.map((s) => (
               <div key={s.name} className="flex items-center gap-2.5 text-sm">
                 <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: s.color }} />
                 <span className="text-muted flex-1">{s.name}</span>
@@ -219,7 +216,7 @@ export function IjpsClient() {
         <div className="card card-pad">
           <h3 className="font-semibold text-ink mb-4">Quick Actions</h3>
           <div className="space-y-1">
-            {quickActions.map((a) => (
+            {data.quickActions.map((a) => (
               <button key={a.label} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-ink hover:bg-surface-2 transition-colors group">
                 <QuickActionIcon type={a.icon} className="text-muted group-hover:text-ink" />
                 <span className="flex-1 text-left">{a.label}</span>
@@ -240,14 +237,14 @@ export function IjpsClient() {
           </div>
           <div className="mb-4">
             <p className="text-xs text-muted">Total Revenue</p>
-            <p className="text-2xl font-semibold text-ink mt-0.5">₹ 6,25,450</p>
+            <p className="text-2xl font-semibold text-ink mt-0.5">{`₹ ${totalRevenue.toLocaleString("en-IN")}`}</p>
             <div className="flex items-center gap-1.5 mt-1">
               <Delta value={28.6} />
               <span className="text-[11px] text-faint">vs Apr 2025</span>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={160}>
-            <BarChart data={revenueData} margin={{ left: 0, right: 0, top: 5 }}>
+            <BarChart data={data.revenueData} margin={{ left: 0, right: 0, top: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
               <XAxis dataKey="month" {...axis} />
               <YAxis {...axis} width={30} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
@@ -262,7 +259,7 @@ export function IjpsClient() {
             </BarChart>
           </ResponsiveContainer>
           <div className="mt-4 space-y-2">
-            {revenueBreakdownIjps.map((r) => (
+            {data.revenueBreakdownIjps.map((r) => (
               <div key={r.name} className="flex items-center gap-2.5 text-sm">
                 <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: r.color }} />
                 <span className="text-muted flex-1 truncate">{r.name}</span>
@@ -282,7 +279,7 @@ export function IjpsClient() {
           <div className="mb-6">
             <p className="text-xs text-muted">Total Collected</p>
             <div className="flex items-center gap-3 mt-0.5">
-              <p className="text-2xl font-semibold text-ink">₹ 6,25,450</p>
+              <p className="text-2xl font-semibold text-ink">{`₹ ${data.razorpayIncome.total.toLocaleString("en-IN")}`}</p>
               <span className="inline-flex items-center rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
                 <svg viewBox="0 0 24 24" className="h-4 w-4 mr-1" fill="currentColor"><path d="M7.076 2h2.368l-1.6 4.667h2.789L6.5 14l1.263-5.333H5.394L7.076 2zm5.448 0h2.368l-1.6 4.667h2.789L11.948 14l1.263-5.333h-2.369L12.524 2z" /></svg>
                 Razorpay
@@ -297,7 +294,7 @@ export function IjpsClient() {
           <div className="mb-6">
             <p className="text-sm font-medium text-ink mb-3">Top Payment Sources</p>
             <div className="space-y-3">
-              {razorpayIncome.sources.map((s) => (
+              {data.razorpayIncome.sources.map((s) => (
                 <div key={s.name}>
                   <div className="flex items-center justify-between text-sm mb-1.5">
                     <span className="text-muted">{s.name}</span>
@@ -337,7 +334,7 @@ export function IjpsClient() {
           </div>
 
           <div className="grid grid-cols-3 gap-3">
-            {googleAds.metrics.map((m) => (
+            {data.googleAds.metrics.map((m) => (
               <div key={m.label} className="rounded-xl bg-surface-2 p-3 text-center">
                 <p className="text-[11px] text-muted mb-1">{m.label}</p>
                 <p className="text-sm font-semibold text-ink">{m.value}</p>
@@ -371,8 +368,8 @@ export function IjpsClient() {
           <div className="relative">
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
-                <Pie data={expensesBreakdownIjps} dataKey="value" nameKey="name" innerRadius="58%" outerRadius="95%" paddingAngle={2} stroke="none">
-                  {expensesBreakdownIjps.map((d, i) => <Cell key={i} fill={d.color} />)}
+                <Pie data={data.expensesBreakdownIjps} dataKey="value" nameKey="name" innerRadius="58%" outerRadius="95%" paddingAngle={2} stroke="none">
+                  {data.expensesBreakdownIjps.map((d, i) => <Cell key={i} fill={d.color} />)}
                 </Pie>
                 <Tooltip
                   content={({ active, payload }) =>
@@ -385,7 +382,7 @@ export function IjpsClient() {
             </ResponsiveContainer>
           </div>
           <div className="mt-2 space-y-2">
-            {expensesBreakdownIjps.map((e) => (
+            {data.expensesBreakdownIjps.map((e) => (
               <div key={e.name} className="flex items-center gap-2.5 text-sm">
                 <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: e.color }} />
                 <span className="text-muted flex-1 truncate">{e.name}</span>
@@ -403,7 +400,7 @@ export function IjpsClient() {
             <MonthFilter />
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={expenseTrend} margin={{ left: 0, right: 6, top: 5 }}>
+            <AreaChart data={data.expenseTrend} margin={{ left: 0, right: 6, top: 5 }}>
               <defs>
                 <linearGradient id="gExpTrend" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#22c55e" stopOpacity={0.25} />
@@ -452,7 +449,7 @@ export function IjpsClient() {
             ))}
           </div>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={profitabilityData} margin={{ left: 0, right: 0, top: 5 }}>
+            <BarChart data={data.profitabilityData} margin={{ left: 0, right: 0, top: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
               <XAxis dataKey="label" {...axis} />
               <YAxis {...axis} width={30} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
@@ -583,7 +580,7 @@ export function IjpsClient() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {recentTransactions.map((t) => {
+                {data.recentTransactions.map((t) => {
                   const isExpense = t.type === "Expense";
                   return (
                     <tr key={t.id} className="group hover:bg-surface-2 transition-colors">
@@ -650,7 +647,7 @@ export function IjpsClient() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {expensesTable.map((e) => (
+              {data.expensesTable.map((e) => (
                 <tr key={e.id} className="group hover:bg-surface-2 transition-colors">
                   <td className="py-3 text-muted whitespace-nowrap">{e.date}</td>
                   <td className="py-3 text-muted">{e.category}</td>

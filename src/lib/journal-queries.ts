@@ -336,3 +336,120 @@ function formatRelativeTime(dateInput: string | Date): string {
   if (diffDay < 30) return `${diffDay} day${diffDay > 1 ? "s" : ""} ago`;
   return date.toLocaleDateString("en-IN");
 }
+
+
+// ---------------------------------------------------------------------------
+// IJPS-specific page (/journals/ijps) data
+// ---------------------------------------------------------------------------
+
+export type IjpsPaymentMethod = {
+  name: string;
+  amount: number;
+  pct: number;
+  count: number;
+};
+
+export async function getIjpsPaymentMethods(
+  cfg?: IjpsConnectionConfig
+): Promise<IjpsPaymentMethod[]> {
+  const conn = await createIjpsConnection(cfg);
+  try {
+    const [rows] = await conn.execute<any>(
+      "SELECT json_details FROM ijps_tblpayment WHERE is_deleted = 0"
+    );
+
+    const methods = new Map<string, { amount: number; count: number }>();
+    let total = 0;
+
+    for (const row of rows) {
+      try {
+        const json = JSON.parse(row.json_details || "{}");
+        const amount = Number(json.amount);
+        const currency = json.currency || "INR";
+        if (!amount) continue;
+
+        const amountRs = currency === "INR" ? amount / 100 : amount;
+        const method = json.method || "Other";
+        const existing = methods.get(method) ?? { amount: 0, count: 0 };
+        existing.amount += amountRs;
+        existing.count += 1;
+        methods.set(method, existing);
+        total += amountRs;
+      } catch {
+        // ignore malformed JSON
+      }
+    }
+
+    const result: IjpsPaymentMethod[] = [];
+    for (const [method, data] of methods) {
+      result.push({
+        name: method.charAt(0).toUpperCase() + method.slice(1),
+        amount: Math.round(data.amount),
+        pct: total ? Math.round((data.amount / total) * 100) : 0,
+        count: data.count,
+      });
+    }
+
+    return result.sort((a, b) => b.amount - a.amount);
+  } finally {
+    await conn.end();
+  }
+}
+
+export type IjpsRecentTransaction = {
+  id: string;
+  date: string;
+  type: "Income" | "Expense";
+  category: string;
+  description: string;
+  amount: number;
+  mode: string;
+  source: string;
+};
+
+export async function getIjpsRecentTransactions(
+  limit = 10,
+  cfg?: IjpsConnectionConfig
+): Promise<IjpsRecentTransaction[]> {
+  const conn = await createIjpsConnection(cfg);
+  try {
+    const [rows] = await conn.execute<any>(`
+      SELECT json_details, created_date, article_id
+      FROM ijps_tblpayment
+      WHERE is_deleted = 0
+      ORDER BY created_date DESC
+      LIMIT ?
+    `, [limit]);
+
+    return rows.map((r: any, idx: number) => {
+      let amount = 0;
+      let method = "Online";
+      try {
+        const json = JSON.parse(r.json_details || "{}");
+        amount = Number(json.amount) || 0;
+        const currency = json.currency || "INR";
+        amount = currency === "INR" ? amount / 100 : amount;
+        method = json.method ? json.method.toUpperCase() : "Online";
+      } catch {
+        // ignore
+      }
+
+      return {
+        id: `ijps-txn-${idx}`,
+        date: new Date(r.created_date).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }),
+        type: "Income" as const,
+        category: "Article Processing",
+        description: `Article ID: ${r.article_id || "N/A"}`,
+        amount: Math.round(amount),
+        mode: method,
+        source: "Razorpay",
+      };
+    });
+  } finally {
+    await conn.end();
+  }
+}
