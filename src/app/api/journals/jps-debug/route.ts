@@ -38,10 +38,17 @@ export async function GET() {
     await client.connect();
     await client.query("SELECT 1");
     auth = "success";
-    const res = await client.query(
-      "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name LIMIT 100"
-    );
-    tables = res.rows.map((r: any) => r.table_name);
+    const focus = ["manuscripts", "articles", "payments", "employees", "issues", "status_history", "users"];
+    const cols: Record<string, any[]> = {};
+    for (const t of focus) {
+      const r = await client.query(
+        "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1 ORDER BY ordinal_position",
+        [t]
+      );
+      cols[t] = r.rows;
+    }
+    tables = Object.keys(cols);
+    return Response.json({ host, port, tcp, auth, cols });
   } catch (err: any) {
     auth = `error: ${err.message}`;
   } finally {
