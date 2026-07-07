@@ -1,15 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   BookOpen, FileText, CheckCircle2, Clock, Users, IndianRupee, ArrowUpRight, ArrowDownRight,
   Plus, FileStack, BarChart3, UserCog, Megaphone, Building2, CreditCard, Bell, TrendingUp,
+  Upload, Pencil, Trash2, Megaphone as AdsIcon, Eye,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { MultiLineChart, StackedBars, Sparkline } from "@/components/charts";
-import { Dropdown } from "@/components/vault-ui";
+import { Dropdown, Modal } from "@/components/vault-ui";
 import { cn, inr } from "@/lib/utils";
 import { type JournalDashboardData } from "@/lib/journal-dashboard";
+import { type JournalExpense } from "@/lib/journal-expenses-store";
 
 const statTone: Record<string, string> = {
   indigo: "bg-indigo-100 text-indigo-600", blue: "bg-blue-100 text-blue-600",
@@ -27,6 +29,17 @@ const qaIcon: Record<string, React.ElementType> = {
 };
 const subIcon: Record<string, React.ElementType> = { users: Users, building: Building2, card: CreditCard };
 const alertTone: Record<string, string> = { red: "bg-red-50 text-red-600 border-red-100", amber: "bg-amber-50 text-amber-600 border-amber-100" };
+
+const JOURNAL_OPTIONS = [
+  { code: "ALL", label: "All Journals (Combined)" },
+  { code: "IJPS", label: "IJPS" },
+  { code: "IJSRT", label: "IJSRT" },
+  { code: "IJMPS", label: "IJMPS" },
+  { code: "IJES", label: "IJES" },
+  { code: "JPS", label: "JPS" },
+];
+const EXPENSE_CATEGORIES = ["Salary", "Domain & Hosting", "Interakt Fee", "AI Voice Calling", "Development", "Other Expense"];
+const journalLabel = (code: string) => JOURNAL_OPTIONS.find((j) => j.code === code)?.label ?? code;
 
 function Delta({ v, className }: { v: number; className?: string }) {
   const up = v >= 0;
@@ -106,12 +119,262 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
   const totalArticleStatus = data.articleStatus.reduce((s, a) => s + a.value, 0);
   const totalSubmissionSource = data.submissionSource.reduce((s, a) => s + a.value, 0);
 
+  // -------------------------------------------------------------- business expense sheet --------------------------------------------------------------
+  const [expenses, setExpenses] = useState<JournalExpense[]>(data.businessExpenses);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<JournalExpense | null>(null);
+  const [viewingExpense, setViewingExpense] = useState<JournalExpense | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const billInputRef = useRef<HTMLInputElement>(null);
+
+  const [expJournal, setExpJournal] = useState("ALL");
+  const [expCategory, setExpCategory] = useState(EXPENSE_CATEGORIES[0]);
+  const [expAmount, setExpAmount] = useState("");
+  const [expDate, setExpDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [expMode, setExpMode] = useState("UPI");
+  const [expPaymentTo, setExpPaymentTo] = useState("");
+  const [expDesc, setExpDesc] = useState("");
+  const [expBillFile, setExpBillFile] = useState<File | null>(null);
+
+  function flash(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  }
+
+  function resetForm() {
+    setExpJournal("ALL"); setExpCategory(EXPENSE_CATEGORIES[0]); setExpAmount("");
+    setExpDate(new Date().toISOString().slice(0, 10)); setExpMode("UPI");
+    setExpPaymentTo(""); setExpDesc(""); setExpBillFile(null);
+    if (billInputRef.current) billInputRef.current.value = "";
+  }
+
+  async function uploadBill(file: File): Promise<{ url: string; name: string } | null> {
+    try {
+      const fd = new FormData();
+      fd.append("files", file);
+      fd.append("category", "Journal Expenses");
+      const res = await fetch("/api/documents", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Upload failed");
+      const doc = json.docs?.[0];
+      return doc ? { url: doc.url, name: doc.name } : null;
+    } catch (err) {
+      console.error(err);
+      flash("Bill upload failed, saving expense without it");
+      return null;
+    }
+  }
+
+  async function submitExpense() {
+    const amountNum = Number(expAmount);
+    if (!amountNum || amountNum <= 0) { flash("Enter a valid amount"); return; }
+    if (!expDate) { flash("Enter a date"); return; }
+    setSaving(true);
+    try {
+      let bill: { url: string; name: string } | null = null;
+      if (expBillFile) bill = await uploadBill(expBillFile);
+
+      const res = await fetch("/api/journals/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          journalCode: expJournal, category: expCategory, amount: amountNum, date: expDate,
+          mode: expMode, description: expDesc, paymentTo: expPaymentTo,
+          billUrl: bill?.url, billName: bill?.name,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to add expense");
+
+      setExpenses((p) => [json.expense, ...p]);
+      resetForm();
+      setShowAddModal(false);
+      flash("Expense added");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Failed to add expense");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveEditedExpense() {
+    if (!editingExpense) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/journals/expenses/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingExpense.id, journalCode: editingExpense.journalCode, category: editingExpense.category,
+          amount: editingExpense.amount, date: editingExpense.date, mode: editingExpense.mode,
+          description: editingExpense.description, paymentTo: editingExpense.paymentTo,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to update expense");
+      setExpenses((p) => p.map((e) => (e.id === json.expense.id ? json.expense : e)));
+      setEditingExpense(null);
+      flash("Expense updated");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Failed to update expense");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeExpense(id: string) {
+    if (!window.confirm("Delete this expense?")) return;
+    try {
+      const res = await fetch("/api/journals/expenses/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to delete expense");
+      setExpenses((p) => p.filter((e) => e.id !== id));
+      flash("Expense deleted");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Failed to delete expense");
+    }
+  }
+
+  function exportExpensesCsv() {
+    const header = ["Journal", "Category", "Date", "Paid To", "Description", "Amount", "Mode"];
+    const rows = expenses.map((e) => [journalLabel(e.journalCode), e.category, e.date, e.paymentTo, e.description, e.amount, e.mode]);
+    const csv = [header, ...rows].map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "business-expenses.csv"; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const manualExpenseTotal = expenses.reduce((s, e) => s + e.amount, 0);
+  const googleAdsTotal = data.googleAdsSpend.connected ? data.googleAdsSpend.totalSpend : 0;
+  const totalBusinessExpenses = manualExpenseTotal + googleAdsTotal;
+
+  const addExpenseForm = (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-muted mb-1.5 block">Journal</label>
+          <select
+            value={expJournal}
+            onChange={(e) => setExpJournal(e.target.value)}
+            className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brand transition-colors"
+          >
+            {JOURNAL_OPTIONS.map((j) => <option key={j.code} value={j.code}>{j.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-muted mb-1.5 block">Category</label>
+          <select
+            value={expCategory}
+            onChange={(e) => setExpCategory(e.target.value)}
+            className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brand transition-colors"
+          >
+            {EXPENSE_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+          </select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-muted mb-1.5 block">Amount (₹)</label>
+          <input
+            type="number" min={0} step="0.01" placeholder="0.00"
+            value={expAmount} onChange={(e) => setExpAmount(e.target.value)}
+            className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brand transition-colors"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted mb-1.5 block">Date</label>
+          <input
+            type="date" value={expDate} onChange={(e) => setExpDate(e.target.value)}
+            className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brand transition-colors"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-muted mb-1.5 block">Payment Mode</label>
+          <select
+            value={expMode} onChange={(e) => setExpMode(e.target.value)}
+            className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brand transition-colors"
+          >
+            <option>UPI</option><option>Bank Transfer</option><option>Card</option><option>Cash</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-muted mb-1.5 block">Paid To</label>
+          <input
+            type="text" value={expPaymentTo} onChange={(e) => setExpPaymentTo(e.target.value)}
+            placeholder="e.g. Hostinger, Interakt..."
+            className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brand transition-colors"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="text-xs text-muted mb-1.5 block">Description</label>
+        <textarea
+          rows={2} value={expDesc} onChange={(e) => setExpDesc(e.target.value)}
+          placeholder="Enter description.."
+          className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brand resize-none transition-colors"
+        />
+      </div>
+      <div>
+        <label className="text-xs text-muted mb-1.5 block">Attach Bill / Invoice (Optional)</label>
+        <input
+          ref={billInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
+          onChange={(e) => setExpBillFile(e.target.files?.[0] ?? null)}
+        />
+        <button
+          type="button" onClick={() => billInputRef.current?.click()}
+          className="flex w-full items-center justify-center rounded-xl border-2 border-dashed border-border bg-surface-2 p-4 text-center hover:bg-surface-2/70 transition-colors"
+        >
+          <div>
+            <Upload className="h-5 w-5 text-faint mx-auto mb-1" />
+            {expBillFile ? (
+              <p className="text-xs font-medium text-ink truncate max-w-[220px]">{expBillFile.name}</p>
+            ) : (
+              <>
+                <p className="text-xs text-muted"><span className="font-medium text-ink">Choose file</span> or drag & drop</p>
+                <p className="text-[11px] text-faint mt-0.5">PDF, JPG, PNG (Max. 5MB)</p>
+              </>
+            )}
+          </div>
+        </button>
+      </div>
+      <button
+        onClick={submitExpense} disabled={saving}
+        className="w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors disabled:opacity-60"
+      >
+        {saving ? "Saving…" : "Add Expense"}
+      </button>
+    </div>
+  );
+
   return (
     <div className="animate-fade-up space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-ink">Journal Management</h1>
-        <p className="mt-1 text-sm text-muted">Complete analytics and insights across all journals.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-ink">Journal Management</h1>
+          <p className="mt-1 text-sm text-muted">Complete analytics and insights across all journals.</p>
+        </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors"
+        >
+          <Plus className="h-4 w-4" /> Quick Add Expense
+        </button>
       </div>
+
+      {toast && (
+        <div className="fixed right-6 top-6 z-[110] rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-card-lg animate-fade-up">
+          {toast}
+        </div>
+      )}
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -134,6 +397,101 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           );
         })}
       </div>
+
+      {/* Business Expense Sheet */}
+      <Panel
+        title="Business Expense Sheet"
+        action={
+          <div className="flex items-center gap-2">
+            <button onClick={exportExpensesCsv} className="text-xs font-medium text-indigo-600 hover:underline">Export CSV</button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add Expense
+            </button>
+          </div>
+        }
+      >
+        <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="rounded-xl border border-border p-3">
+            <p className="text-xs text-muted">Total Expenses (All Categories)</p>
+            <p className="text-lg font-bold text-ink">{inr(totalBusinessExpenses)}</p>
+          </div>
+          <div className="rounded-xl border border-border p-3">
+            <p className="text-xs text-muted">Manual Entries</p>
+            <p className="text-lg font-bold text-ink">{inr(manualExpenseTotal)}</p>
+            <p className="text-[11px] text-faint">{expenses.length} entries</p>
+          </div>
+          <div className="rounded-xl border border-border p-3">
+            <div className="flex items-center gap-1.5">
+              <AdsIcon className="h-3.5 w-3.5 text-indigo-500" />
+              <p className="text-xs text-muted">Google Ads ({data.googleAdsSpend.periodLabel})</p>
+            </div>
+            <p className="text-lg font-bold text-ink">{data.googleAdsSpend.connected ? inr(data.googleAdsSpend.totalSpend) : "—"}</p>
+            <p className={cn("text-[11px]", data.googleAdsSpend.connected ? "text-green-600" : "text-faint")}>
+              {data.googleAdsSpend.connected ? "Live from Google Ads API" : (data.googleAdsSpend.error || "Not connected")}
+            </p>
+          </div>
+          <div className="rounded-xl border border-border p-3">
+            <p className="text-xs text-muted">Categories Tracked</p>
+            <p className="text-lg font-bold text-ink">7</p>
+            <p className="text-[11px] text-faint">6 manual + Google Ads (live)</p>
+          </div>
+        </div>
+
+        {data.googleAdsSpend.connected && data.googleAdsSpend.campaigns.length > 0 && (
+          <div className="mb-4 rounded-xl border border-border p-3">
+            <p className="mb-2 text-xs font-medium text-muted">Google Ads spend by campaign ({data.googleAdsSpend.periodLabel})</p>
+            <div className="space-y-1.5">
+              {data.googleAdsSpend.campaigns.slice(0, 5).map((c) => (
+                <div key={c.name} className="flex items-center justify-between text-sm">
+                  <span className="truncate text-muted">{c.name}</span>
+                  <span className="font-medium text-ink">{inr(c.cost)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[820px] text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs font-medium text-faint">
+                <th className="pb-2.5">Journal</th>
+                <th className="pb-2.5">Category</th>
+                <th className="pb-2.5">Date</th>
+                <th className="pb-2.5">Paid To</th>
+                <th className="pb-2.5">Description</th>
+                <th className="pb-2.5 text-right">Amount</th>
+                <th className="pb-2.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {expenses.length === 0 && (
+                <tr><td colSpan={7} className="py-6 text-center text-sm text-faint">No expenses recorded yet. Add one above.</td></tr>
+              )}
+              {expenses.map((e) => (
+                <tr key={e.id} className="border-b border-border last:border-0 hover:bg-surface-2/50">
+                  <td className="py-3"><span className="rounded-md bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted">{journalLabel(e.journalCode)}</span></td>
+                  <td className="py-3 text-ink">{e.category}</td>
+                  <td className="py-3 text-muted">{new Date(e.date + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                  <td className="py-3 text-muted">{e.paymentTo || "—"}</td>
+                  <td className="py-3 max-w-[220px] truncate text-muted">{e.description || "—"}</td>
+                  <td className="py-3 text-right font-medium text-ink">{inr(e.amount)}</td>
+                  <td className="py-3">
+                    <div className="flex items-center justify-end gap-1">
+                      <button onClick={() => setViewingExpense(e)} className="grid h-7 w-7 place-items-center rounded-lg text-faint hover:bg-surface-2 hover:text-ink"><Eye className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => setEditingExpense(e)} className="grid h-7 w-7 place-items-center rounded-lg text-faint hover:bg-surface-2 hover:text-ink"><Pencil className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => removeExpense(e.id)} className="grid h-7 w-7 place-items-center rounded-lg text-faint hover:bg-red-50 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
 
       {/* Overview + donut + activities */}
       <div className="grid gap-5 xl:grid-cols-4">
@@ -429,6 +787,122 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           </table>
         </div>
       </Panel>
+
+      {/* Add Expense modal */}
+      <Modal open={showAddModal} onClose={() => setShowAddModal(false)} title="Add Business Expense" subtitle="Attribute to one journal or mark as a combined/shared cost" size="md">
+        {addExpenseForm}
+      </Modal>
+
+      {/* View Expense modal */}
+      {viewingExpense && (
+        <Modal open={!!viewingExpense} onClose={() => setViewingExpense(null)} title="Expense Details" size="sm">
+          <div className="space-y-2.5 text-sm">
+            <Row label="Journal" value={journalLabel(viewingExpense.journalCode)} />
+            <Row label="Category" value={viewingExpense.category} />
+            <Row label="Date" value={new Date(viewingExpense.date + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} />
+            <Row label="Amount" value={inr(viewingExpense.amount)} />
+            <Row label="Payment Mode" value={viewingExpense.mode} />
+            <Row label="Paid To" value={viewingExpense.paymentTo || "—"} />
+            <Row label="Description" value={viewingExpense.description || "—"} />
+            {viewingExpense.billUrl && (
+              <a href={viewingExpense.billUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:underline">
+                View attached bill
+              </a>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {/* Edit Expense modal */}
+      {editingExpense && (
+        <Modal open={!!editingExpense} onClose={() => setEditingExpense(null)} title="Edit Expense" size="md">
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-muted mb-1.5 block">Journal</label>
+                <select
+                  value={editingExpense.journalCode}
+                  onChange={(e) => setEditingExpense({ ...editingExpense, journalCode: e.target.value })}
+                  className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brand transition-colors"
+                >
+                  {JOURNAL_OPTIONS.map((j) => <option key={j.code} value={j.code}>{j.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-muted mb-1.5 block">Category</label>
+                <select
+                  value={editingExpense.category}
+                  onChange={(e) => setEditingExpense({ ...editingExpense, category: e.target.value })}
+                  className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brand transition-colors"
+                >
+                  {EXPENSE_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-muted mb-1.5 block">Amount (₹)</label>
+                <input
+                  type="number" min={0} step="0.01" value={editingExpense.amount}
+                  onChange={(e) => setEditingExpense({ ...editingExpense, amount: Number(e.target.value) })}
+                  className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brand transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted mb-1.5 block">Date</label>
+                <input
+                  type="date" value={editingExpense.date}
+                  onChange={(e) => setEditingExpense({ ...editingExpense, date: e.target.value })}
+                  className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brand transition-colors"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-muted mb-1.5 block">Payment Mode</label>
+                <select
+                  value={editingExpense.mode}
+                  onChange={(e) => setEditingExpense({ ...editingExpense, mode: e.target.value })}
+                  className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brand transition-colors"
+                >
+                  <option>UPI</option><option>Bank Transfer</option><option>Card</option><option>Cash</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-muted mb-1.5 block">Paid To</label>
+                <input
+                  type="text" value={editingExpense.paymentTo}
+                  onChange={(e) => setEditingExpense({ ...editingExpense, paymentTo: e.target.value })}
+                  className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brand transition-colors"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-muted mb-1.5 block">Description</label>
+              <textarea
+                rows={2} value={editingExpense.description}
+                onChange={(e) => setEditingExpense({ ...editingExpense, description: e.target.value })}
+                className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brand resize-none transition-colors"
+              />
+            </div>
+            <button
+              onClick={saveEditedExpense} disabled={saving}
+              className="w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors disabled:opacity-60"
+            >
+              {saving ? "Saving…" : "Save Changes"}
+            </button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-border pb-2 last:border-0">
+      <span className="text-xs text-muted">{label}</span>
+      <span className="text-right font-medium text-ink">{value}</span>
     </div>
   );
 }

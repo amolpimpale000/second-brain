@@ -41,6 +41,8 @@ import {
   getJpsRecentActivity,
   getJpsEmployees,
 } from "./jps-queries";
+import { listCombinedExpenses, type JournalExpense } from "./journal-expenses-store";
+import { getGoogleAdsSpend, type GoogleAdsSpend } from "./google-ads";
 
 // ---------------------------------------------------------------------------
 // Aggregates real data for every connected journal: IJPS/IJSRT/IJMPS/IJES
@@ -66,6 +68,8 @@ export type JournalDashboardData = {
   jmAlerts: typeof sampleJmAlerts;
   quickActionsJM: typeof sampleQuickActionsJM;
   employees: Employee[];
+  businessExpenses: JournalExpense[];
+  googleAdsSpend: GoogleAdsSpend;
 };
 
 const CONNECTED_JOURNALS: { code: string; prefix: string; name: string }[] = [
@@ -160,6 +164,14 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
     if (r.status === "fulfilled") real.set(codes[idx], r.value);
     else console.error(`Failed to load ${codes[idx]} data:`, r.reason);
   });
+
+  // Business expense sheet: real Supabase-tracked expenses (per-journal or
+  // combined) plus live Google Ads spend. Isolated from the rest of the
+  // dashboard so a Supabase/Google Ads hiccup never blanks the whole page.
+  const [businessExpenses, googleAdsSpend] = await Promise.all([
+    listCombinedExpenses().catch((err) => { console.error("Business expenses failed to load:", err.message); return []; }),
+    getGoogleAdsSpend().catch((err) => ({ connected: false, totalSpend: 0, currency: "INR", campaigns: [], periodLabel: "This Month", error: err.message })),
+  ]);
 
   // --- journal performance table: replace every connected journal with real data ---
   const journalPerformance: JournalPerf[] = sampleJournalPerformance.map((j) => {
@@ -356,6 +368,8 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
     jmAlerts: sampleJmAlerts,
     quickActionsJM: sampleQuickActionsJM,
     employees: employeesOut.length ? employeesOut : sampleEmployees,
+    businessExpenses,
+    googleAdsSpend,
   };
 }
 

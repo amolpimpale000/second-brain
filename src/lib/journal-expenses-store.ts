@@ -82,6 +82,16 @@ export async function listExpenses(journalCode: string): Promise<JournalExpense[
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
 }
 
+// journalCode "ALL" is the sentinel for a combined/shared expense (Interakt
+// fees, salaries, etc. that aren't attributable to one journal). Used by the
+// aggregate business expense sheet on /journal-management, which shows every
+// expense across every journal plus every "ALL" entry.
+export async function listCombinedExpenses(): Promise<JournalExpense[]> {
+  await ensureExpensesBucket();
+  const all = await readAllExpenses();
+  return all.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+}
+
 export async function addExpense(input: Omit<JournalExpense, "id" | "createdAt">): Promise<JournalExpense> {
   await ensureExpensesBucket();
   const all = await readAllExpenses();

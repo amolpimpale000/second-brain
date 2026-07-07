@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listExpenses, addExpense } from "@/lib/journal-expenses-store";
+import { listExpenses, listCombinedExpenses, addExpense } from "@/lib/journal-expenses-store";
 
 export const dynamic = "force-dynamic";
 
@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   try {
     const code = request.nextUrl.searchParams.get("code");
     if (!code) return NextResponse.json({ error: "Missing journal code" }, { status: 400 });
-    const expenses = await listExpenses(code);
+    const expenses = code === "ALL" ? await listCombinedExpenses() : await listExpenses(code);
     return NextResponse.json({ expenses });
   } catch (err) {
     console.error("List expenses error:", err);
