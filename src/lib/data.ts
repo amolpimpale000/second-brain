@@ -531,7 +531,7 @@ export const journalPerformance: JournalPerf[] = [
   { code: "IJSRT", name: "International Journal of Scientific Research & Technology", manuscripts: 312, published: 215, acceptance: 68.9, impact: 3.721, revenue: 450200, growth: 22.4, color: JCOL.IJSRT },
   { code: "IJMPS", name: "International Journal of Medical & Pharmaceutical Sciences", manuscripts: 225, published: 156, acceptance: 69.3, impact: 2.986, revenue: 315600, growth: 15.3, color: JCOL.IJMPS },
   { code: "IJES", name: "International Journal of Engineering & Science", manuscripts: 150, published: 98, acceptance: 65.3, impact: 2.456, revenue: 210300, growth: 10.1, color: JCOL.IJES },
-  { code: "JPS", name: "Journal of Pharmacy & Sciences", manuscripts: 124, published: 61, acceptance: 49.2, impact: 1.923, revenue: 173900, growth: 8.7, color: JCOL.JPS },
+  { code: "JPS", name: "Journal of Pharmaceutical Sciences", manuscripts: 124, published: 61, acceptance: 49.2, impact: 1.923, revenue: 173900, growth: 8.7, color: JCOL.JPS },
 ];
 
 export const revenueBreakdown = [
