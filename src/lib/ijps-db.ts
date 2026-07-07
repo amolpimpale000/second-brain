@@ -18,6 +18,9 @@ function unquote(v: string | undefined): string | undefined {
   let s = v.trim();
   while (s.length > 0 && (s[0] === '"' || s[0] === "'")) s = s.slice(1);
   while (s.length > 0 && (s[s.length - 1] === '"' || s[s.length - 1] === "'")) s = s.slice(0, -1);
+  // Hostinger's env-var import treats "#" as a special/comment character and
+  // stores it backslash-escaped ("\#") instead of literal "#". Undo that.
+  s = s.replace(/\\#/g, "#");
   return s;
 }
 
