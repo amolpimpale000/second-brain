@@ -7,12 +7,20 @@ export async function GET() {
   const debug: Record<string, unknown> = {};
 
   try {
+    const raw = process.env.JOURNAL_IJPS_DB_PASSWORD ?? "";
     const cfg = getIjpsConfigFromEnv();
     debug.host = cfg.host;
     debug.port = cfg.port;
     debug.database = cfg.database;
     debug.user = cfg.user;
     debug.passwordLength = cfg.password?.length ?? 0;
+    // Char codes only (never the actual characters) so the boundary/whitespace
+    // structure of the stored secret can be diagnosed without exposing it.
+    debug.rawLength = raw.length;
+    debug.rawFirstCodes = Array.from(raw.slice(0, 3)).map((c) => c.charCodeAt(0));
+    debug.rawLastCodes = Array.from(raw.slice(-3)).map((c) => c.charCodeAt(0));
+    debug.cleanedFirstCodes = Array.from((cfg.password ?? "").slice(0, 3)).map((c) => c.charCodeAt(0));
+    debug.cleanedLastCodes = Array.from((cfg.password ?? "").slice(-3)).map((c) => c.charCodeAt(0));
   } catch (err: any) {
     debug.configError = err.message;
     return NextResponse.json(debug);
