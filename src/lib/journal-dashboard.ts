@@ -33,10 +33,20 @@ import {
   type IjpsActivity,
   type IjpsEmployee,
 } from "./journal-queries";
+import {
+  getJpsCounts,
+  getJpsRevenue,
+  getJpsMonthlyTrends,
+  getJpsTypeBreakdown,
+  getJpsRecentActivity,
+  getJpsEmployees,
+} from "./jps-queries";
 
 // ---------------------------------------------------------------------------
-// Aggregates real data for every connected journal (IJPS, IJSRT, IJMPS, IJES)
-// with placeholder data for JPS, which isn't wired to a live DB yet.
+// Aggregates real data for every connected journal: IJPS/IJSRT/IJMPS/IJES
+// (MySQL, via journal-queries.ts) plus JPS (Postgres on its own VPS, via
+// jps-queries.ts — structurally different schema, so it gets its own
+// fetch/adapter below that reshapes it into the same RealJournalData shape).
 // ---------------------------------------------------------------------------
 
 export type JournalDashboardData = {
@@ -95,14 +105,60 @@ async function fetchJournal(code: string, prefix: string): Promise<RealJournalDa
   return { code, counts, revenue, monthly, articleTypes, recentActivity, employees };
 }
 
+// JPS runs on a separate Postgres database with a different schema, so it's
+// reshaped here into the same RealJournalData shape the MySQL journals use.
+async function fetchJps(): Promise<RealJournalData> {
+  const [counts, revenue] = await Promise.all([getJpsCounts(), getJpsRevenue()]);
+  const [monthlyRaw, articleTypes, recentActivity, jpsEmployees] = await Promise.all([
+    getJpsMonthlyTrends().catch((err) => { console.error("JPS monthly trends failed:", err.message); return []; }),
+    getJpsTypeBreakdown().catch((err) => { console.error("JPS article types failed:", err.message); return []; }),
+    getJpsRecentActivity().catch((err) => { console.error("JPS recent activity failed:", err.message); return []; }),
+    getJpsEmployees().catch((err) => { console.error("JPS employees failed:", err.message); return []; }),
+  ]);
+
+  const mappedCounts: IjpsCounts = {
+    totalManuscripts: counts.totalManuscripts,
+    publishedArticles: counts.publishedArticles,
+    received: counts.submitted,
+    accepted: counts.accepted,
+    paid: counts.paid,
+    published: counts.published,
+    rejected: counts.rejected,
+    revisionRequired: counts.revisionRequired,
+    underReview: counts.underReview,
+    totalAuthors: counts.totalAuthors,
+    totalSubscribers: counts.totalSubscribers,
+    totalEmployees: counts.totalEmployees,
+  };
+  const mappedRevenue: IjpsRevenue = { apc: revenue.completed, plagiarism: 0, total: revenue.completed };
+  const monthly: MonthlyPoint[] = monthlyRaw.map((m) => ({
+    month: m.month,
+    submissions: m.submissions,
+    articles: 0,
+    accepted: 0,
+  }));
+
+  return {
+    code: "JPS",
+    counts: mappedCounts,
+    revenue: mappedRevenue,
+    monthly,
+    articleTypes,
+    recentActivity,
+    employees: jpsEmployees,
+  };
+}
+
 export async function getJournalDashboardData(): Promise<JournalDashboardData> {
-  const results = await Promise.allSettled(
-    CONNECTED_JOURNALS.map((j) => fetchJournal(j.code, j.prefix))
-  );
+  const results = await Promise.allSettled([
+    ...CONNECTED_JOURNALS.map((j) => fetchJournal(j.code, j.prefix)),
+    fetchJps(),
+  ]);
+  const codes = [...CONNECTED_JOURNALS.map((j) => j.code), "JPS"];
   const real = new Map<string, RealJournalData>();
   results.forEach((r, idx) => {
-    if (r.status === "fulfilled") real.set(CONNECTED_JOURNALS[idx].code, r.value);
-    else console.error(`Failed to load ${CONNECTED_JOURNALS[idx].code} data:`, r.reason);
+    if (r.status === "fulfilled") real.set(codes[idx], r.value);
+    else console.error(`Failed to load ${codes[idx]} data:`, r.reason);
   });
 
   // --- journal performance table: replace every connected journal with real data ---
@@ -129,14 +185,12 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
   // --- article status donut: summed across every connected journal ---
   const realJournals = Array.from(real.values());
   const sumCounts = (fn: (c: IjpsCounts) => number) => realJournals.reduce((s, r) => s + fn(r.counts), 0);
-  // Sample JPS contributes its placeholder share alongside the real totals.
-  const jpsSample = sampleArticleStatus;
   const articleStatus = [
-    { name: "Under Review", value: sumCounts((c) => c.underReview) + jpsSample[0].value, pct: 0, color: "#22c55e" },
-    { name: "Revision", value: sumCounts((c) => c.revisionRequired) + 0, pct: 0, color: "#3b82f6" },
-    { name: "Accepted", value: sumCounts((c) => c.accepted + c.paid) + jpsSample[2].value, pct: 0, color: "#8b5cf6" },
-    { name: "Published", value: sumCounts((c) => c.publishedArticles) + jpsSample[3].value, pct: 0, color: "#f59e0b" },
-    { name: "Rejected", value: sumCounts((c) => c.rejected) + jpsSample[4].value, pct: 0, color: "#ef4444" },
+    { name: "Under Review", value: sumCounts((c) => c.underReview), pct: 0, color: "#22c55e" },
+    { name: "Revision", value: sumCounts((c) => c.revisionRequired), pct: 0, color: "#3b82f6" },
+    { name: "Accepted", value: sumCounts((c) => c.accepted + c.paid), pct: 0, color: "#8b5cf6" },
+    { name: "Published", value: sumCounts((c) => c.publishedArticles), pct: 0, color: "#f59e0b" },
+    { name: "Rejected", value: sumCounts((c) => c.rejected), pct: 0, color: "#ef4444" },
   ];
   normalizePercentages(articleStatus);
 
@@ -241,12 +295,9 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
   // --- top stat cards ---
   const totalManuscripts = journalPerformance.reduce((s, j) => s + j.manuscripts, 0);
   const totalPublished = journalPerformance.reduce((s, j) => s + j.published, 0);
-  const totalUnderReview = realJournals.reduce((s, r) => s + r.counts.underReview, 0) + sampleArticleStatus[0].value;
+  const totalUnderReview = realJournals.reduce((s, r) => s + r.counts.underReview, 0);
   const totalAuthors = realJournals.reduce((s, r) => s + r.counts.totalAuthors, 0);
-  const jpsUsersEstimate = Math.round(
-    (sampleJournalPerformance.find((j) => j.code === "JPS")?.manuscripts ?? 0) * 8.5
-  );
-  const totalUsers = totalAuthors + jpsUsersEstimate;
+  const totalUsers = totalAuthors;
   const totalRevenueAll = journalPerformance.reduce((s, j) => s + j.revenue, 0);
 
   const jmStats = sampleJmStats.map((s) => {
