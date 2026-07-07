@@ -39,7 +39,12 @@ const config: Config = {
         },
       },
       animation: {
-        "fade-up": "fade-up 0.4s ease-out both",
+        // No fill-mode: retaining the end-state transform (even translateY(0),
+        // matrix(1,0,0,1,0,0)) makes this element a containing block for any
+        // `position: fixed` descendant (e.g. modals), breaking viewport-fixed
+        // positioning on every page that uses this class. Letting the
+        // animation end normally clears the transform once it completes.
+        "fade-up": "fade-up 0.4s ease-out",
       },
     },
   },

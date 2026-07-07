@@ -140,7 +140,7 @@ export function DocumentsClient() {
   const [modal, setModal] = useState<null | "category" | "folder" | "rename" | "upload-category" | "change-category">(null);
   const [renamingDoc, setRenamingDoc] = useState<DocItem | null>(null);
   const [categoryDoc, setCategoryDoc] = useState<DocItem | null>(null);
-  const [pendingFiles, setPendingFiles] = useState<FileList | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
   const [pendingPhoto, setPendingPhoto] = useState(false);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -251,12 +251,12 @@ export function DocumentsClient() {
     } catch (err) { console.error(err); flash("Rename failed"); if (prev) setDocs((p) => p.map((d) => (d.id === id ? prev : d))); }
   };
 
-  const onUpload = async (files: FileList | null, asPhoto: boolean, chosenCategory?: string) => {
+  const onUpload = async (files: File[] | null, asPhoto: boolean, chosenCategory?: string) => {
     if (!files?.length) return;
     setUploading(true);
     try {
       const formData = new FormData();
-      Array.from(files).forEach((f) => formData.append("files", f));
+      files.forEach((f) => formData.append("files", f));
       formData.append("category", asPhoto ? PHOTO_CATEGORY : (chosenCategory || activeCat || "Important Docs"));
       const res = await fetch("/api/documents", { method: "POST", body: formData });
       const data = await res.json();
@@ -268,8 +268,12 @@ export function DocumentsClient() {
     finally { setUploading(false); }
   };
 
-  const handleDocFiles = (files: FileList | null) => {
-    if (!files?.length) return;
+  // Snapshot the FileList into a plain File[] immediately: the <input> is reset
+  // (value = "") right after this fires, and when the picked category is chosen
+  // later via a modal, a still-live FileList reference can end up empty by then.
+  const handleDocFiles = (fileList: FileList | null) => {
+    if (!fileList?.length) return;
+    const files = Array.from(fileList);
     const direct = directUploadCat.current;
     directUploadCat.current = null;
     if (direct) {
@@ -281,9 +285,9 @@ export function DocumentsClient() {
     }
   };
 
-  const handlePhotoFiles = (files: FileList | null) => {
-    if (!files?.length) return;
-    onUpload(files, true);
+  const handlePhotoFiles = (fileList: FileList | null) => {
+    if (!fileList?.length) return;
+    onUpload(Array.from(fileList), true);
   };
 
   const changeCategory = async (id: string, newCategory: string) => {
@@ -469,8 +473,15 @@ export function DocumentsClient() {
               <div className="mt-4 rounded-2xl border border-border bg-card p-14 text-center text-sm text-muted shadow-card">
                 {loading ? "Loading…" : (
                   <>
-                    {tab === "photos" ? "No photos yet. " : "No documents here. "}
-                    <button onClick={() => (tab === "photos" ? photoInputRef : docInputRef).current?.click()} className="font-medium text-violet-600 hover:underline">
+                    {tab === "photos" ? "No photos yet. " : activeCat ? `No documents in ${activeCat} yet. ` : "No documents here. "}
+                    <button
+                      onClick={() => {
+                        if (tab === "photos") { photoInputRef.current?.click(); return; }
+                        if (activeCat) directUploadCat.current = activeCat;
+                        docInputRef.current?.click();
+                      }}
+                      className="font-medium text-violet-600 hover:underline"
+                    >
                       Upload {tab === "photos" ? "a photo" : "one"}
                     </button>
                   </>

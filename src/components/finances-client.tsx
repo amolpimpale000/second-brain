@@ -852,28 +852,35 @@ export function FinancesClient() {
     <div className="animate-fade-up space-y-4">
       <KpiCards />
 
-      <div className="grid items-start gap-4 md:grid-cols-2">
-        <NetWorthCard />
-        <AccountsOverview setModal={() => setModal("account")} />
-      </div>
+      <div className="grid items-start gap-4 xl:grid-cols-[1fr_300px]">
+        {/* Main column */}
+        <div className="space-y-4">
+          <NetWorthCard />
 
-      <div className="grid items-start gap-4 xl:grid-cols-[1fr_1fr_300px]">
-        <CashFlow />
-        <ExpenseBreakdown />
-        <SavingsGoals setModal={() => setModal("goal")} />
-      </div>
+          <div className="grid items-start gap-4 md:grid-cols-2">
+            <CashFlow />
+            <ExpenseBreakdown />
+          </div>
 
-      <div className="grid items-start gap-4 xl:grid-cols-[1fr_1fr_1fr_300px]">
-        <RecentTransactions />
-        <BudgetVsActual />
-        <TopSpending />
-        <UpcomingBills />
-      </div>
+          <div className="grid items-start gap-4 xl:grid-cols-3">
+            <RecentTransactions />
+            <BudgetVsActual />
+            <TopSpending />
+          </div>
 
-      <div className="grid items-start gap-4 xl:grid-cols-3">
-        <LoansOverview />
-        <MoneyDueToOthers setModal={() => setModal("debt")} />
-        <FinancialHealth />
+          <div className="grid items-start gap-4 xl:grid-cols-3">
+            <LoansOverview />
+            <MoneyDueToOthers setModal={() => setModal("debt")} />
+            <FinancialHealth />
+          </div>
+        </div>
+
+        {/* Right rail — stays a consistent 300px regardless of how the main column's rows wrap */}
+        <div className="space-y-4">
+          <AccountsOverview setModal={() => setModal("account")} />
+          <SavingsGoals setModal={() => setModal("goal")} />
+          <UpcomingBills />
+        </div>
       </div>
 
       <Modal open={modal === "goal"} onClose={() => setModal(null)} title="Add New Goal">
