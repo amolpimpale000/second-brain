@@ -10,19 +10,15 @@ export type IjpsConnectionConfig = {
 
 // Hosting panels often store env values exactly as pasted. If a value was
 // copied from a .env file with surrounding quotes (e.g. PASSWORD="abc#123"),
-// the quotes end up as literal characters in the stored value, which then
+// stray quote characters (matched pair, or just one from a partial
+// selection) end up as literal characters in the stored value, which then
 // fails auth with an otherwise-correct password. Strip them defensively.
 function unquote(v: string | undefined): string | undefined {
   if (!v) return v;
-  const trimmed = v.trim();
-  if (trimmed.length >= 2) {
-    const first = trimmed[0];
-    const last = trimmed[trimmed.length - 1];
-    if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
-      return trimmed.slice(1, -1);
-    }
-  }
-  return trimmed;
+  let s = v.trim();
+  while (s.length > 0 && (s[0] === '"' || s[0] === "'")) s = s.slice(1);
+  while (s.length > 0 && (s[s.length - 1] === '"' || s[s.length - 1] === "'")) s = s.slice(0, -1);
+  return s;
 }
 
 export function getIjpsConfigFromEnv(): IjpsConnectionConfig {
