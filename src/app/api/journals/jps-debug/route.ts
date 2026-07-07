@@ -38,17 +38,51 @@ export async function GET() {
     await client.connect();
     await client.query("SELECT 1");
     auth = "success";
-    const focus = ["manuscripts", "articles", "payments", "employees", "issues", "status_history", "users"];
-    const cols: Record<string, any[]> = {};
-    for (const t of focus) {
-      const r = await client.query(
-        "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1 ORDER BY ordinal_position",
-        [t]
-      );
-      cols[t] = r.rows;
-    }
-    tables = Object.keys(cols);
-    return Response.json({ host, port, tcp, auth, cols });
+
+    const [
+      manuscriptCount,
+      articleCount,
+      paymentCount,
+      employeeCount,
+      statusBreakdown,
+      typeBreakdown,
+      paymentStatusBreakdown,
+      paymentSample,
+      manuscriptSample,
+      monthlySubmissions,
+      employeeSample,
+    ] = await Promise.all([
+      client.query("SELECT count(*) FROM manuscripts"),
+      client.query("SELECT count(*) FROM articles"),
+      client.query("SELECT count(*) FROM payments"),
+      client.query("SELECT count(*) FROM employees"),
+      client.query("SELECT status, count(*) FROM manuscripts GROUP BY status ORDER BY count(*) DESC"),
+      client.query("SELECT article_type, count(*) FROM manuscripts GROUP BY article_type ORDER BY count(*) DESC"),
+      client.query("SELECT status, count(*), sum(amount) FROM payments GROUP BY status ORDER BY count(*) DESC"),
+      client.query("SELECT amount, currency, status, payment_method, paid_at, created_at FROM payments ORDER BY created_at DESC LIMIT 5"),
+      client.query("SELECT manuscript_id, title, status, article_type, submission_date, publication_date FROM manuscripts ORDER BY created_at DESC LIMIT 5"),
+      client.query(
+        "SELECT to_char(submission_date, 'YYYY-MM') AS month, count(*) FROM manuscripts WHERE submission_date IS NOT NULL GROUP BY 1 ORDER BY 1 DESC LIMIT 12"
+      ),
+      client.query(
+        "SELECT e.department, e.position, e.can_manage_manuscripts, e.can_manage_users, e.is_active, u.first_name, u.last_name, u.email FROM employees e LEFT JOIN users u ON u.id = e.user_id LIMIT 20"
+      ),
+    ]);
+
+    return Response.json({
+      host, port, tcp, auth,
+      manuscriptCount: manuscriptCount.rows[0].count,
+      articleCount: articleCount.rows[0].count,
+      paymentCount: paymentCount.rows[0].count,
+      employeeCount: employeeCount.rows[0].count,
+      statusBreakdown: statusBreakdown.rows,
+      typeBreakdown: typeBreakdown.rows,
+      paymentStatusBreakdown: paymentStatusBreakdown.rows,
+      paymentSample: paymentSample.rows,
+      manuscriptSample: manuscriptSample.rows,
+      monthlySubmissions: monthlySubmissions.rows,
+      employeeSample: employeeSample.rows,
+    });
   } catch (err: any) {
     auth = `error: ${err.message}`;
   } finally {
