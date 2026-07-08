@@ -182,7 +182,7 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Failed to add shared expense");
         setExpenses((p) => [...json.expenses, ...p]);
-        flash(`Split ${inr(amountNum)} (${expPeriod}) across ${json.expenses.length} journals — ${inr(json.perJournalAmount)} each`);
+        flash(`Split ${inr(amountNum)} (${expPeriod}) — ${inr(json.perJournalAmount)}/journal/month across ${json.monthsCovered} month${json.monthsCovered > 1 ? "s" : ""}`);
       } else {
         const res = await fetch("/api/journals/expenses", {
           method: "POST",
@@ -326,6 +326,7 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
       {expShared && perJournalPreview > 0 && (
         <p className="rounded-xl bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700">
           ≈ {inr(perJournalPreview)} per journal per month × {JOURNAL_OPTIONS.length} journals
+          {selectedPeriodMonths > 1 && <> — appears in each of the next {selectedPeriodMonths} months starting {new Date(expDate + "T00:00:00").toLocaleDateString("en-GB", { month: "short", year: "numeric" })}</>}
         </p>
       )}
       <div className="grid grid-cols-2 gap-3">
@@ -471,6 +472,48 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
         })}
       </div>
 
+      {/* Overview + donut + activities */}
+      <div className="grid gap-5 xl:grid-cols-4">
+        <Panel title="Manuscripts Overview" action={period} className="xl:col-span-2">
+          <div className="mb-2 flex flex-wrap gap-4 text-xs">
+            {[["Total Submitted", "#6366f1"], ["Under Review", "#3b82f6"], ["Accepted", "#22c55e"], ["Rejected", "#ef4444"]].map(([n, c]) => (
+              <span key={n} className="flex items-center gap-1.5 text-muted"><span className="h-2 w-2 rounded-full" style={{ background: c }} />{n}</span>
+            ))}
+          </div>
+          <MultiLineChart data={data.submissionsTrend} series={[
+            { key: "total", name: "Total Submitted", color: "#6366f1" },
+            { key: "review", name: "Under Review", color: "#3b82f6" },
+            { key: "accepted", name: "Accepted", color: "#22c55e" },
+            { key: "rejected", name: "Rejected", color: "#ef4444" },
+          ]} />
+        </Panel>
+
+        <Panel title="Manuscripts by Journal">
+          <div className="flex items-center gap-4">
+            <Donut data={data.submissionsByJournal} center={totalSubmissionsByJournal.toLocaleString("en-IN")} sub="Total" />
+            <Legend items={data.submissionsByJournal} />
+          </div>
+        </Panel>
+
+        <Panel title="Recent Activities" action={viewAll}>
+          <div className="space-y-3.5">
+            {data.jmActivities.map((a) => {
+              const Icon = actIcon[a.icon];
+              return (
+                <div key={a.id} className="flex items-start gap-2.5">
+                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg" style={{ background: `${a.color}1a`, color: a.color }}><Icon className="h-4 w-4" /></div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium leading-tight text-ink">{a.text}</p>
+                    <p className="truncate text-xs text-faint">{a.meta}</p>
+                  </div>
+                  <span className="shrink-0 text-xs text-faint">{a.time}</span>
+                </div>
+              );
+            })}
+          </div>
+        </Panel>
+      </div>
+
       {/* Expense Journal — journal x category pivot, month-navigable */}
       <Panel
         title="Expense Journal"
@@ -572,100 +615,58 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
             <p className="max-w-sm text-xs text-muted">{data.googleAdsSpend.error || "Add Google Ads credentials to see live spend per journal here."}</p>
           </div>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
             {data.googleAdsSpend.byJournal.map((j) => (
-              <div key={j.code} className="overflow-hidden rounded-2xl border border-border bg-gradient-to-b from-surface-2/60 to-transparent">
-                <div className="flex items-center justify-between border-b border-border/70 px-3.5 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <GoogleAdsLogo className="h-4 w-4" />
-                    <span className="text-xs font-semibold text-ink">{j.code}</span>
+              <div key={j.code} className="overflow-hidden rounded-xl border border-border bg-gradient-to-b from-surface-2/60 to-transparent">
+                <div className="flex items-center justify-between border-b border-border/70 px-2.5 py-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <GoogleAdsLogo className="h-3.5 w-3.5" />
+                    <span className="text-[11px] font-semibold text-ink">{j.code}</span>
                   </div>
-                  <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                  <span className={cn("inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold",
                     j.connected ? "bg-green-50 text-green-600" : "bg-red-50 text-red-500")}>
-                    <span className={cn("h-1.5 w-1.5 rounded-full", j.connected ? "bg-green-500" : "bg-red-400")} />
+                    <span className={cn("h-1 w-1 rounded-full", j.connected ? "bg-green-500" : "bg-red-400")} />
                     {j.connected ? "Live" : (j.error ? "Error" : "—")}
                   </span>
                 </div>
-                <div className="p-3.5">
-                  <p className="text-2xl font-bold text-ink">{j.connected ? inr(j.totalSpend) : "—"}</p>
+                <div className="p-2.5">
+                  <p className="text-lg font-bold text-ink">{j.connected ? inr(j.totalSpend) : "—"}</p>
                   {j.connected && (
-                    <div className="mt-3 grid grid-cols-3 gap-2">
-                      <div className="rounded-lg bg-surface-2/70 p-2 text-center">
-                        <Eye className="mx-auto h-3.5 w-3.5 text-blue-500" />
-                        <p className="mt-1 text-xs font-semibold text-ink">{j.impressions.toLocaleString("en-IN")}</p>
-                        <p className="text-[10px] text-faint">Impressions</p>
+                    <div className="mt-2 grid grid-cols-3 gap-1">
+                      <div className="rounded-md bg-surface-2/70 p-1 text-center">
+                        <Eye className="mx-auto h-3 w-3 text-blue-500" />
+                        <p className="mt-0.5 text-[11px] font-semibold text-ink">{j.impressions.toLocaleString("en-IN")}</p>
+                        <p className="text-[9px] text-faint">Impr.</p>
                       </div>
-                      <div className="rounded-lg bg-surface-2/70 p-2 text-center">
-                        <MousePointerClick className="mx-auto h-3.5 w-3.5 text-amber-500" />
-                        <p className="mt-1 text-xs font-semibold text-ink">{j.clicks.toLocaleString("en-IN")}</p>
-                        <p className="text-[10px] text-faint">Clicks</p>
+                      <div className="rounded-md bg-surface-2/70 p-1 text-center">
+                        <MousePointerClick className="mx-auto h-3 w-3 text-amber-500" />
+                        <p className="mt-0.5 text-[11px] font-semibold text-ink">{j.clicks.toLocaleString("en-IN")}</p>
+                        <p className="text-[9px] text-faint">Clicks</p>
                       </div>
-                      <div className="rounded-lg bg-surface-2/70 p-2 text-center">
-                        <Target className="mx-auto h-3.5 w-3.5 text-green-500" />
-                        <p className="mt-1 text-xs font-semibold text-ink">{j.conversions.toLocaleString("en-IN")}</p>
-                        <p className="text-[10px] text-faint">Conversions</p>
+                      <div className="rounded-md bg-surface-2/70 p-1 text-center">
+                        <Target className="mx-auto h-3 w-3 text-green-500" />
+                        <p className="mt-0.5 text-[11px] font-semibold text-ink">{j.conversions.toLocaleString("en-IN")}</p>
+                        <p className="text-[9px] text-faint">Conv.</p>
                       </div>
                     </div>
                   )}
                   {j.connected && j.campaigns.length > 0 && (
-                    <div className="mt-3 space-y-1 border-t border-border pt-2.5">
-                      {j.campaigns.slice(0, 3).map((c) => (
-                        <div key={c.name} className="flex items-center justify-between text-xs">
+                    <div className="mt-2 space-y-0.5 border-t border-border pt-1.5">
+                      {j.campaigns.slice(0, 2).map((c) => (
+                        <div key={c.name} className="flex items-center justify-between text-[10px]">
                           <span className="truncate text-faint">{c.name}</span>
                           <span className="text-muted">{inr(c.cost)}</span>
                         </div>
                       ))}
                     </div>
                   )}
-                  {!j.connected && j.error && <p className="mt-1 truncate text-[11px] text-faint" title={j.error}>{j.error}</p>}
+                  {!j.connected && j.error && <p className="mt-1 truncate text-[10px] text-faint" title={j.error}>{j.error}</p>}
                 </div>
               </div>
             ))}
           </div>
         )}
       </Panel>
-
-      {/* Overview + donut + activities */}
-      <div className="grid gap-5 xl:grid-cols-4">
-        <Panel title="Manuscripts Overview" action={period} className="xl:col-span-2">
-          <div className="mb-2 flex flex-wrap gap-4 text-xs">
-            {[["Total Submitted", "#6366f1"], ["Under Review", "#3b82f6"], ["Accepted", "#22c55e"], ["Rejected", "#ef4444"]].map(([n, c]) => (
-              <span key={n} className="flex items-center gap-1.5 text-muted"><span className="h-2 w-2 rounded-full" style={{ background: c }} />{n}</span>
-            ))}
-          </div>
-          <MultiLineChart data={data.submissionsTrend} series={[
-            { key: "total", name: "Total Submitted", color: "#6366f1" },
-            { key: "review", name: "Under Review", color: "#3b82f6" },
-            { key: "accepted", name: "Accepted", color: "#22c55e" },
-            { key: "rejected", name: "Rejected", color: "#ef4444" },
-          ]} />
-        </Panel>
-
-        <Panel title="Manuscripts by Journal">
-          <div className="flex items-center gap-4">
-            <Donut data={data.submissionsByJournal} center={totalSubmissionsByJournal.toLocaleString("en-IN")} sub="Total" />
-            <Legend items={data.submissionsByJournal} />
-          </div>
-        </Panel>
-
-        <Panel title="Recent Activities" action={viewAll}>
-          <div className="space-y-3.5">
-            {data.jmActivities.map((a) => {
-              const Icon = actIcon[a.icon];
-              return (
-                <div key={a.id} className="flex items-start gap-2.5">
-                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg" style={{ background: `${a.color}1a`, color: a.color }}><Icon className="h-4 w-4" /></div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium leading-tight text-ink">{a.text}</p>
-                    <p className="truncate text-xs text-faint">{a.meta}</p>
-                  </div>
-                  <span className="shrink-0 text-xs text-faint">{a.time}</span>
-                </div>
-              );
-            })}
-          </div>
-        </Panel>
-      </div>
 
       {/* Journal performance table + revenue */}
       <div className="grid gap-5 xl:grid-cols-3">

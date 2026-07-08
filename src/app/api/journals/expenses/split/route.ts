@@ -6,6 +6,16 @@ export const dynamic = "force-dynamic";
 
 const PERIOD_MONTHS: Record<string, number> = { monthly: 1, quarterly: 3, yearly: 12 };
 
+/** "2026-07-08" + 2 -> "2026-09-08" (clamped to the target month's last day). */
+function shiftMonth(dateStr: string, monthOffset: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const targetYear = y + Math.floor((m - 1 + monthOffset) / 12);
+  const targetMonth = ((m - 1 + monthOffset) % 12 + 12) % 12;
+  const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  const day = Math.min(d, lastDay);
+  return new Date(Date.UTC(targetYear, targetMonth, day)).toISOString().slice(0, 10);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -25,19 +35,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Split amount rounds to zero — increase the total" }, { status: 400 });
     }
 
-    const expenses = await addExpenses(
-      GOOGLE_ADS_JOURNAL_CODES.map((journalCode) => ({
+    // A quarterly/yearly shared cost is amortized across every month it
+    // covers, not just the month it was entered in — so it shows up in the
+    // expense journal for each of those months, for every journal.
+    const monthDates = Array.from({ length: periodMonths }, (_, i) => shiftMonth(date, i));
+    const inputs = GOOGLE_ADS_JOURNAL_CODES.flatMap((journalCode) =>
+      monthDates.map((monthDate) => ({
         journalCode,
         category,
         amount: perJournalAmount,
-        date,
+        date: monthDate,
         mode: mode || "UPI",
         description: description || "",
         paymentTo: paymentTo || "",
       }))
     );
 
-    return NextResponse.json({ expenses, perJournalAmount });
+    const expenses = await addExpenses(inputs);
+
+    return NextResponse.json({ expenses, perJournalAmount, monthsCovered: periodMonths });
   } catch (err) {
     console.error("Split expense error:", err);
     const msg = err instanceof Error ? err.message : "Failed to create split expense";
