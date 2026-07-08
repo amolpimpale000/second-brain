@@ -15,6 +15,7 @@ import {
 } from "./jps-queries";
 import { listExpenses } from "./journal-expenses-store";
 import { getGoogleAdsCardData } from "./google-ads";
+import { getRazorpayIncomeForJournal } from "./razorpay";
 import type { JournalPageData } from "./journal-page-data";
 
 // ---------------------------------------------------------------------------
@@ -58,6 +59,10 @@ export async function getJpsPageData(): Promise<JournalPageData> {
   const googleAds = await getGoogleAdsCardData("JPS").catch((err) => {
     console.error("JPS Google Ads spend failed to load:", err instanceof Error ? err.message : err);
     return { connected: false, totalSpend: 0, delta: 0, impressions: 0, clicks: 0, conversions: 0, metrics: [] };
+  });
+  const razorpayLive = await getRazorpayIncomeForJournal("JPS").catch((err) => {
+    console.error("JPS Razorpay income failed to load:", err instanceof Error ? err.message : err);
+    return { connected: false, total: 0, delta: 0, sources: [], transactionCount: 0, periodLabel: "This Month", error: "Request failed" };
   });
 
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
@@ -121,11 +126,13 @@ export async function getJpsPageData(): Promise<JournalPageData> {
   ];
 
   const razorpayTotal = paymentMethods.reduce((s, m) => s + m.amount, 0);
-  const razorpayIncome = {
-    total: razorpayTotal || revenue.completed,
-    delta: sampleRazorpayIncome.delta,
-    sources: paymentMethods.length > 0 ? paymentMethods.map((m) => ({ name: m.name, pct: m.pct, amount: m.amount })) : [],
-  };
+  const razorpayIncome = razorpayLive.connected
+    ? { total: razorpayLive.total, delta: razorpayLive.delta, sources: razorpayLive.sources }
+    : {
+        total: razorpayTotal || revenue.completed,
+        delta: sampleRazorpayIncome.delta,
+        sources: paymentMethods.length > 0 ? paymentMethods.map((m) => ({ name: m.name, pct: m.pct, amount: m.amount })) : [],
+      };
 
   const catMap = new Map<string, number>();
   for (const e of expenses) catMap.set(e.category, (catMap.get(e.category) ?? 0) + e.amount);

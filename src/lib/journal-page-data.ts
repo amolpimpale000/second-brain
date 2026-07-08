@@ -15,6 +15,7 @@ import {
 } from "./journal-queries";
 import { listExpenses, type JournalExpense } from "./journal-expenses-store";
 import { getGoogleAdsCardData, type GoogleAdsCardData } from "./google-ads";
+import { getRazorpayIncomeForJournal } from "./razorpay";
 
 // ---------------------------------------------------------------------------
 // Generic data layer for any single-journal page (/journals/<code>).
@@ -85,6 +86,10 @@ export async function getJournalPageData(code: string, prefix: string): Promise<
   const googleAds = await getGoogleAdsCardData(code).catch((err) => {
     console.error(`${code} Google Ads spend failed to load:`, err instanceof Error ? err.message : err);
     return { connected: false, totalSpend: 0, delta: 0, impressions: 0, clicks: 0, conversions: 0, metrics: [] };
+  });
+  const razorpayLive = await getRazorpayIncomeForJournal(code).catch((err) => {
+    console.error(`${code} Razorpay income failed to load:`, err instanceof Error ? err.message : err);
+    return { connected: false, total: 0, delta: 0, sources: [], transactionCount: 0, periodLabel: "This Month", error: "Request failed" };
   });
 
   // --- real expense totals (this journal's Supabase-tracked expenses) ---
@@ -160,15 +165,18 @@ export async function getJournalPageData(code: string, prefix: string): Promise<
   ];
   normalizePercentages(revenueBreakdownIjps);
 
-  // --- Razorpay income ---
+  // --- Razorpay income: live from each journal's own Razorpay account when
+  // configured, falling back to the journal DB's payment records otherwise ---
   const razorpayTotal = paymentMethods.reduce((s, m) => s + m.amount, 0);
-  const razorpayIncome = {
-    total: razorpayTotal || revenue.total,
-    delta: sampleRazorpayIncome.delta,
-    sources: paymentMethods.length > 0
-      ? paymentMethods.map((m) => ({ name: m.name, pct: m.pct, amount: m.amount }))
-      : [],
-  };
+  const razorpayIncome = razorpayLive.connected
+    ? { total: razorpayLive.total, delta: razorpayLive.delta, sources: razorpayLive.sources }
+    : {
+        total: razorpayTotal || revenue.total,
+        delta: sampleRazorpayIncome.delta,
+        sources: paymentMethods.length > 0
+          ? paymentMethods.map((m) => ({ name: m.name, pct: m.pct, amount: m.amount }))
+          : [],
+      };
 
   // --- real expenses breakdown (by category) ---
   const catMap = new Map<string, number>();

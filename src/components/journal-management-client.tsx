@@ -741,8 +741,8 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
         <Panel title="Revenue Overview" action={period}>
           <p className="text-xs text-muted">Total Revenue</p>
           <div className="flex items-center gap-2">
-            <p className="text-2xl font-bold text-ink">{inr(1875450)}</p>
-            <Delta v={24.8} />
+            <p className="text-2xl font-bold text-ink">{inr(totalJournalRevenue)}</p>
+            <Delta v={data.financialSummary.find((f) => f.label === "Total Revenue")?.growth ?? 0} />
           </div>
           <div className="mt-3 flex items-center gap-3">
             <Donut data={data.revenueBreakdown} center="" sub="" />
