@@ -4,13 +4,19 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
  * Journal-level expenses aren't tracked in any journal's read-only MySQL
  * database (confirmed by schema inspection), so this app can't source real
  * expense figures from there — and must never write to those databases
- * regardless. Expenses entered here are stored in their own private Supabase
- * Storage bucket (same proven pattern as documents-store.ts), completely
- * separate from the journal databases.
+ * regardless. Expenses are stored in this app's own Supabase Postgres table
+ * (journal_expenses), completely separate from the journal databases.
+ *
+ * This used to be a single JSON blob in Supabase Storage, read-modified-then
+ * rewritten on every change. That pattern proved unreliable in production —
+ * reads shortly after a write could return a stale pre-write copy (observed
+ * even after disabling Storage's default Cache-Control), and the next write
+ * would then silently persist that stale copy, erasing recently-added
+ * entries. A real table with atomic INSERT/UPDATE/DELETE avoids the entire
+ * bug class since there's no read-all-then-write-all step.
  */
 
-const BUCKET = "journal-expenses";
-const MANIFEST = "expenses.json";
+const TABLE = "journal_expenses";
 
 export type JournalExpense = {
   id: string;
@@ -25,6 +31,36 @@ export type JournalExpense = {
   billName?: string;
   createdAt: string;
 };
+
+type ExpenseRow = {
+  id: string;
+  journal_code: string;
+  category: string;
+  amount: number;
+  date: string;
+  mode: string;
+  description: string;
+  payment_to: string;
+  bill_url: string | null;
+  bill_name: string | null;
+  created_at: string;
+};
+
+function rowToExpense(row: ExpenseRow): JournalExpense {
+  return {
+    id: row.id,
+    journalCode: row.journal_code,
+    category: row.category,
+    amount: Number(row.amount),
+    date: row.date,
+    mode: row.mode,
+    description: row.description,
+    paymentTo: row.payment_to,
+    billUrl: row.bill_url ?? undefined,
+    billName: row.bill_name ?? undefined,
+    createdAt: row.created_at,
+  };
+}
 
 let _client: SupabaseClient | null = null;
 
@@ -41,97 +77,82 @@ function admin(): SupabaseClient {
   return _client;
 }
 
-export async function ensureExpensesBucket() {
-  const sb = admin();
-  const { data } = await sb.storage.getBucket(BUCKET);
-  if (!data) {
-    await sb.storage.createBucket(BUCKET, { public: false, fileSizeLimit: "5MB" });
-  }
-}
-
-export async function readAllExpenses(): Promise<JournalExpense[]> {
-  const sb = admin();
-  const { data, error } = await sb.storage.from(BUCKET).download(MANIFEST);
-  if (error || !data) return [];
-  try {
-    return JSON.parse(await data.text());
-  } catch {
-    return [];
-  }
-}
-
-async function writeAllExpenses(expenses: JournalExpense[]) {
-  const sb = admin();
-  const body = new Blob([JSON.stringify(expenses, null, 2)], { type: "application/json" });
-  const { error } = await sb.storage.from(BUCKET).upload(MANIFEST, body, {
-    upsert: true,
-    contentType: "application/json",
-    cacheControl: "0",
-  });
-  if (error) throw error;
-}
-
 export function uid() {
   return Math.random().toString(36).slice(2, 9);
 }
 
 export async function listExpenses(journalCode: string): Promise<JournalExpense[]> {
-  await ensureExpensesBucket();
-  const all = await readAllExpenses();
-  return all
-    .filter((e) => e.journalCode === journalCode)
-    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+  const sb = admin();
+  const { data, error } = await sb
+    .from(TABLE)
+    .select("*")
+    .eq("journal_code", journalCode)
+    .order("date", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as ExpenseRow[] | null ?? []).map(rowToExpense);
 }
 
 // All expenses across every journal, for the /journal-management expense journal.
 export async function listCombinedExpenses(): Promise<JournalExpense[]> {
-  await ensureExpensesBucket();
-  const all = await readAllExpenses();
-  return all.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+  const sb = admin();
+  const { data, error } = await sb
+    .from(TABLE)
+    .select("*")
+    .order("date", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as ExpenseRow[] | null ?? []).map(rowToExpense);
 }
 
-// The manifest is a single JSON blob (see readAllExpenses/writeAllExpenses),
-// so concurrent addExpense() calls race on read-modify-write and can silently
-// drop entries (last write wins). Anything adding more than one expense at
-// once — e.g. splitting a shared cost across all journals — must go through
-// this batch function instead, which does exactly one read and one write.
 export async function addExpenses(inputs: Omit<JournalExpense, "id" | "createdAt">[]): Promise<JournalExpense[]> {
-  await ensureExpensesBucket();
-  const all = await readAllExpenses();
-  const now = new Date().toISOString();
-  const created = inputs.map((input) => ({ ...input, id: uid(), createdAt: now }));
-  all.unshift(...created);
-  await writeAllExpenses(all);
-  return created;
+  const sb = admin();
+  const rows = inputs.map((input) => ({
+    id: uid(),
+    journal_code: input.journalCode,
+    category: input.category,
+    amount: input.amount,
+    date: input.date,
+    mode: input.mode,
+    description: input.description,
+    payment_to: input.paymentTo,
+    bill_url: input.billUrl ?? null,
+    bill_name: input.billName ?? null,
+  }));
+  const { data, error } = await sb.from(TABLE).insert(rows).select();
+  if (error) throw error;
+  return (data as ExpenseRow[] | null ?? []).map(rowToExpense);
 }
 
 export async function addExpense(input: Omit<JournalExpense, "id" | "createdAt">): Promise<JournalExpense> {
-  await ensureExpensesBucket();
-  const all = await readAllExpenses();
-  const expense: JournalExpense = { ...input, id: uid(), createdAt: new Date().toISOString() };
-  all.unshift(expense);
-  await writeAllExpenses(all);
-  return expense;
+  const [created] = await addExpenses([input]);
+  return created;
 }
 
 export async function updateExpense(
   id: string,
-  patch: Partial<Omit<JournalExpense, "id" | "journalCode" | "createdAt">>
+  patch: Partial<Omit<JournalExpense, "id" | "createdAt">>
 ): Promise<JournalExpense | null> {
-  await ensureExpensesBucket();
-  const all = await readAllExpenses();
-  const idx = all.findIndex((e) => e.id === id);
-  if (idx === -1) return null;
-  all[idx] = { ...all[idx], ...patch };
-  await writeAllExpenses(all);
-  return all[idx];
+  const sb = admin();
+  const dbPatch: Partial<ExpenseRow> = {};
+  if (patch.journalCode !== undefined) dbPatch.journal_code = patch.journalCode;
+  if (patch.category !== undefined) dbPatch.category = patch.category;
+  if (patch.amount !== undefined) dbPatch.amount = patch.amount;
+  if (patch.date !== undefined) dbPatch.date = patch.date;
+  if (patch.mode !== undefined) dbPatch.mode = patch.mode;
+  if (patch.description !== undefined) dbPatch.description = patch.description;
+  if (patch.paymentTo !== undefined) dbPatch.payment_to = patch.paymentTo;
+  if (patch.billUrl !== undefined) dbPatch.bill_url = patch.billUrl;
+  if (patch.billName !== undefined) dbPatch.bill_name = patch.billName;
+
+  const { data, error } = await sb.from(TABLE).update(dbPatch).eq("id", id).select().maybeSingle();
+  if (error) throw error;
+  return data ? rowToExpense(data as ExpenseRow) : null;
 }
 
 export async function deleteExpense(id: string): Promise<boolean> {
-  await ensureExpensesBucket();
-  const all = await readAllExpenses();
-  const next = all.filter((e) => e.id !== id);
-  if (next.length === all.length) return false;
-  await writeAllExpenses(next);
-  return true;
+  const sb = admin();
+  const { data, error } = await sb.from(TABLE).delete().eq("id", id).select();
+  if (error) throw error;
+  return (data?.length ?? 0) > 0;
 }
