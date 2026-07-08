@@ -1,7 +1,6 @@
 import {
   jmStats as sampleJmStats,
   submissionsByJournal as sampleSubmissionsByJournal,
-  jmActivities as sampleJmActivities,
   journalPerformance as sampleJournalPerformance,
   revenueBreakdown as sampleRevenueBreakdown,
   articleStatus as sampleArticleStatus,
@@ -54,7 +53,6 @@ export type JournalDashboardData = {
   jmStats: typeof sampleJmStats;
   submissionsByJournalTrend: { data: Record<string, number | string>[]; series: { key: string; name: string; color: string }[] };
   submissionsByJournal: typeof sampleSubmissionsByJournal;
-  jmActivities: typeof sampleJmActivities;
   journalPerformance: JournalPerf[];
   revenueBreakdown: typeof sampleRevenueBreakdown;
   articleStatus: typeof sampleArticleStatus;
@@ -225,22 +223,6 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
     color: JCOL[rj.code as keyof typeof JCOL] ?? "#94a3b8",
   }));
 
-  // --- recent activities: real logs from every connected journal, newest first ---
-  const realActivities = realJournals.flatMap((rj) =>
-    rj.recentActivity.map((a) => ({
-      id: a.id,
-      text: a.text,
-      meta: a.meta,
-      time: a.time,
-      icon: "file" as const,
-      color: JCOL[rj.code as keyof typeof JCOL] ?? JCOL.IJPS,
-    }))
-  );
-  const jmActivities = [
-    ...realActivities.slice(0, 5),
-    ...sampleJmActivities.slice(0, Math.max(0, 5 - realActivities.length)),
-  ];
-
   // --- revenue breakdown: summed APC / plagiarism across connected journals ---
   const totalApc = realJournals.reduce((s, r) => s + r.revenue.apc, 0);
   const totalPlagiarism = realJournals.reduce((s, r) => s + r.revenue.plagiarism, 0);
@@ -359,7 +341,6 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
     jmStats,
     submissionsByJournalTrend: { data: submissionsByJournalData, series: submissionsByJournalSeries },
     submissionsByJournal,
-    jmActivities,
     journalPerformance,
     revenueBreakdown,
     articleStatus,

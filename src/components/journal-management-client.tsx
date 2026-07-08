@@ -24,9 +24,6 @@ const statTone: Record<string, string> = {
 const statIcon: Record<string, React.ElementType> = {
   book: BookOpen, file: FileText, check: CheckCircle2, review: Clock, users: Users, rupee: IndianRupee,
 };
-const actIcon: Record<string, React.ElementType> = {
-  file: FileText, check: CheckCircle2, rupee: IndianRupee, user: Users, book: BookOpen,
-};
 const qaIcon: Record<string, React.ElementType> = {
   add: Plus, file: FileStack, report: BarChart3, users: UserCog, megaphone: Megaphone,
 };
@@ -490,21 +487,33 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           </div>
         </Panel>
 
-        <Panel title="Recent Activities" action={viewAll}>
-          <div className="space-y-3.5">
-            {data.jmActivities.map((a) => {
-              const Icon = actIcon[a.icon];
-              return (
-                <div key={a.id} className="flex items-start gap-2.5">
-                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg" style={{ background: `${a.color}1a`, color: a.color }}><Icon className="h-4 w-4" /></div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium leading-tight text-ink">{a.text}</p>
-                    <p className="truncate text-xs text-faint">{a.meta}</p>
+        <Panel title="Journal Snapshot">
+          <div className="space-y-3">
+            {data.journalPerformance.map((j) => (
+              <div key={j.code} className="rounded-xl border border-border p-2.5">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full" style={{ background: j.color }} />
+                    <span className="text-xs font-semibold text-ink">{j.code}</span>
                   </div>
-                  <span className="shrink-0 text-xs text-faint">{a.time}</span>
+                  <Delta v={j.growth} />
                 </div>
-              );
-            })}
+                <div className="grid grid-cols-3 gap-1.5 text-center">
+                  <div>
+                    <p className="text-sm font-semibold text-ink">{j.manuscripts.toLocaleString("en-IN")}</p>
+                    <p className="text-[10px] text-faint">Manuscripts</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-ink">{j.acceptance}%</p>
+                    <p className="text-[10px] text-faint">Acceptance</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-ink">{inr(j.revenue)}</p>
+                    <p className="text-[10px] text-faint">Revenue</p>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </Panel>
       </div>
