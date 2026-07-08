@@ -66,6 +66,7 @@ async function writeAllExpenses(expenses: JournalExpense[]) {
   const { error } = await sb.storage.from(BUCKET).upload(MANIFEST, body, {
     upsert: true,
     contentType: "application/json",
+    cacheControl: "0",
   });
   if (error) throw error;
 }
