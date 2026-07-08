@@ -14,6 +14,7 @@ import {
   getJpsRecentTransactions,
 } from "./jps-queries";
 import { listExpenses } from "./journal-expenses-store";
+import { getGoogleAdsCardData } from "./google-ads";
 import type { JournalPageData } from "./journal-page-data";
 
 // ---------------------------------------------------------------------------
@@ -53,6 +54,10 @@ export async function getJpsPageData(): Promise<JournalPageData> {
   const expenses = await listExpenses("JPS").catch((err) => {
     console.error("JPS expenses failed to load:", err instanceof Error ? err.message : err);
     return [];
+  });
+  const googleAds = await getGoogleAdsCardData("JPS").catch((err) => {
+    console.error("JPS Google Ads spend failed to load:", err instanceof Error ? err.message : err);
+    return { connected: false, totalSpend: 0, delta: 0, metrics: [] };
   });
 
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
@@ -177,7 +182,7 @@ export async function getJpsPageData(): Promise<JournalPageData> {
     revenueData: revenueData.length ? revenueData : sampleRevenueData,
     revenueBreakdownIjps,
     razorpayIncome,
-    googleAds: { connected: false, totalSpend: 0, delta: 0, metrics: [] },
+    googleAds,
     expensesBreakdownIjps,
     expenseTrend,
     profitabilityData,

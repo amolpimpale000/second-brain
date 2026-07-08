@@ -610,26 +610,59 @@ export function IjpsClient({
           </div>
         </div>
 
-        {/* Google Ads Overview — no connected data source */}
+        {/* Google Ads Overview — live from the Google Ads API when this journal's account is configured */}
         <div className="card card-pad">
           <div className="flex items-start justify-between mb-1">
             <h3 className="font-semibold text-ink">Google Ads Overview</h3>
           </div>
-          <div className="flex h-full flex-col items-center justify-center gap-3 py-10 text-center">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-surface-2 text-faint">
-              <PlugZap className="h-6 w-6" />
+          {data.googleAds.connected ? (
+            <>
+              <div className="mb-6">
+                <p className="text-xs text-muted">Spend This Month</p>
+                <div className="flex items-center gap-3 mt-0.5">
+                  <p className="text-2xl font-semibold text-ink">{inrFmt(data.googleAds.totalSpend)}</p>
+                  <span className="inline-flex items-center rounded-lg bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">Live</span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <Delta value={data.googleAds.delta} />
+                  <span className="text-[11px] text-faint">vs last month</span>
+                </div>
+              </div>
+              <div className="mb-2">
+                <p className="text-sm font-medium text-ink mb-3">Top Campaigns</p>
+                {data.googleAds.metrics.length === 0 ? (
+                  <p className="text-xs text-faint">No campaign spend recorded this month.</p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {data.googleAds.metrics.map((m) => (
+                      <div key={m.label} className="flex items-center justify-between text-sm">
+                        <span className="truncate text-muted">{m.label}</span>
+                        <span className="shrink-0 text-xs font-medium text-ink">{m.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-3 py-10 text-center">
+              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-surface-2 text-faint">
+                <PlugZap className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-ink">Google Ads isn't connected</p>
+                <p className="mt-1 max-w-[220px] text-xs text-muted">
+                  {data.googleAds.error || "Link a Google Ads account to see spend, clicks, and conversions here."}
+                </p>
+              </div>
+              <button
+                onClick={() => window.open("https://ads.google.com", "_blank", "noopener,noreferrer")}
+                className="mt-1 inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3.5 py-2 text-xs font-semibold text-ink hover:bg-surface-2 transition-colors"
+              >
+                Open Google Ads <ArrowUpRight className="h-3.5 w-3.5" />
+              </button>
             </div>
-            <div>
-              <p className="text-sm font-medium text-ink">Google Ads isn't connected</p>
-              <p className="mt-1 max-w-[220px] text-xs text-muted">Link a Google Ads account to see spend, clicks, and conversions here.</p>
-            </div>
-            <button
-              onClick={() => window.open("https://ads.google.com", "_blank", "noopener,noreferrer")}
-              className="mt-1 inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3.5 py-2 text-xs font-semibold text-ink hover:bg-surface-2 transition-colors"
-            >
-              Open Google Ads <ArrowUpRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
+          )}
         </div>
       </div>
 

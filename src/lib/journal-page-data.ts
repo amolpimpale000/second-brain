@@ -14,6 +14,7 @@ import {
   getJournalRecentTransactions,
 } from "./journal-queries";
 import { listExpenses, type JournalExpense } from "./journal-expenses-store";
+import { getGoogleAdsCardData, type GoogleAdsCardData } from "./google-ads";
 
 // ---------------------------------------------------------------------------
 // Generic data layer for any single-journal page (/journals/<code>).
@@ -21,8 +22,9 @@ import { listExpenses, type JournalExpense } from "./journal-expenses-store";
 // database. Expenses aren't tracked in any journal database at all, so they
 // come from this app's own Supabase-backed expense tracker instead (see
 // journal-expenses-store.ts) — real once entered, honestly zero until then.
-// Google Ads has no connected data source, so that section is marked
-// unconnected rather than showing an invented number.
+// Google Ads spend is pulled live per-journal from the Google Ads API (each
+// journal has its own Ads account); if that journal has no configured
+// account, the section shows an honest "not connected" state instead.
 // ---------------------------------------------------------------------------
 
 const EXPENSE_COLORS = ["#6366f1", "#3b82f6", "#ef4444", "#f59e0b", "#8b5cf6", "#94a3b8", "#14b8a6", "#ec4899"];
@@ -35,7 +37,7 @@ export type JournalPageData = {
   revenueData: typeof sampleRevenueData;
   revenueBreakdownIjps: { name: string; value: number; pct: number; color: string }[];
   razorpayIncome: typeof sampleRazorpayIncome;
-  googleAds: { connected: false; totalSpend: 0; delta: 0; metrics: [] };
+  googleAds: GoogleAdsCardData;
   expensesBreakdownIjps: { name: string; value: number; pct: number; color: string }[];
   expenseTrend: { label: string; value: number }[];
   profitabilityData: { label: string; revenue: number; expenses: number; profit: number }[];
@@ -79,6 +81,10 @@ export async function getJournalPageData(code: string, prefix: string): Promise<
   const expenses = await listExpenses(code).catch((err) => {
     console.error(`${code} expenses failed to load:`, err instanceof Error ? err.message : err);
     return [];
+  });
+  const googleAds = await getGoogleAdsCardData(code).catch((err) => {
+    console.error(`${code} Google Ads spend failed to load:`, err instanceof Error ? err.message : err);
+    return { connected: false, totalSpend: 0, delta: 0, metrics: [] };
   });
 
   // --- real expense totals (this journal's Supabase-tracked expenses) ---
@@ -216,7 +222,7 @@ export async function getJournalPageData(code: string, prefix: string): Promise<
     revenueData: revenueData.length ? revenueData : sampleRevenueData,
     revenueBreakdownIjps,
     razorpayIncome,
-    googleAds: { connected: false, totalSpend: 0, delta: 0, metrics: [] },
+    googleAds,
     expensesBreakdownIjps,
     expenseTrend,
     profitabilityData,

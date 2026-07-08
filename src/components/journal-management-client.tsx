@@ -1,10 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BookOpen, FileText, CheckCircle2, Clock, Users, IndianRupee, ArrowUpRight, ArrowDownRight,
   Plus, FileStack, BarChart3, UserCog, Megaphone, Building2, CreditCard, Bell, TrendingUp,
-  Upload, Pencil, Trash2, Megaphone as AdsIcon, Eye,
+  Upload, Pencil, Trash2, Megaphone as AdsIcon, Eye, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { MultiLineChart, StackedBars, Sparkline } from "@/components/charts";
@@ -355,6 +355,71 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
     </div>
   );
 
+  // -------------------------------------------------------------- expense journal (matrix) --------------------------------------------------------------
+  const MATRIX_ROWS = [
+    { code: "IJPS", label: "IJPS Journal" },
+    { code: "IJSRT", label: "IJSRT Journal" },
+    { code: "IJMPS", label: "IJMPS Journal" },
+    { code: "IJES", label: "IJES Journal" },
+    { code: "JPS", label: "JPS Journal" },
+    { code: "ALL", label: "Shared / Combined" },
+  ];
+
+  const [matrixDate, setMatrixDate] = useState(() => new Date());
+  const matrixMonthKey = `${matrixDate.getFullYear()}-${String(matrixDate.getMonth() + 1).padStart(2, "0")}`;
+  const matrixMonthLabel = matrixDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const isCurrentMonth = matrixMonthKey === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+
+  const [matrixAds, setMatrixAds] = useState(data.googleAdsSpend);
+  const [matrixAdsLoading, setMatrixAdsLoading] = useState(false);
+  const [detailCell, setDetailCell] = useState<{ journal: string; category: string; label: string } | null>(null);
+
+  function shiftMatrixMonth(delta: number) {
+    setMatrixDate((d) => new Date(d.getFullYear(), d.getMonth() + delta, 1));
+  }
+
+  useEffect(() => {
+    loadMatrixAds(matrixMonthKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matrixMonthKey]);
+
+  async function loadMatrixAds(monthKey: string) {
+    if (monthKey === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`) {
+      setMatrixAds(data.googleAdsSpend);
+      return;
+    }
+    setMatrixAdsLoading(true);
+    try {
+      const res = await fetch(`/api/journals/google-ads?month=${monthKey}`);
+      const json = await res.json();
+      if (res.ok) setMatrixAds(json);
+    } catch {
+      // keep previous value on failure
+    } finally {
+      setMatrixAdsLoading(false);
+    }
+  }
+
+  function cellAmount(journalCode: string, category: string): number {
+    return expenses
+      .filter((e) => e.journalCode === journalCode && e.category === category && e.date.slice(0, 7) === matrixMonthKey)
+      .reduce((s, e) => s + e.amount, 0);
+  }
+  function cellEntries(journalCode: string, category: string): JournalExpense[] {
+    return expenses.filter((e) => e.journalCode === journalCode && e.category === category && e.date.slice(0, 7) === matrixMonthKey);
+  }
+  function adsAmount(journalCode: string): number {
+    return matrixAds.byJournal.find((j) => j.code === journalCode)?.totalSpend ?? 0;
+  }
+  function rowTotal(journalCode: string): number {
+    return EXPENSE_CATEGORIES.reduce((s, c) => s + cellAmount(journalCode, c), 0) + adsAmount(journalCode);
+  }
+  function columnTotal(category: string): number {
+    return MATRIX_ROWS.reduce((s, r) => s + cellAmount(r.code, category), 0);
+  }
+  const adsColumnTotal = matrixAds.byJournal.reduce((s, j) => s + j.totalSpend, 0);
+  const grandTotal = MATRIX_ROWS.reduce((s, r) => s + rowTotal(r.code), 0);
+
   return (
     <div className="animate-fade-up space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -440,33 +505,6 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           </div>
         </div>
 
-        {data.googleAdsSpend.connected && data.googleAdsSpend.byJournal.length > 0 && (
-          <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {data.googleAdsSpend.byJournal.map((j) => (
-              <div key={j.code} className="rounded-xl border border-border p-3">
-                <div className="mb-1.5 flex items-center justify-between">
-                  <span className="rounded-md bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted">{j.code}</span>
-                  <span className={cn("text-[11px]", j.connected ? "text-green-600" : "text-red-500")}>
-                    {j.connected ? "Live" : (j.error ? "Error" : "—")}
-                  </span>
-                </div>
-                <p className="text-lg font-bold text-ink">{j.connected ? inr(j.totalSpend) : "—"}</p>
-                {j.connected && j.campaigns.length > 0 && (
-                  <div className="mt-1.5 space-y-1 border-t border-border pt-1.5">
-                    {j.campaigns.slice(0, 3).map((c) => (
-                      <div key={c.name} className="flex items-center justify-between text-xs">
-                        <span className="truncate text-faint">{c.name}</span>
-                        <span className="text-muted">{inr(c.cost)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {!j.connected && j.error && <p className="mt-1 truncate text-[11px] text-faint" title={j.error}>{j.error}</p>}
-              </div>
-            ))}
-          </div>
-        )}
-
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] text-sm">
             <thead>
@@ -504,6 +542,120 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
             </tbody>
           </table>
         </div>
+      </Panel>
+
+      {/* Expense Journal — journal x category pivot, month-navigable */}
+      <Panel
+        title="Expense Journal"
+        action={
+          <div className="flex items-center gap-2">
+            <button onClick={() => shiftMatrixMonth(-1)} className="grid h-7 w-7 place-items-center rounded-lg border border-border text-muted hover:bg-surface-2 hover:text-ink">
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <span className="min-w-[110px] text-center text-sm font-medium text-ink">{matrixMonthLabel}</span>
+            <button onClick={() => shiftMatrixMonth(1)} disabled={isCurrentMonth} className="grid h-7 w-7 place-items-center rounded-lg border border-border text-muted hover:bg-surface-2 hover:text-ink disabled:opacity-30">
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+            <Dropdown
+              label="This Month"
+              options={["This Month", "Last Month"]}
+              onSelect={(v) => setMatrixDate(v === "Last Month" ? new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1) : new Date())}
+              align="right"
+            />
+          </div>
+        }
+      >
+        <p className="mb-3 text-xs text-muted">Complete expense breakdown including Google Ads spend — click any amount to see the entries behind it.</p>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px] text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs font-medium text-faint">
+                <th className="pb-2.5 pr-3">Business</th>
+                {EXPENSE_CATEGORIES.map((c) => <th key={c} className="pb-2.5 px-3 text-right">{c}</th>)}
+                <th className="pb-2.5 px-3 text-right bg-indigo-50/60">Google Ads {matrixAdsLoading && "…"}</th>
+                <th className="pb-2.5 pl-3 text-right bg-surface-2">Total Expense</th>
+              </tr>
+            </thead>
+            <tbody>
+              {MATRIX_ROWS.map((row) => (
+                <tr key={row.code} className="border-b border-border last:border-0 hover:bg-surface-2/40">
+                  <td className="py-2.5 pr-3">
+                    <span className="rounded-md bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted">{row.label}</span>
+                  </td>
+                  {EXPENSE_CATEGORIES.map((c) => {
+                    const amt = cellAmount(row.code, c);
+                    return (
+                      <td key={c} className="py-2.5 px-3 text-right">
+                        {amt > 0 ? (
+                          <button onClick={() => setDetailCell({ journal: row.code, category: c, label: `${row.label} — ${c}` })} className="font-medium text-ink hover:text-indigo-600 hover:underline">
+                            {inr(amt)}
+                          </button>
+                        ) : (
+                          <span className="text-faint">₹0</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className="py-2.5 px-3 text-right bg-indigo-50/60">
+                    {row.code !== "ALL" && adsAmount(row.code) > 0 ? (
+                      <span className="font-medium text-indigo-700">{inr(adsAmount(row.code))}</span>
+                    ) : (
+                      <span className="text-faint">₹0</span>
+                    )}
+                  </td>
+                  <td className="py-2.5 pl-3 text-right font-semibold text-ink bg-surface-2">{inr(rowTotal(row.code))}</td>
+                </tr>
+              ))}
+              <tr className="border-t-2 border-border font-semibold">
+                <td className="py-3 pr-3 text-indigo-600">Grand Total</td>
+                {EXPENSE_CATEGORIES.map((c) => (
+                  <td key={c} className="py-3 px-3 text-right text-ink">{inr(columnTotal(c))}</td>
+                ))}
+                <td className="py-3 px-3 text-right text-indigo-700 bg-indigo-50/60">{inr(adsColumnTotal)}</td>
+                <td className="py-3 pl-3 text-right text-ink bg-surface-2">{inr(grandTotal)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+
+      {/* Google Ads Spend — separate from the manual expense sheet, live per-journal */}
+      <Panel
+        title="Google Ads Spend"
+        action={<span className={cn("text-xs font-medium", data.googleAdsSpend.connected ? "text-green-600" : "text-faint")}>{data.googleAdsSpend.periodLabel}{data.googleAdsSpend.connected ? " · Live" : ""}</span>}
+      >
+        {!data.googleAdsSpend.connected ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
+            <AdsIcon className="h-6 w-6 text-faint" />
+            <p className="text-sm font-medium text-ink">Google Ads isn't connected</p>
+            <p className="max-w-sm text-xs text-muted">{data.googleAdsSpend.error || "Add Google Ads credentials to see live spend per journal here."}</p>
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {data.googleAdsSpend.byJournal.map((j) => (
+              <div key={j.code} className="rounded-xl border border-border p-3">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="rounded-md bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted">{j.code}</span>
+                  <span className={cn("text-[11px]", j.connected ? "text-green-600" : "text-red-500")}>
+                    {j.connected ? "Live" : (j.error ? "Error" : "—")}
+                  </span>
+                </div>
+                <p className="text-lg font-bold text-ink">{j.connected ? inr(j.totalSpend) : "—"}</p>
+                {j.connected && j.campaigns.length > 0 && (
+                  <div className="mt-1.5 space-y-1 border-t border-border pt-1.5">
+                    {j.campaigns.slice(0, 3).map((c) => (
+                      <div key={c.name} className="flex items-center justify-between text-xs">
+                        <span className="truncate text-faint">{c.name}</span>
+                        <span className="text-muted">{inr(c.cost)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!j.connected && j.error && <p className="mt-1 truncate text-[11px] text-faint" title={j.error}>{j.error}</p>}
+              </div>
+            ))}
+          </div>
+        )}
       </Panel>
 
       {/* Overview + donut + activities */}
@@ -800,6 +952,27 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           </table>
         </div>
       </Panel>
+
+      {/* Expense Journal drill-down modal */}
+      {detailCell && (
+        <Modal open={!!detailCell} onClose={() => setDetailCell(null)} title={detailCell.label} subtitle={matrixMonthLabel} size="md">
+          <div className="space-y-2">
+            {cellEntries(detailCell.journal, detailCell.category).map((e) => (
+              <div key={e.id} className="flex items-center justify-between gap-3 rounded-xl border border-border p-3 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium text-ink">{e.paymentTo || "—"}</p>
+                  <p className="truncate text-xs text-muted">{e.description || "No description"}</p>
+                  <p className="text-[11px] text-faint">{new Date(e.date + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} · {e.mode}</p>
+                </div>
+                <span className="shrink-0 font-semibold text-ink">{inr(e.amount)}</span>
+              </div>
+            ))}
+            {cellEntries(detailCell.journal, detailCell.category).length === 0 && (
+              <p className="py-4 text-center text-sm text-faint">No entries for this cell.</p>
+            )}
+          </div>
+        </Modal>
+      )}
 
       {/* Add Expense modal */}
       <Modal open={showAddModal} onClose={() => setShowAddModal(false)} title="Add Business Expense" subtitle="Attribute to one journal or mark as a combined/shared cost" size="md">
