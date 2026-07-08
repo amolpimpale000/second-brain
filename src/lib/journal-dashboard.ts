@@ -67,6 +67,7 @@ export type JournalDashboardData = {
   employees: Employee[];
   businessExpenses: JournalExpense[];
   googleAdsSpend: GoogleAdsSpend;
+  topCountries: { name: string; flag: string; count: number; pct: number }[];
 };
 
 const CONNECTED_JOURNALS: { code: string; prefix: string; name: string }[] = [
@@ -361,6 +362,7 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
     employees: employeesOut.length ? employeesOut : sampleEmployees,
     businessExpenses,
     googleAdsSpend,
+    topCountries: [],
   };
 }
 

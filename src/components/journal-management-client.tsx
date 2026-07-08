@@ -6,9 +6,10 @@ import {
   BookOpen, FileText, CheckCircle2, Clock, Users, IndianRupee, ArrowUpRight, ArrowDownRight,
   Plus, FileStack, BarChart3, UserCog, Megaphone, Building2, CreditCard, Bell, TrendingUp,
   Pencil, Trash2, Eye, ChevronLeft, ChevronRight, MousePointerClick, Target,
+  Flower2, Leaf, Stethoscope, GraduationCap, Flower, Star, Globe,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-import { MultiLineChart, StackedBars, Sparkline } from "@/components/charts";
+import { MultiLineChart, StackedBars, Sparkline, SegmentedGauge } from "@/components/charts";
 import { Dropdown, Modal } from "@/components/vault-ui";
 import { GoogleAdsLogo } from "@/components/google-ads-logo";
 import { cn, inr } from "@/lib/utils";
@@ -43,6 +44,9 @@ const PERIOD_OPTIONS = [
   { value: "yearly", label: "Yearly", months: 12 },
 ];
 const journalLabel = (code: string) => JOURNAL_OPTIONS.find((j) => j.code === code)?.label ?? code;
+const JOURNAL_ICON: Record<string, React.ElementType> = {
+  IJPS: Flower2, IJSRT: Leaf, IJMPS: Stethoscope, IJES: GraduationCap, JPS: Flower,
+};
 
 function Delta({ v, className }: { v: number; className?: string }) {
   const up = v >= 0;
@@ -104,6 +108,8 @@ function Legend({ items }: { items: { name: string; value: number; pct?: number;
 export function JournalManagementClient({ data }: { data: JournalDashboardData }) {
   const [sortKey, setSortKey] = useState<"score" | "handled" | "turnaround">("score");
   const [trendRangeLabel, setTrendRangeLabel] = useState<6 | 12>(12);
+  const [showAllCountries, setShowAllCountries] = useState(false);
+  const topCountries = data.topCountries;
   const sortedEmployees = [...data.employees].sort((a, b) =>
     sortKey === "turnaround" ? a.turnaround - b.turnaround : b[sortKey] - a[sortKey]
   );
@@ -470,6 +476,55 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
         })}
       </div>
 
+      {/* Per-journal identity cards */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        {data.journalPerformance.map((j) => {
+          const Icon = JOURNAL_ICON[j.code] ?? BookOpen;
+          return (
+            <div key={j.code} className="rounded-2xl border border-border bg-card p-4 shadow-card">
+              <div className="flex items-center gap-2.5">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full border-2" style={{ borderColor: `${j.color}55`, color: j.color, background: `${j.color}12` }}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold" style={{ color: j.color }}>{j.code}</p>
+                  <p className="truncate text-[11px] text-faint">{j.name}</p>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <p className="text-xl font-bold text-ink">{j.manuscripts.toLocaleString("en-IN")}</p>
+                <Delta v={j.growth} />
+              </div>
+              <p className="text-[11px] text-faint">Total Submissions</p>
+              <div className="mt-2.5 flex items-center justify-between border-t border-border pt-2 text-[11px]">
+                <span className="text-muted">Published: <span className="font-semibold text-ink">{j.published.toLocaleString("en-IN")}</span></span>
+                <span className="text-muted">IF/Impact: <span className="font-semibold text-ink">{j.impact.toFixed(3)}</span></span>
+              </div>
+            </div>
+          );
+        })}
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+          <div className="flex items-center gap-2.5">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full border-2 border-indigo-200 bg-indigo-50 text-indigo-600">
+              <Star className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-indigo-600">All Journals</p>
+              <p className="truncate text-[11px] text-faint">Overall</p>
+            </div>
+          </div>
+          <div className="mt-3 flex items-center gap-2">
+            <p className="text-xl font-bold text-ink">{totalJournalManuscripts.toLocaleString("en-IN")}</p>
+            <Delta v={avgGrowth} />
+          </div>
+          <p className="text-[11px] text-faint">Total Submissions</p>
+          <div className="mt-2.5 flex items-center justify-between border-t border-border pt-2 text-[11px]">
+            <span className="text-muted">Published: <span className="font-semibold text-ink">{totalJournalPublished.toLocaleString("en-IN")}</span></span>
+            <span className="text-muted">Avg. IF: <span className="font-semibold text-ink">{avgImpact.toFixed(3)}</span></span>
+          </div>
+        </div>
+      </div>
+
       {/* Overview + donut + activities */}
       <div className="grid gap-5 xl:grid-cols-4">
         <Panel
@@ -762,32 +817,78 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
         </Panel>
       </div>
 
-      {/* Article status + Financial + Quick actions */}
+      {/* Financial Overview + Top Performing Journals + Article Status gauge */}
       <div className="grid gap-5 xl:grid-cols-3">
-        <Panel title="Article Status Overview" action={period}>
-          <div className="flex items-center gap-4">
-            <Donut data={data.articleStatus} center={totalArticleStatus.toLocaleString("en-IN")} sub="Total" />
-            <Legend items={data.articleStatus} />
-          </div>
-        </Panel>
-
         <Panel title="Financial Overview" action={period}>
-          <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-3">
             {data.financialSummary.map((f) => (
-              <div key={f.label} className="flex items-center gap-3 rounded-xl border border-border p-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted">{f.label}</p>
-                  <p className="text-lg font-bold text-ink">{f.value}</p>
-                  <Delta v={f.growth} />
-                </div>
-                <div className="h-10 w-24 shrink-0"><Sparkline data={f.spark} color={f.color} /></div>
+              <div key={f.label}>
+                <p className="text-xs text-muted">{f.label}</p>
+                <p className="mt-0.5 text-lg font-bold text-ink">{f.value}</p>
+                <Delta v={f.growth} className="mt-0.5" />
+                <div className="mt-2 h-8"><Sparkline data={f.spark} color={f.color} /></div>
               </div>
             ))}
           </div>
         </Panel>
 
-        <Panel title="Quick Actions">
-          <div className="space-y-1">
+        <Panel title="Top Performing Journals" action={period}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs font-medium text-faint">
+                  <th className="pb-2">Journal</th>
+                  <th className="pb-2 text-right">Submissions</th>
+                  <th className="pb-2 text-right">Published</th>
+                  <th className="pb-2 text-right">Revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...data.journalPerformance].sort((a, b) => b.revenue - a.revenue).map((j) => (
+                  <tr key={j.code} className="border-b border-border last:border-0">
+                    <td className="py-2">
+                      <div className="flex items-center gap-2">
+                        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-bold text-white" style={{ background: j.color }}>{j.code[0]}</span>
+                        <span className="font-medium text-ink">{j.code}</span>
+                      </div>
+                    </td>
+                    <td className="py-2 text-right text-ink">{j.manuscripts.toLocaleString("en-IN")}</td>
+                    <td className="py-2 text-right text-ink">{j.published.toLocaleString("en-IN")}</td>
+                    <td className="py-2 text-right font-medium text-ink">{inr(j.revenue)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+
+        <Panel title="Article Status Overview" action={period}>
+          <SegmentedGauge data={data.articleStatus} center={totalArticleStatus.toLocaleString("en-IN")} sub="Total Articles" />
+          <Legend items={data.articleStatus} />
+        </Panel>
+      </div>
+
+      {/* Top Countries + Quick Actions */}
+      <div className="grid gap-5 xl:grid-cols-3">
+        <Panel title="Top Countries (Submissions)" action={<button onClick={() => setShowAllCountries(true)} className="text-xs font-medium text-indigo-600 hover:underline">View All</button>}>
+          {topCountries.length === 0 ? (
+            <p className="py-6 text-center text-sm text-faint">Country data isn't available yet.</p>
+          ) : (
+            <div className="space-y-2.5">
+              {topCountries.slice(0, 5).map((c) => (
+                <div key={c.name} className="flex items-center gap-3 text-sm">
+                  <span className="text-lg">{c.flag}</span>
+                  <span className="flex-1 text-ink">{c.name}</span>
+                  <span className="font-medium text-ink">{c.count.toLocaleString("en-IN")}</span>
+                  <span className="w-12 text-right text-xs text-faint">({c.pct}%)</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+
+        <Panel title="Quick Actions" className="xl:col-span-2">
+          <div className="grid gap-1 sm:grid-cols-2">
             {data.quickActionsJM.map((a) => {
               const Icon = qaIcon[a.icon];
               return (
@@ -940,6 +1041,23 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           </table>
         </div>
       </Panel>
+
+      {/* All Countries modal */}
+      {showAllCountries && (
+        <Modal open={showAllCountries} onClose={() => setShowAllCountries(false)} title="Top Countries (Submissions)" size="sm">
+          <div className="space-y-2.5">
+            {topCountries.map((c) => (
+              <div key={c.name} className="flex items-center gap-3 text-sm">
+                <span className="text-lg">{c.flag}</span>
+                <span className="flex-1 text-ink">{c.name}</span>
+                <span className="font-medium text-ink">{c.count.toLocaleString("en-IN")}</span>
+                <span className="w-12 text-right text-xs text-faint">({c.pct}%)</span>
+              </div>
+            ))}
+            {topCountries.length === 0 && <p className="py-4 text-center text-sm text-faint">Country data isn't available yet.</p>}
+          </div>
+        </Modal>
+      )}
 
       {/* Expense Journal drill-down modal — editable */}
       {detailCell && (

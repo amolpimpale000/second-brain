@@ -231,6 +231,59 @@ export function GrowthLine({ data }: { data: { month: string; value: number }[] 
 }
 
 // -------- Radial gauge (financial health) --------
+// -------- Half-circle gauge, multiple weighted segments (e.g. article status) --------
+export function SegmentedGauge({
+  data,
+  center,
+  sub,
+  height = 180,
+}: {
+  data: { name: string; value: number; color: string }[];
+  center: string;
+  sub: string;
+  height?: number;
+}) {
+  return (
+    <div className="relative">
+      <ResponsiveContainer width="100%" height={height} debounce={200}>
+        <PieChart>
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="name"
+            cx="50%"
+            cy="85%"
+            startAngle={180}
+            endAngle={0}
+            innerRadius="65%"
+            outerRadius="100%"
+            paddingAngle={2}
+            stroke="none"
+          >
+            {data.map((d, i) => (
+              <Cell key={i} fill={d.color} />
+            ))}
+          </Pie>
+          <Tooltip
+            content={({ active, payload }) =>
+              active && payload?.length ? (
+                <Box>
+                  <p className="font-medium text-ink">{payload[0].name}</p>
+                  <p className="text-muted">{payload[0].value}</p>
+                </Box>
+              ) : null
+            }
+          />
+        </PieChart>
+      </ResponsiveContainer>
+      <div className="pointer-events-none absolute inset-x-0 bottom-1 flex flex-col items-center justify-end text-center" style={{ height: height * 0.5 }}>
+        <p className="text-2xl font-bold text-ink">{center}</p>
+        <p className="text-xs text-faint">{sub}</p>
+      </div>
+    </div>
+  );
+}
+
 export function Gauge({ value, label }: { value: number; label: string }) {
   const data = [{ name: "score", value, fill: "var(--c-green)" }];
   return (
