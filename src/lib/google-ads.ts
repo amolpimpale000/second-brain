@@ -12,12 +12,15 @@
 const API_VERSION = process.env.GOOGLE_ADS_API_VERSION || "v21";
 export const GOOGLE_ADS_JOURNAL_CODES = ["IJPS", "IJSRT", "IJMPS", "IJES", "JPS"];
 
-export type GoogleAdsCampaignSpend = { name: string; cost: number };
+export type GoogleAdsCampaignSpend = { name: string; cost: number; impressions: number; clicks: number; conversions: number };
 
 export type GoogleAdsJournalSpend = {
   code: string;
   connected: boolean;
   totalSpend: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
   campaigns: GoogleAdsCampaignSpend[];
   error?: string;
 };
@@ -87,7 +90,7 @@ async function fetchJournalSpend(
 ): Promise<GoogleAdsJournalSpend> {
   const loginCustomerId = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID?.replace(/-/g, "");
   const query = `
-    SELECT campaign.name, metrics.cost_micros
+    SELECT campaign.name, metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions
     FROM campaign
     WHERE segments.date BETWEEN '${range.start}' AND '${range.end}'
   `;
@@ -98,6 +101,8 @@ async function fetchJournalSpend(
   };
   if (loginCustomerId) headers["login-customer-id"] = loginCustomerId;
 
+  const emptyResult: GoogleAdsJournalSpend = { code, connected: false, totalSpend: 0, impressions: 0, clicks: 0, conversions: 0, campaigns: [] };
+
   try {
     const res = await fetch(
       `https://googleads.googleapis.com/${API_VERSION}/customers/${customerId}/googleAds:search`,
@@ -105,23 +110,36 @@ async function fetchJournalSpend(
     );
     if (!res.ok) {
       const text = await res.text();
-      return { code, connected: false, totalSpend: 0, campaigns: [], error: `API error (${res.status}): ${text.slice(0, 200)}` };
+      return { ...emptyResult, error: `API error (${res.status}): ${text.slice(0, 200)}` };
     }
     const json = await res.json();
     const rows: any[] = json.results || [];
-    const byCampaign = new Map<string, number>();
+    const byCampaign = new Map<string, { cost: number; impressions: number; clicks: number; conversions: number }>();
     for (const row of rows) {
       const name = row.campaign?.name || "Unnamed Campaign";
-      const cost = Number(row.metrics?.costMicros || 0) / 1_000_000;
-      byCampaign.set(name, (byCampaign.get(name) ?? 0) + cost);
+      const existing = byCampaign.get(name) ?? { cost: 0, impressions: 0, clicks: 0, conversions: 0 };
+      existing.cost += Number(row.metrics?.costMicros || 0) / 1_000_000;
+      existing.impressions += Number(row.metrics?.impressions || 0);
+      existing.clicks += Number(row.metrics?.clicks || 0);
+      existing.conversions += Number(row.metrics?.conversions || 0);
+      byCampaign.set(name, existing);
     }
     const campaigns = Array.from(byCampaign.entries())
-      .map(([name, cost]) => ({ name, cost: Math.round(cost) }))
+      .map(([name, m]) => ({
+        name,
+        cost: Math.round(m.cost),
+        impressions: Math.round(m.impressions),
+        clicks: Math.round(m.clicks),
+        conversions: Math.round(m.conversions * 10) / 10,
+      }))
       .sort((a, b) => b.cost - a.cost);
     const totalSpend = Math.round(campaigns.reduce((s, c) => s + c.cost, 0));
-    return { code, connected: true, totalSpend, campaigns };
+    const impressions = campaigns.reduce((s, c) => s + c.impressions, 0);
+    const clicks = campaigns.reduce((s, c) => s + c.clicks, 0);
+    const conversions = Math.round(campaigns.reduce((s, c) => s + c.conversions, 0) * 10) / 10;
+    return { code, connected: true, totalSpend, impressions, clicks, conversions, campaigns };
   } catch (err) {
-    return { code, connected: false, totalSpend: 0, campaigns: [], error: err instanceof Error ? err.message : "Request failed" };
+    return { ...emptyResult, error: err instanceof Error ? err.message : "Request failed" };
   }
 }
 
@@ -158,14 +176,14 @@ export async function getGoogleAdsSpendForJournal(code: string, monthKey?: strin
   const range = monthRange(monthKey);
   const customerId = getCustomerId(code);
   if (!baseConfigured() || !customerId) {
-    return { code, connected: false, totalSpend: 0, campaigns: [], periodLabel: range.label, error: "Not configured for this journal." };
+    return { code, connected: false, totalSpend: 0, impressions: 0, clicks: 0, conversions: 0, campaigns: [], periodLabel: range.label, error: "Not configured for this journal." };
   }
   try {
     const accessToken = await getAccessToken();
     const result = await fetchJournalSpend(code, customerId, accessToken, range);
     return { ...result, periodLabel: range.label };
   } catch (err) {
-    return { code, connected: false, totalSpend: 0, campaigns: [], periodLabel: range.label, error: err instanceof Error ? err.message : "Request failed" };
+    return { code, connected: false, totalSpend: 0, impressions: 0, clicks: 0, conversions: 0, campaigns: [], periodLabel: range.label, error: err instanceof Error ? err.message : "Request failed" };
   }
 }
 
@@ -179,6 +197,9 @@ export type GoogleAdsCardData = {
   connected: boolean;
   totalSpend: number;
   delta: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
   metrics: { label: string; value: string; delta: number }[];
   error?: string;
 };
@@ -190,7 +211,7 @@ export async function getGoogleAdsCardData(code: string): Promise<GoogleAdsCardD
     getGoogleAdsSpendForJournal(code, lastMonthKey()),
   ]);
   if (!thisMonth.connected) {
-    return { connected: false, totalSpend: 0, delta: 0, metrics: [], error: thisMonth.error };
+    return { connected: false, totalSpend: 0, delta: 0, impressions: 0, clicks: 0, conversions: 0, metrics: [], error: thisMonth.error };
   }
   const delta = prevMonth.connected && prevMonth.totalSpend > 0
     ? Math.round(((thisMonth.totalSpend - prevMonth.totalSpend) / prevMonth.totalSpend) * 1000) / 10
@@ -200,5 +221,13 @@ export async function getGoogleAdsCardData(code: string): Promise<GoogleAdsCardD
     value: `₹ ${c.cost.toLocaleString("en-IN")}`,
     delta: 0,
   }));
-  return { connected: true, totalSpend: thisMonth.totalSpend, delta, metrics };
+  return {
+    connected: true,
+    totalSpend: thisMonth.totalSpend,
+    delta,
+    impressions: thisMonth.impressions,
+    clicks: thisMonth.clicks,
+    conversions: thisMonth.conversions,
+    metrics,
+  };
 }

@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 const quickLinks = [
   { label: "Transaction", href: "/finances" },
+  { label: "Expense", href: "/journal-management?addExpense=1" },
   { label: "Note", href: "/notes" },
   { label: "Task", href: "/tasks" },
   { label: "Goal", href: "/goals" },

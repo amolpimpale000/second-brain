@@ -5,7 +5,7 @@ import {
   FileText, BookOpen, CheckCircle2, DollarSign, TrendingDown, TrendingUp,
   ArrowUpRight, ArrowDownRight, ChevronDown, ChevronRight, Eye, Pencil, Trash2,
   Upload, Send, Receipt, FileBarChart, BarChart3, Download, Filter, X, Check,
-  PlugZap,
+  MousePointerClick, Target,
 } from "lucide-react";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -14,6 +14,8 @@ import {
 import { type IjpsPageData } from "@/lib/ijps-dashboard";
 import { cn } from "@/lib/utils";
 import { Modal, Field, inputCls } from "@/components/vault-ui";
+import { GoogleAdsLogo } from "@/components/google-ads-logo";
+import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
 
 const axis = { tick: { fill: "var(--faint)", fontSize: 11 }, axisLine: false, tickLine: false } as const;
 
@@ -156,7 +158,7 @@ export function IjpsClient({
   const [moExpBreakdown, setMoExpBreakdown] = useState<MonthOption>("All Time");
 
   // Add Expense form
-  const [expCategory, setExpCategory] = useState("Salaries");
+  const [expCategory, setExpCategory] = useState(EXPENSE_CATEGORIES[0]);
   const [expAmount, setExpAmount] = useState("");
   const [expDate, setExpDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [expMode, setExpMode] = useState("UPI");
@@ -613,11 +615,14 @@ export function IjpsClient({
         {/* Google Ads Overview — live from the Google Ads API when this journal's account is configured */}
         <div className="card card-pad">
           <div className="flex items-start justify-between mb-1">
-            <h3 className="font-semibold text-ink">Google Ads Overview</h3>
+            <div className="flex items-center gap-2">
+              <GoogleAdsLogo className="h-5 w-5" />
+              <h3 className="font-semibold text-ink">Google Ads Overview</h3>
+            </div>
           </div>
           {data.googleAds.connected ? (
             <>
-              <div className="mb-6">
+              <div className="mb-4">
                 <p className="text-xs text-muted">Spend This Month</p>
                 <div className="flex items-center gap-3 mt-0.5">
                   <p className="text-2xl font-semibold text-ink">{inrFmt(data.googleAds.totalSpend)}</p>
@@ -626,6 +631,23 @@ export function IjpsClient({
                 <div className="flex items-center gap-1.5 mt-1">
                   <Delta value={data.googleAds.delta} />
                   <span className="text-[11px] text-faint">vs last month</span>
+                </div>
+              </div>
+              <div className="mb-4 grid grid-cols-3 gap-2">
+                <div className="rounded-lg bg-surface-2/70 p-2 text-center">
+                  <Eye className="mx-auto h-3.5 w-3.5 text-blue-500" />
+                  <p className="mt-1 text-xs font-semibold text-ink">{data.googleAds.impressions.toLocaleString("en-IN")}</p>
+                  <p className="text-[10px] text-faint">Impressions</p>
+                </div>
+                <div className="rounded-lg bg-surface-2/70 p-2 text-center">
+                  <MousePointerClick className="mx-auto h-3.5 w-3.5 text-amber-500" />
+                  <p className="mt-1 text-xs font-semibold text-ink">{data.googleAds.clicks.toLocaleString("en-IN")}</p>
+                  <p className="text-[10px] text-faint">Clicks</p>
+                </div>
+                <div className="rounded-lg bg-surface-2/70 p-2 text-center">
+                  <Target className="mx-auto h-3.5 w-3.5 text-green-500" />
+                  <p className="mt-1 text-xs font-semibold text-ink">{data.googleAds.conversions.toLocaleString("en-IN")}</p>
+                  <p className="text-[10px] text-faint">Conversions</p>
                 </div>
               </div>
               <div className="mb-2">
@@ -647,7 +669,7 @@ export function IjpsClient({
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-3 py-10 text-center">
               <div className="grid h-12 w-12 place-items-center rounded-2xl bg-surface-2 text-faint">
-                <PlugZap className="h-6 w-6" />
+                <GoogleAdsLogo className="h-6 w-6 opacity-40" />
               </div>
               <div>
                 <p className="text-sm font-medium text-ink">Google Ads isn't connected</p>
@@ -818,12 +840,7 @@ export function IjpsClient({
                   onChange={(e) => setExpCategory(e.target.value)}
                   className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brand transition-colors"
                 >
-                  <option>Google Ads</option>
-                  <option>Salaries</option>
-                  <option>Hosting &amp; Domain</option>
-                  <option>Software &amp; Tools</option>
-                  <option>Publication Charges</option>
-                  <option>Other Expenses</option>
+                  {EXPENSE_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
                 </select>
               </div>
               <div>
@@ -1127,12 +1144,7 @@ export function IjpsClient({
                 value={editingExpense.category}
                 onChange={(e) => setEditingExpense({ ...editingExpense, category: e.target.value })}
               >
-                <option>Google Ads</option>
-                <option>Salaries</option>
-                <option>Hosting &amp; Domain</option>
-                <option>Software &amp; Tools</option>
-                <option>Publication Charges</option>
-                <option>Other Expenses</option>
+                {EXPENSE_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
               </select>
             </Field>
             <Field label="Amount (₹)">

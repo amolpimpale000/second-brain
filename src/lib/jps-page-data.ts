@@ -57,7 +57,7 @@ export async function getJpsPageData(): Promise<JournalPageData> {
   });
   const googleAds = await getGoogleAdsCardData("JPS").catch((err) => {
     console.error("JPS Google Ads spend failed to load:", err instanceof Error ? err.message : err);
-    return { connected: false, totalSpend: 0, delta: 0, metrics: [] };
+    return { connected: false, totalSpend: 0, delta: 0, impressions: 0, clicks: 0, conversions: 0, metrics: [] };
   });
 
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);

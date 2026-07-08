@@ -1,17 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   BookOpen, FileText, CheckCircle2, Clock, Users, IndianRupee, ArrowUpRight, ArrowDownRight,
   Plus, FileStack, BarChart3, UserCog, Megaphone, Building2, CreditCard, Bell, TrendingUp,
-  Upload, Pencil, Trash2, Megaphone as AdsIcon, Eye, ChevronLeft, ChevronRight,
+  Pencil, Trash2, Eye, ChevronLeft, ChevronRight, MousePointerClick, Target,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { MultiLineChart, StackedBars, Sparkline } from "@/components/charts";
 import { Dropdown, Modal } from "@/components/vault-ui";
+import { GoogleAdsLogo } from "@/components/google-ads-logo";
 import { cn, inr } from "@/lib/utils";
 import { type JournalDashboardData } from "@/lib/journal-dashboard";
 import { type JournalExpense } from "@/lib/journal-expenses-store";
+import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
 
 const statTone: Record<string, string> = {
   indigo: "bg-indigo-100 text-indigo-600", blue: "bg-blue-100 text-blue-600",
@@ -31,14 +34,17 @@ const subIcon: Record<string, React.ElementType> = { users: Users, building: Bui
 const alertTone: Record<string, string> = { red: "bg-red-50 text-red-600 border-red-100", amber: "bg-amber-50 text-amber-600 border-amber-100" };
 
 const JOURNAL_OPTIONS = [
-  { code: "ALL", label: "All Journals (Combined)" },
   { code: "IJPS", label: "IJPS" },
   { code: "IJSRT", label: "IJSRT" },
   { code: "IJMPS", label: "IJMPS" },
   { code: "IJES", label: "IJES" },
   { code: "JPS", label: "JPS" },
 ];
-const EXPENSE_CATEGORIES = ["Salary", "Domain & Hosting", "Interakt Fee", "AI Voice Calling", "Development", "Other Expense"];
+const PERIOD_OPTIONS = [
+  { value: "monthly", label: "Monthly", months: 1 },
+  { value: "quarterly", label: "Quarterly", months: 3 },
+  { value: "yearly", label: "Yearly", months: 12 },
+];
 const journalLabel = (code: string) => JOURNAL_OPTIONS.find((j) => j.code === code)?.label ?? code;
 
 function Delta({ v, className }: { v: number; className?: string }) {
@@ -119,23 +125,32 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
   const totalArticleStatus = data.articleStatus.reduce((s, a) => s + a.value, 0);
   const totalSubmissionSource = data.submissionSource.reduce((s, a) => s + a.value, 0);
 
-  // -------------------------------------------------------------- business expense sheet --------------------------------------------------------------
+  // -------------------------------------------------------------- expense journal --------------------------------------------------------------
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [expenses, setExpenses] = useState<JournalExpense[]>(data.businessExpenses);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState<JournalExpense | null>(null);
-  const [viewingExpense, setViewingExpense] = useState<JournalExpense | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const billInputRef = useRef<HTMLInputElement>(null);
 
-  const [expJournal, setExpJournal] = useState("ALL");
+  const [expShared, setExpShared] = useState(false);
+  const [expPeriod, setExpPeriod] = useState<"monthly" | "quarterly" | "yearly">("monthly");
+  const [expJournal, setExpJournal] = useState(JOURNAL_OPTIONS[0].code);
   const [expCategory, setExpCategory] = useState(EXPENSE_CATEGORIES[0]);
   const [expAmount, setExpAmount] = useState("");
   const [expDate, setExpDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [expMode, setExpMode] = useState("UPI");
   const [expPaymentTo, setExpPaymentTo] = useState("");
   const [expDesc, setExpDesc] = useState("");
-  const [expBillFile, setExpBillFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    if (searchParams.get("addExpense") === "1") {
+      setShowAddModal(true);
+      router.replace("/journal-management", { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function flash(msg: string) {
     setToast(msg);
@@ -143,27 +158,10 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
   }
 
   function resetForm() {
-    setExpJournal("ALL"); setExpCategory(EXPENSE_CATEGORIES[0]); setExpAmount("");
+    setExpShared(false); setExpPeriod("monthly");
+    setExpJournal(JOURNAL_OPTIONS[0].code); setExpCategory(EXPENSE_CATEGORIES[0]); setExpAmount("");
     setExpDate(new Date().toISOString().slice(0, 10)); setExpMode("UPI");
-    setExpPaymentTo(""); setExpDesc(""); setExpBillFile(null);
-    if (billInputRef.current) billInputRef.current.value = "";
-  }
-
-  async function uploadBill(file: File): Promise<{ url: string; name: string } | null> {
-    try {
-      const fd = new FormData();
-      fd.append("files", file);
-      fd.append("category", "Journal Expenses");
-      const res = await fetch("/api/documents", { method: "POST", body: fd });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Upload failed");
-      const doc = json.docs?.[0];
-      return doc ? { url: doc.url, name: doc.name } : null;
-    } catch (err) {
-      console.error(err);
-      flash("Bill upload failed, saving expense without it");
-      return null;
-    }
+    setExpPaymentTo(""); setExpDesc("");
   }
 
   async function submitExpense() {
@@ -172,25 +170,35 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
     if (!expDate) { flash("Enter a date"); return; }
     setSaving(true);
     try {
-      let bill: { url: string; name: string } | null = null;
-      if (expBillFile) bill = await uploadBill(expBillFile);
-
-      const res = await fetch("/api/journals/expenses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          journalCode: expJournal, category: expCategory, amount: amountNum, date: expDate,
-          mode: expMode, description: expDesc, paymentTo: expPaymentTo,
-          billUrl: bill?.url, billName: bill?.name,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed to add expense");
-
-      setExpenses((p) => [json.expense, ...p]);
+      if (expShared) {
+        const res = await fetch("/api/journals/expenses/split", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category: expCategory, totalAmount: amountNum, period: expPeriod, date: expDate,
+            mode: expMode, description: expDesc, paymentTo: expPaymentTo,
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Failed to add shared expense");
+        setExpenses((p) => [...json.expenses, ...p]);
+        flash(`Split ${inr(amountNum)} (${expPeriod}) across ${json.expenses.length} journals — ${inr(json.perJournalAmount)} each`);
+      } else {
+        const res = await fetch("/api/journals/expenses", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            journalCode: expJournal, category: expCategory, amount: amountNum, date: expDate,
+            mode: expMode, description: expDesc, paymentTo: expPaymentTo,
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Failed to add expense");
+        setExpenses((p) => [json.expense, ...p]);
+        flash("Expense added");
+      }
       resetForm();
       setShowAddModal(false);
-      flash("Expense added");
     } catch (err) {
       flash(err instanceof Error ? err.message : "Failed to add expense");
     } finally {
@@ -251,23 +259,42 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
     URL.revokeObjectURL(url);
   }
 
-  const manualExpenseTotal = expenses.reduce((s, e) => s + e.amount, 0);
-  const googleAdsTotal = data.googleAdsSpend.connected ? data.googleAdsSpend.totalSpend : 0;
-  const totalBusinessExpenses = manualExpenseTotal + googleAdsTotal;
+  const selectedPeriodMonths = PERIOD_OPTIONS.find((p) => p.value === expPeriod)?.months ?? 1;
+  const perJournalPreview = expShared && Number(expAmount) > 0
+    ? Math.round((Number(expAmount) / selectedPeriodMonths / JOURNAL_OPTIONS.length) * 100) / 100
+    : 0;
 
   const addExpenseForm = (
     <div className="space-y-4">
+      <label className="flex items-center gap-2.5 rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm">
+        <input type="checkbox" checked={expShared} onChange={(e) => setExpShared(e.target.checked)} className="h-4 w-4 rounded border-border accent-emerald-500" />
+        <span className="font-medium text-ink">Shared cost — split equally across all 5 journals</span>
+      </label>
+
       <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs text-muted mb-1.5 block">Journal</label>
-          <select
-            value={expJournal}
-            onChange={(e) => setExpJournal(e.target.value)}
-            className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brand transition-colors"
-          >
-            {JOURNAL_OPTIONS.map((j) => <option key={j.code} value={j.code}>{j.label}</option>)}
-          </select>
-        </div>
+        {expShared ? (
+          <div>
+            <label className="text-xs text-muted mb-1.5 block">Billing Period</label>
+            <select
+              value={expPeriod}
+              onChange={(e) => setExpPeriod(e.target.value as typeof expPeriod)}
+              className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brand transition-colors"
+            >
+              {PERIOD_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            </select>
+          </div>
+        ) : (
+          <div>
+            <label className="text-xs text-muted mb-1.5 block">Journal</label>
+            <select
+              value={expJournal}
+              onChange={(e) => setExpJournal(e.target.value)}
+              className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brand transition-colors"
+            >
+              {JOURNAL_OPTIONS.map((j) => <option key={j.code} value={j.code}>{j.label}</option>)}
+            </select>
+          </div>
+        )}
         <div>
           <label className="text-xs text-muted mb-1.5 block">Category</label>
           <select
@@ -281,7 +308,7 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-xs text-muted mb-1.5 block">Amount (₹)</label>
+          <label className="text-xs text-muted mb-1.5 block">{expShared ? `Total Amount (${PERIOD_OPTIONS.find((p) => p.value === expPeriod)?.label})` : "Amount"} (₹)</label>
           <input
             type="number" min={0} step="0.01" placeholder="0.00"
             value={expAmount} onChange={(e) => setExpAmount(e.target.value)}
@@ -296,6 +323,11 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           />
         </div>
       </div>
+      {expShared && perJournalPreview > 0 && (
+        <p className="rounded-xl bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700">
+          ≈ {inr(perJournalPreview)} per journal per month × {JOURNAL_OPTIONS.length} journals
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-muted mb-1.5 block">Payment Mode</label>
@@ -323,29 +355,6 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brand resize-none transition-colors"
         />
       </div>
-      <div>
-        <label className="text-xs text-muted mb-1.5 block">Attach Bill / Invoice (Optional)</label>
-        <input
-          ref={billInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
-          onChange={(e) => setExpBillFile(e.target.files?.[0] ?? null)}
-        />
-        <button
-          type="button" onClick={() => billInputRef.current?.click()}
-          className="flex w-full items-center justify-center rounded-xl border-2 border-dashed border-border bg-surface-2 p-4 text-center hover:bg-surface-2/70 transition-colors"
-        >
-          <div>
-            <Upload className="h-5 w-5 text-faint mx-auto mb-1" />
-            {expBillFile ? (
-              <p className="text-xs font-medium text-ink truncate max-w-[220px]">{expBillFile.name}</p>
-            ) : (
-              <>
-                <p className="text-xs text-muted"><span className="font-medium text-ink">Choose file</span> or drag & drop</p>
-                <p className="text-[11px] text-faint mt-0.5">PDF, JPG, PNG (Max. 5MB)</p>
-              </>
-            )}
-          </div>
-        </button>
-      </div>
       <button
         onClick={submitExpense} disabled={saving}
         className="w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors disabled:opacity-60"
@@ -362,7 +371,6 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
     { code: "IJMPS", label: "IJMPS Journal" },
     { code: "IJES", label: "IJES Journal" },
     { code: "JPS", label: "JPS Journal" },
-    { code: "ALL", label: "Shared / Combined" },
   ];
 
   const [matrixDate, setMatrixDate] = useState(() => new Date());
@@ -463,92 +471,11 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
         })}
       </div>
 
-      {/* Business Expense Sheet */}
-      <Panel
-        title="Business Expense Sheet"
-        action={
-          <div className="flex items-center gap-2">
-            <button onClick={exportExpensesCsv} className="text-xs font-medium text-indigo-600 hover:underline">Export CSV</button>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 transition-colors"
-            >
-              <Plus className="h-3.5 w-3.5" /> Add Expense
-            </button>
-          </div>
-        }
-      >
-        <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <div className="rounded-xl border border-border p-3">
-            <p className="text-xs text-muted">Total Expenses (All Categories)</p>
-            <p className="text-lg font-bold text-ink">{inr(totalBusinessExpenses)}</p>
-          </div>
-          <div className="rounded-xl border border-border p-3">
-            <p className="text-xs text-muted">Manual Entries</p>
-            <p className="text-lg font-bold text-ink">{inr(manualExpenseTotal)}</p>
-            <p className="text-[11px] text-faint">{expenses.length} entries</p>
-          </div>
-          <div className="rounded-xl border border-border p-3">
-            <div className="flex items-center gap-1.5">
-              <AdsIcon className="h-3.5 w-3.5 text-indigo-500" />
-              <p className="text-xs text-muted">Google Ads ({data.googleAdsSpend.periodLabel})</p>
-            </div>
-            <p className="text-lg font-bold text-ink">{data.googleAdsSpend.connected ? inr(data.googleAdsSpend.totalSpend) : "—"}</p>
-            <p className={cn("text-[11px]", data.googleAdsSpend.connected ? "text-green-600" : "text-faint")}>
-              {data.googleAdsSpend.connected ? "Live from Google Ads API" : (data.googleAdsSpend.error || "Not connected")}
-            </p>
-          </div>
-          <div className="rounded-xl border border-border p-3">
-            <p className="text-xs text-muted">Categories Tracked</p>
-            <p className="text-lg font-bold text-ink">7</p>
-            <p className="text-[11px] text-faint">6 manual + Google Ads (live)</p>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px] text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs font-medium text-faint">
-                <th className="pb-2.5">Journal</th>
-                <th className="pb-2.5">Category</th>
-                <th className="pb-2.5">Date</th>
-                <th className="pb-2.5">Paid To</th>
-                <th className="pb-2.5">Description</th>
-                <th className="pb-2.5 text-right">Amount</th>
-                <th className="pb-2.5 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {expenses.length === 0 && (
-                <tr><td colSpan={7} className="py-6 text-center text-sm text-faint">No expenses recorded yet. Add one above.</td></tr>
-              )}
-              {expenses.map((e) => (
-                <tr key={e.id} className="border-b border-border last:border-0 hover:bg-surface-2/50">
-                  <td className="py-3"><span className="rounded-md bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted">{journalLabel(e.journalCode)}</span></td>
-                  <td className="py-3 text-ink">{e.category}</td>
-                  <td className="py-3 text-muted">{new Date(e.date + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</td>
-                  <td className="py-3 text-muted">{e.paymentTo || "—"}</td>
-                  <td className="py-3 max-w-[220px] truncate text-muted">{e.description || "—"}</td>
-                  <td className="py-3 text-right font-medium text-ink">{inr(e.amount)}</td>
-                  <td className="py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => setViewingExpense(e)} className="grid h-7 w-7 place-items-center rounded-lg text-faint hover:bg-surface-2 hover:text-ink"><Eye className="h-3.5 w-3.5" /></button>
-                      <button onClick={() => setEditingExpense(e)} className="grid h-7 w-7 place-items-center rounded-lg text-faint hover:bg-surface-2 hover:text-ink"><Pencil className="h-3.5 w-3.5" /></button>
-                      <button onClick={() => removeExpense(e.id)} className="grid h-7 w-7 place-items-center rounded-lg text-faint hover:bg-red-50 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
-
       {/* Expense Journal — journal x category pivot, month-navigable */}
       <Panel
         title="Expense Journal"
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button onClick={() => shiftMatrixMonth(-1)} className="grid h-7 w-7 place-items-center rounded-lg border border-border text-muted hover:bg-surface-2 hover:text-ink">
               <ChevronLeft className="h-3.5 w-3.5" />
             </button>
@@ -562,6 +489,13 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
               onSelect={(v) => setMatrixDate(v === "Last Month" ? new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1) : new Date())}
               align="right"
             />
+            <button onClick={exportExpensesCsv} className="text-xs font-medium text-indigo-600 hover:underline">Export CSV</button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add Expense
+            </button>
           </div>
         }
       >
@@ -597,7 +531,7 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
                     );
                   })}
                   <td className="py-2.5 px-3 text-right bg-indigo-50/60">
-                    {row.code !== "ALL" && adsAmount(row.code) > 0 ? (
+                    {adsAmount(row.code) > 0 ? (
                       <span className="font-medium text-indigo-700">{inr(adsAmount(row.code))}</span>
                     ) : (
                       <span className="text-faint">₹0</span>
@@ -622,36 +556,69 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
       {/* Google Ads Spend — separate from the manual expense sheet, live per-journal */}
       <Panel
         title="Google Ads Spend"
-        action={<span className={cn("text-xs font-medium", data.googleAdsSpend.connected ? "text-green-600" : "text-faint")}>{data.googleAdsSpend.periodLabel}{data.googleAdsSpend.connected ? " · Live" : ""}</span>}
+        action={
+          <div className="flex items-center gap-2">
+            <GoogleAdsLogo className="h-5 w-5" />
+            <span className={cn("text-xs font-medium", data.googleAdsSpend.connected ? "text-green-600" : "text-faint")}>
+              {data.googleAdsSpend.periodLabel}{data.googleAdsSpend.connected ? " · Live" : ""}
+            </span>
+          </div>
+        }
       >
         {!data.googleAdsSpend.connected ? (
           <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-            <AdsIcon className="h-6 w-6 text-faint" />
+            <GoogleAdsLogo className="h-8 w-8 opacity-40" />
             <p className="text-sm font-medium text-ink">Google Ads isn't connected</p>
             <p className="max-w-sm text-xs text-muted">{data.googleAdsSpend.error || "Add Google Ads credentials to see live spend per journal here."}</p>
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {data.googleAdsSpend.byJournal.map((j) => (
-              <div key={j.code} className="rounded-xl border border-border p-3">
-                <div className="mb-1.5 flex items-center justify-between">
-                  <span className="rounded-md bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted">{j.code}</span>
-                  <span className={cn("text-[11px]", j.connected ? "text-green-600" : "text-red-500")}>
+              <div key={j.code} className="overflow-hidden rounded-2xl border border-border bg-gradient-to-b from-surface-2/60 to-transparent">
+                <div className="flex items-center justify-between border-b border-border/70 px-3.5 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <GoogleAdsLogo className="h-4 w-4" />
+                    <span className="text-xs font-semibold text-ink">{j.code}</span>
+                  </div>
+                  <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                    j.connected ? "bg-green-50 text-green-600" : "bg-red-50 text-red-500")}>
+                    <span className={cn("h-1.5 w-1.5 rounded-full", j.connected ? "bg-green-500" : "bg-red-400")} />
                     {j.connected ? "Live" : (j.error ? "Error" : "—")}
                   </span>
                 </div>
-                <p className="text-lg font-bold text-ink">{j.connected ? inr(j.totalSpend) : "—"}</p>
-                {j.connected && j.campaigns.length > 0 && (
-                  <div className="mt-1.5 space-y-1 border-t border-border pt-1.5">
-                    {j.campaigns.slice(0, 3).map((c) => (
-                      <div key={c.name} className="flex items-center justify-between text-xs">
-                        <span className="truncate text-faint">{c.name}</span>
-                        <span className="text-muted">{inr(c.cost)}</span>
+                <div className="p-3.5">
+                  <p className="text-2xl font-bold text-ink">{j.connected ? inr(j.totalSpend) : "—"}</p>
+                  {j.connected && (
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      <div className="rounded-lg bg-surface-2/70 p-2 text-center">
+                        <Eye className="mx-auto h-3.5 w-3.5 text-blue-500" />
+                        <p className="mt-1 text-xs font-semibold text-ink">{j.impressions.toLocaleString("en-IN")}</p>
+                        <p className="text-[10px] text-faint">Impressions</p>
                       </div>
-                    ))}
-                  </div>
-                )}
-                {!j.connected && j.error && <p className="mt-1 truncate text-[11px] text-faint" title={j.error}>{j.error}</p>}
+                      <div className="rounded-lg bg-surface-2/70 p-2 text-center">
+                        <MousePointerClick className="mx-auto h-3.5 w-3.5 text-amber-500" />
+                        <p className="mt-1 text-xs font-semibold text-ink">{j.clicks.toLocaleString("en-IN")}</p>
+                        <p className="text-[10px] text-faint">Clicks</p>
+                      </div>
+                      <div className="rounded-lg bg-surface-2/70 p-2 text-center">
+                        <Target className="mx-auto h-3.5 w-3.5 text-green-500" />
+                        <p className="mt-1 text-xs font-semibold text-ink">{j.conversions.toLocaleString("en-IN")}</p>
+                        <p className="text-[10px] text-faint">Conversions</p>
+                      </div>
+                    </div>
+                  )}
+                  {j.connected && j.campaigns.length > 0 && (
+                    <div className="mt-3 space-y-1 border-t border-border pt-2.5">
+                      {j.campaigns.slice(0, 3).map((c) => (
+                        <div key={c.name} className="flex items-center justify-between text-xs">
+                          <span className="truncate text-faint">{c.name}</span>
+                          <span className="text-muted">{inr(c.cost)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {!j.connected && j.error && <p className="mt-1 truncate text-[11px] text-faint" title={j.error}>{j.error}</p>}
+                </div>
               </div>
             ))}
           </div>
@@ -953,7 +920,7 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
         </div>
       </Panel>
 
-      {/* Expense Journal drill-down modal */}
+      {/* Expense Journal drill-down modal — editable */}
       {detailCell && (
         <Modal open={!!detailCell} onClose={() => setDetailCell(null)} title={detailCell.label} subtitle={matrixMonthLabel} size="md">
           <div className="space-y-2">
@@ -964,7 +931,11 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
                   <p className="truncate text-xs text-muted">{e.description || "No description"}</p>
                   <p className="text-[11px] text-faint">{new Date(e.date + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} · {e.mode}</p>
                 </div>
-                <span className="shrink-0 font-semibold text-ink">{inr(e.amount)}</span>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="font-semibold text-ink">{inr(e.amount)}</span>
+                  <button onClick={() => setEditingExpense(e)} className="grid h-7 w-7 place-items-center rounded-lg text-faint hover:bg-surface-2 hover:text-ink"><Pencil className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => removeExpense(e.id)} className="grid h-7 w-7 place-items-center rounded-lg text-faint hover:bg-red-50 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+                </div>
               </div>
             ))}
             {cellEntries(detailCell.journal, detailCell.category).length === 0 && (
@@ -978,26 +949,6 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
       <Modal open={showAddModal} onClose={() => setShowAddModal(false)} title="Add Business Expense" subtitle="Attribute to one journal or mark as a combined/shared cost" size="md">
         {addExpenseForm}
       </Modal>
-
-      {/* View Expense modal */}
-      {viewingExpense && (
-        <Modal open={!!viewingExpense} onClose={() => setViewingExpense(null)} title="Expense Details" size="sm">
-          <div className="space-y-2.5 text-sm">
-            <Row label="Journal" value={journalLabel(viewingExpense.journalCode)} />
-            <Row label="Category" value={viewingExpense.category} />
-            <Row label="Date" value={new Date(viewingExpense.date + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} />
-            <Row label="Amount" value={inr(viewingExpense.amount)} />
-            <Row label="Payment Mode" value={viewingExpense.mode} />
-            <Row label="Paid To" value={viewingExpense.paymentTo || "—"} />
-            <Row label="Description" value={viewingExpense.description || "—"} />
-            {viewingExpense.billUrl && (
-              <a href={viewingExpense.billUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:underline">
-                View attached bill
-              </a>
-            )}
-          </div>
-        </Modal>
-      )}
 
       {/* Edit Expense modal */}
       {editingExpense && (

@@ -84,7 +84,7 @@ export async function getJournalPageData(code: string, prefix: string): Promise<
   });
   const googleAds = await getGoogleAdsCardData(code).catch((err) => {
     console.error(`${code} Google Ads spend failed to load:`, err instanceof Error ? err.message : err);
-    return { connected: false, totalSpend: 0, delta: 0, metrics: [] };
+    return { connected: false, totalSpend: 0, delta: 0, impressions: 0, clicks: 0, conversions: 0, metrics: [] };
   });
 
   // --- real expense totals (this journal's Supabase-tracked expenses) ---
