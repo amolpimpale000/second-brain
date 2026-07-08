@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   BookOpen, FileText, CheckCircle2, Clock, Users, IndianRupee, ArrowUpRight, ArrowDownRight,
-  Plus, FileStack, BarChart3, UserCog, Megaphone, Building2, CreditCard, Bell, TrendingUp,
+  Plus, Bell, TrendingUp,
   Pencil, Trash2, Eye, ChevronLeft, ChevronRight, MousePointerClick, Target,
-  Flower2, Leaf, Stethoscope, GraduationCap, Flower, Star, Globe,
+  Flower2, Leaf, Stethoscope, GraduationCap, Flower, Star,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-import { MultiLineChart, StackedBars, Sparkline, SegmentedGauge } from "@/components/charts";
+import { MultiLineChart, SegmentedGauge } from "@/components/charts";
 import { Dropdown, Modal } from "@/components/vault-ui";
 import { GoogleAdsLogo } from "@/components/google-ads-logo";
 import { cn, inr } from "@/lib/utils";
@@ -25,10 +25,6 @@ const statTone: Record<string, string> = {
 const statIcon: Record<string, React.ElementType> = {
   book: BookOpen, file: FileText, check: CheckCircle2, review: Clock, users: Users, rupee: IndianRupee,
 };
-const qaIcon: Record<string, React.ElementType> = {
-  add: Plus, file: FileStack, report: BarChart3, users: UserCog, megaphone: Megaphone,
-};
-const subIcon: Record<string, React.ElementType> = { users: Users, building: Building2, card: CreditCard };
 const alertTone: Record<string, string> = { red: "bg-red-50 text-red-600 border-red-100", amber: "bg-amber-50 text-amber-600 border-amber-100" };
 
 const JOURNAL_OPTIONS = [
@@ -70,7 +66,6 @@ function Panel({ title, action, children, className }: { title: string; action?:
 }
 
 const period = <Dropdown label="This Month" options={["This Month", "Last Month", "This Quarter", "This Year"]} onSelect={() => {}} align="right" />;
-const viewAll = <button className="text-xs font-medium text-indigo-600 hover:underline">View all</button>;
 
 function Donut({ data, center, sub }: { data: { name: string; value: number; color: string }[]; center: string; sub: string }) {
   return (
@@ -154,7 +149,6 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
   const avgGrowth = data.journalPerformance.reduce((s, j) => s + j.growth, 0) / data.journalPerformance.length || 0;
   const totalSubmissionsByJournal = data.submissionsByJournal.reduce((s, j) => s + j.value, 0);
   const totalArticleStatus = data.articleStatus.reduce((s, a) => s + a.value, 0);
-  const totalSubmissionSource = data.submissionSource.reduce((s, a) => s + a.value, 0);
 
   // -------------------------------------------------------------- expense journal --------------------------------------------------------------
   const router = useRouter();
@@ -857,21 +851,8 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
         </Panel>
       </div>
 
-      {/* Financial Overview + Top Performing Journals + Article Status gauge */}
+      {/* Top Performing Journals + Article Status gauge + Top Countries */}
       <div className="grid gap-5 xl:grid-cols-3">
-        <Panel title="Financial Overview" action={period}>
-          <div className="grid grid-cols-3 gap-3">
-            {data.financialSummary.map((f) => (
-              <div key={f.label}>
-                <p className="text-xs text-muted">{f.label}</p>
-                <p className="mt-0.5 text-lg font-bold text-ink">{f.value}</p>
-                <Delta v={f.growth} className="mt-0.5" />
-                <div className="mt-2 h-8"><Sparkline data={f.spark} color={f.color} /></div>
-              </div>
-            ))}
-          </div>
-        </Panel>
-
         <Panel title="Top Performing Journals" action={period}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -906,10 +887,7 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           <SegmentedGauge data={data.articleStatus} center={totalArticleStatus.toLocaleString("en-IN")} sub="Total Articles" />
           <Legend items={data.articleStatus} />
         </Panel>
-      </div>
 
-      {/* Top Countries + Quick Actions */}
-      <div className="grid gap-5 xl:grid-cols-3">
         <Panel title="Top Countries (Submissions)" action={<button onClick={() => setShowAllCountries(true)} className="text-xs font-medium text-indigo-600 hover:underline">View All</button>}>
           {topCountries.length === 0 ? (
             <p className="py-6 text-center text-sm text-faint">Country data isn't available yet.</p>
@@ -926,96 +904,21 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
             </div>
           )}
         </Panel>
-
-        <Panel title="Quick Actions" className="xl:col-span-2">
-          <div className="grid gap-1 sm:grid-cols-2">
-            {data.quickActionsJM.map((a) => {
-              const Icon = qaIcon[a.icon];
-              return (
-                <button key={a.label} className="flex w-full items-center gap-3 rounded-xl border border-border px-3 py-2.5 text-left text-sm font-medium text-ink transition-colors hover:bg-surface-2">
-                  <Icon className="h-4 w-4 text-indigo-500" /> {a.label}
-                  <ArrowUpRight className="ml-auto h-4 w-4 rotate-45 text-faint" />
-                </button>
-              );
-            })}
-          </div>
-        </Panel>
       </div>
 
-      {/* Key metrics + subjects + subscription */}
-      <div className="grid gap-5 xl:grid-cols-4">
-        <Panel title="Key Metrics Trend" action={period} className="xl:col-span-2">
-          <div className="grid grid-cols-2 gap-3">
-            {data.keyMetrics.map((m) => (
-              <div key={m.label} className="rounded-xl border border-border p-3">
-                <p className="text-xs text-muted">{m.label}</p>
-                <div className="flex items-center gap-2">
-                  <p className="text-lg font-bold text-ink">{m.value}</p>
-                  <Delta v={m.growth} />
-                </div>
-                <div className="mt-1 h-9"><Sparkline data={m.spark} color={m.color} /></div>
-              </div>
-            ))}
-          </div>
-        </Panel>
-
-        <Panel title="Top Subject Areas" action={viewAll}>
-          <div className="space-y-3">
-            {data.subjectAreas.map((s) => (
-              <div key={s.name}>
-                <div className="mb-1 flex justify-between text-xs"><span className="text-muted">{s.name}</span><span className="font-medium text-ink">{s.pct}%</span></div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full" style={{ width: `${s.pct}%`, background: s.color }} /></div>
-              </div>
-            ))}
-          </div>
-        </Panel>
-
-        <Panel title="Subscription & Membership" action={viewAll}>
-          <div className="space-y-3">
-            {data.subscription.map((s) => {
-              const Icon = subIcon[s.icon];
-              return (
-                <div key={s.label} className="flex items-center gap-3 rounded-xl border border-border p-3">
-                  <div className="grid h-9 w-9 place-items-center rounded-lg bg-indigo-50 text-indigo-600"><Icon className="h-4 w-4" /></div>
-                  <div className="min-w-0 flex-1"><p className="text-xs text-muted">{s.label}</p><p className="text-lg font-bold text-ink">{s.value}</p></div>
-                  <Delta v={s.growth} />
-                </div>
-              );
-            })}
-          </div>
-        </Panel>
-      </div>
-
-      {/* Source + Publication trend + Alerts */}
-      <div className="grid gap-5 xl:grid-cols-3">
-        <Panel title="Submission Source">
-          <div className="flex items-center gap-4">
-            <Donut data={data.submissionSource} center={totalSubmissionSource.toLocaleString("en-IN")} sub="Total" />
-            <Legend items={data.submissionSource} />
-          </div>
-        </Panel>
-
-        <Panel title="Publication Trend" action={period}>
-          <div className="mb-2 flex gap-4 text-xs">
-            <span className="flex items-center gap-1.5 text-muted"><span className="h-2 w-2 rounded-full bg-[#22c55e]" />Published</span>
-            <span className="flex items-center gap-1.5 text-muted"><span className="h-2 w-2 rounded-full bg-[#3b82f6]" />Accepted</span>
-          </div>
-          <StackedBars data={data.publicationTrend} series={[{ key: "accepted", color: "#3b82f6" }, { key: "published", color: "#22c55e" }]} />
-        </Panel>
-
-        <Panel title="Alerts & Notifications">
-          <div className="space-y-2.5">
-            {data.jmAlerts.map((a) => (
-              <div key={a.id} className={cn("flex items-center gap-2.5 rounded-xl border p-3 text-sm", alertTone[a.tone])}>
-                <Bell className="h-4 w-4 shrink-0" />
-                <span className="flex-1">{a.text}</span>
-                <button className="shrink-0 text-xs font-semibold hover:underline">View Now</button>
-              </div>
-            ))}
-            <button className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-xl bg-surface-2 py-2.5 text-sm font-medium text-muted hover:text-ink">View All Notifications</button>
-          </div>
-        </Panel>
-      </div>
+      {/* Alerts & Notifications */}
+      <Panel title="Alerts & Notifications">
+        <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+          {data.jmAlerts.map((a) => (
+            <div key={a.id} className={cn("flex items-center gap-2.5 rounded-xl border p-3 text-sm", alertTone[a.tone])}>
+              <Bell className="h-4 w-4 shrink-0" />
+              <span className="flex-1">{a.text}</span>
+              <button className="shrink-0 text-xs font-semibold hover:underline">View Now</button>
+            </div>
+          ))}
+        </div>
+        <button className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-surface-2 py-2.5 text-sm font-medium text-muted hover:text-ink">View All Notifications</button>
+      </Panel>
 
       {/* EMPLOYEE PRODUCTIVITY */}
       <Panel
