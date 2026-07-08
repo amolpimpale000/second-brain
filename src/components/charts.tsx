@@ -260,10 +260,12 @@ export function MultiLineChart({
   data,
   series,
   height = 260,
+  showDots = false,
 }: {
   data: Record<string, number | string>[];
   series: { key: string; name: string; color: string }[];
   height?: number;
+  showDots?: boolean;
 }) {
   return (
     <ResponsiveContainer width="100%" height={height} debounce={200}>
@@ -287,7 +289,16 @@ export function MultiLineChart({
           }
         />
         {series.map((s) => (
-          <Line key={s.key} type="monotone" dataKey={s.key} name={s.name} stroke={s.color} strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
+          <Line
+            key={s.key}
+            type="monotone"
+            dataKey={s.key}
+            name={s.name}
+            stroke={s.color}
+            strokeWidth={2.5}
+            dot={showDots ? { r: 4, strokeWidth: 2, stroke: "var(--card)", fill: s.color } : false}
+            activeDot={{ r: 6 }}
+          />
         ))}
       </LineChart>
     </ResponsiveContainer>

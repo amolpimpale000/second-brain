@@ -103,6 +103,7 @@ function Legend({ items }: { items: { name: string; value: number; pct?: number;
 
 export function JournalManagementClient({ data }: { data: JournalDashboardData }) {
   const [sortKey, setSortKey] = useState<"score" | "handled" | "turnaround">("score");
+  const [trendRangeLabel, setTrendRangeLabel] = useState<6 | 12>(12);
   const sortedEmployees = [...data.employees].sort((a, b) =>
     sortKey === "turnaround" ? a.turnaround - b.turnaround : b[sortKey] - a[sortKey]
   );
@@ -471,13 +472,28 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
 
       {/* Overview + donut + activities */}
       <div className="grid gap-5 xl:grid-cols-4">
-        <Panel title="Manuscripts Overview" className="xl:col-span-2">
-          <div className="mb-2 flex flex-wrap gap-4 text-xs">
+        <Panel
+          title="Submissions Trend (All Journals)"
+          className="xl:col-span-2"
+          action={
+            <Dropdown
+              label={trendRangeLabel === 6 ? "Last 6 Months" : "Last 12 Months"}
+              options={["Last 6 Months", "Last 12 Months"]}
+              onSelect={(v) => setTrendRangeLabel(v === "Last 6 Months" ? 6 : 12)}
+              align="right"
+            />
+          }
+        >
+          <MultiLineChart
+            data={data.submissionsByJournalTrend.data.slice(-trendRangeLabel)}
+            series={data.submissionsByJournalTrend.series}
+            showDots
+          />
+          <div className="mt-3 flex flex-wrap justify-center gap-4 text-xs">
             {data.submissionsByJournalTrend.series.map((s) => (
               <span key={s.key} className="flex items-center gap-1.5 text-muted"><span className="h-2 w-2 rounded-full" style={{ background: s.color }} />{s.name}</span>
             ))}
           </div>
-          <MultiLineChart data={data.submissionsByJournalTrend.data} series={data.submissionsByJournalTrend.series} />
         </Panel>
 
         <Panel title="Manuscripts by Journal">
