@@ -41,7 +41,7 @@ export function CashflowChart({
   data: { month: string; income: number; expenses: number }[];
 }) {
   return (
-    <ResponsiveContainer width="100%" height={260}>
+    <ResponsiveContainer width="100%" height={260} debounce={200}>
       <AreaChart data={data} margin={{ left: 6, right: 6, top: 10 }}>
         <defs>
           <linearGradient id="gIncome" x1="0" y1="0" x2="0" y2="1">
@@ -88,7 +88,7 @@ export function DonutChart({
 }) {
   const total = data.reduce((s, d) => s + d.value, 0);
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <ResponsiveContainer width="100%" height={height} debounce={200}>
       <PieChart>
         <Pie
           data={data}
@@ -132,7 +132,7 @@ export function BarsChart({
   color?: string;
 }) {
   return (
-    <ResponsiveContainer width="100%" height={240}>
+    <ResponsiveContainer width="100%" height={240} debounce={200}>
       <BarChart data={data} margin={{ left: 6, right: 6, top: 10 }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
         <XAxis dataKey="month" {...axis} />
@@ -163,7 +163,7 @@ export function StackedBars({
   series: { key: string; color: string }[];
 }) {
   return (
-    <ResponsiveContainer width="100%" height={300}>
+    <ResponsiveContainer width="100%" height={300} debounce={200}>
       <BarChart data={data} margin={{ left: 6, right: 6, top: 10 }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
         <XAxis dataKey="month" {...axis} />
@@ -202,7 +202,7 @@ export function StackedBars({
 // -------- Portfolio growth line --------
 export function GrowthLine({ data }: { data: { month: string; value: number }[] }) {
   return (
-    <ResponsiveContainer width="100%" height={240}>
+    <ResponsiveContainer width="100%" height={240} debounce={200}>
       <LineChart data={data} margin={{ left: 6, right: 6, top: 10 }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
         <XAxis dataKey="month" {...axis} />
@@ -235,7 +235,7 @@ export function Gauge({ value, label }: { value: number; label: string }) {
   const data = [{ name: "score", value, fill: "var(--c-green)" }];
   return (
     <div className="relative">
-      <ResponsiveContainer width="100%" height={200}>
+      <ResponsiveContainer width="100%" height={200} debounce={200}>
         <RadialBarChart
           innerRadius="72%"
           outerRadius="100%"
@@ -266,7 +266,7 @@ export function MultiLineChart({
   height?: number;
 }) {
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <ResponsiveContainer width="100%" height={height} debounce={200}>
       <LineChart data={data} margin={{ left: 6, right: 6, top: 10 }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
         <XAxis dataKey="label" {...axis} />
@@ -298,7 +298,7 @@ export function MultiLineChart({
 export function Sparkline({ data, color = "var(--c-green)" }: { data: number[]; color?: string }) {
   const d = data.map((v, i) => ({ i, v }));
   return (
-    <ResponsiveContainer width="100%" height={40}>
+    <ResponsiveContainer width="100%" height={40} debounce={200}>
       <AreaChart data={d} margin={{ top: 2, bottom: 2, left: 0, right: 0 }}>
         <defs>
           <linearGradient id={`spark-${color}`} x1="0" y1="0" x2="0" y2="1">

@@ -207,8 +207,14 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
   // Every journal now reports its month key in the same "YYYY-MM" format (a
   // format mismatch between MySQL's "YYYY-MM" and JPS's old "Mon YYYY" used
   // to make merged/sorted months interleave incorrectly on the x-axis).
+  // A stray future-dated record (bad data entry) can produce a month key
+  // past the current month — exclude those so the trend doesn't end in a
+  // misleading trailing zero point.
+  const currentMonthKey = new Date().toISOString().slice(0, 7);
   const monthKeys = new Set<string>();
-  for (const rj of realJournals) for (const m of rj.monthly) monthKeys.add(m.month);
+  for (const rj of realJournals) for (const m of rj.monthly) {
+    if (m.month <= currentMonthKey) monthKeys.add(m.month);
+  }
   const sortedMonths = Array.from(monthKeys).sort().slice(-12);
   const submissionsByJournalData = sortedMonths.map((month) => {
     const row: Record<string, number | string> = { label: month };
