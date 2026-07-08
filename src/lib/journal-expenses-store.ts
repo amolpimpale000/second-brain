@@ -82,14 +82,26 @@ export async function listExpenses(journalCode: string): Promise<JournalExpense[
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
 }
 
-// journalCode "ALL" is the sentinel for a combined/shared expense (Interakt
-// fees, salaries, etc. that aren't attributable to one journal). Used by the
-// aggregate business expense sheet on /journal-management, which shows every
-// expense across every journal plus every "ALL" entry.
+// All expenses across every journal, for the /journal-management expense journal.
 export async function listCombinedExpenses(): Promise<JournalExpense[]> {
   await ensureExpensesBucket();
   const all = await readAllExpenses();
   return all.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+}
+
+// The manifest is a single JSON blob (see readAllExpenses/writeAllExpenses),
+// so concurrent addExpense() calls race on read-modify-write and can silently
+// drop entries (last write wins). Anything adding more than one expense at
+// once — e.g. splitting a shared cost across all journals — must go through
+// this batch function instead, which does exactly one read and one write.
+export async function addExpenses(inputs: Omit<JournalExpense, "id" | "createdAt">[]): Promise<JournalExpense[]> {
+  await ensureExpensesBucket();
+  const all = await readAllExpenses();
+  const now = new Date().toISOString();
+  const created = inputs.map((input) => ({ ...input, id: uid(), createdAt: now }));
+  all.unshift(...created);
+  await writeAllExpenses(all);
+  return created;
 }
 
 export async function addExpense(input: Omit<JournalExpense, "id" | "createdAt">): Promise<JournalExpense> {

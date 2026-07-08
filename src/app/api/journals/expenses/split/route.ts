@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addExpense } from "@/lib/journal-expenses-store";
+import { addExpenses } from "@/lib/journal-expenses-store";
 import { GOOGLE_ADS_JOURNAL_CODES } from "@/lib/google-ads";
 
 export const dynamic = "force-dynamic";
@@ -25,18 +25,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Split amount rounds to zero — increase the total" }, { status: 400 });
     }
 
-    const expenses = await Promise.all(
-      GOOGLE_ADS_JOURNAL_CODES.map((journalCode) =>
-        addExpense({
-          journalCode,
-          category,
-          amount: perJournalAmount,
-          date,
-          mode: mode || "UPI",
-          description: description || "",
-          paymentTo: paymentTo || "",
-        })
-      )
+    const expenses = await addExpenses(
+      GOOGLE_ADS_JOURNAL_CODES.map((journalCode) => ({
+        journalCode,
+        category,
+        amount: perJournalAmount,
+        date,
+        mode: mode || "UPI",
+        description: description || "",
+        paymentTo: paymentTo || "",
+      }))
     );
 
     return NextResponse.json({ expenses, perJournalAmount });
