@@ -232,6 +232,50 @@ export async function getJpsTypeBreakdown(): Promise<JpsTypeStat[]> {
   }
 }
 
+export type PeriodStats = { manuscripts: number; published: number; revenue: number };
+
+/** Manuscript count/published/revenue scoped to a date range (for the period-filterable Journal Snapshot). */
+export async function getJpsPeriodStats(from: string, to: string): Promise<PeriodStats> {
+  const client = await createJpsConnection();
+  try {
+    const [manuscriptRes, revenueRes] = await Promise.all([
+      client.query(
+        `SELECT count(*) AS manuscripts, sum(CASE WHEN status = 'published' THEN 1 ELSE 0 END) AS published
+         FROM manuscripts
+         WHERE submission_date BETWEEN $1 AND $2`,
+        [from, to]
+      ),
+      client.query(
+        `SELECT coalesce(sum(amount), 0) AS total
+         FROM payments
+         WHERE status = 'completed' AND paid_at BETWEEN $1 AND $2`,
+        [from, to]
+      ),
+    ]);
+    return {
+      manuscripts: Number(manuscriptRes.rows[0].manuscripts ?? 0),
+      published: Number(manuscriptRes.rows[0].published ?? 0),
+      revenue: Math.round(Number(revenueRes.rows[0].total) / 100),
+    };
+  } finally {
+    await client.end().catch(() => {});
+  }
+}
+
+export type CountryStat = { name: string; count: number };
+
+export async function getJpsCountryBreakdown(): Promise<CountryStat[]> {
+  const client = await createJpsConnection();
+  try {
+    const res = await client.query(
+      "SELECT country, count(*) FROM manuscripts WHERE country IS NOT NULL AND country != '' GROUP BY country ORDER BY count(*) DESC"
+    );
+    return res.rows.map((r) => ({ name: r.country, count: Number(r.count) }));
+  } finally {
+    await client.end().catch(() => {});
+  }
+}
+
 export async function getJpsEmployees(): Promise<JpsEmployee[]> {
   const client = await createJpsConnection();
   try {

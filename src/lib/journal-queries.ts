@@ -192,6 +192,51 @@ export async function getJournalCounts(
   }
 }
 
+export type PeriodStats = { manuscripts: number; published: number; revenue: number };
+
+/** Manuscript count/published/revenue scoped to a date range (for the period-filterable Journal Snapshot). */
+export async function getJournalPeriodStats(
+  code: string,
+  prefix: string,
+  from: string,
+  to: string,
+  cfg?: JournalConnectionConfig
+): Promise<PeriodStats> {
+  const conn = await connect(code, cfg);
+  try {
+    const [[totals]] = await conn.execute<any>(
+      `
+      SELECT COUNT(*) AS manuscripts, SUM(CASE WHEN statusID = ? THEN 1 ELSE 0 END) AS published
+      FROM ${prefix}_tblmanuscript
+      WHERE isActive = 1 AND createdDate BETWEEN ? AND ?
+    `,
+      [STATUS.PUBLISHED, from, to]
+    );
+
+    const paymentTable = await resolvePaymentTable(conn, code, prefix);
+    const [rows] = await conn.execute<any>(
+      `SELECT json_details FROM ${paymentTable} WHERE is_deleted = 0 AND created_date BETWEEN ? AND ?`,
+      [from, to]
+    );
+    let revenue = 0;
+    for (const row of rows) {
+      try {
+        const json = JSON.parse(row.json_details || "{}");
+        const amount = Number(json.amount);
+        const currency = json.currency || "INR";
+        if (!amount) continue;
+        revenue += currency === "INR" ? amount / 100 : amount;
+      } catch {
+        // ignore malformed JSON
+      }
+    }
+
+    return { manuscripts: Number(totals.manuscripts ?? 0), published: Number(totals.published ?? 0), revenue: Math.round(revenue) };
+  } finally {
+    await conn.end();
+  }
+}
+
 export async function getJournalRevenue(
   code: string,
   prefix: string,
@@ -323,6 +368,29 @@ export async function getJournalArticleTypes(
     `);
 
     return rows.map((r: any) => ({ name: r.name, count: Number(r.count ?? 0) }));
+  } finally {
+    await conn.end();
+  }
+}
+
+export type CountryStat = { name: string; count: number };
+
+export async function getJournalCountryBreakdown(
+  code: string,
+  prefix: string,
+  cfg?: JournalConnectionConfig
+): Promise<CountryStat[]> {
+  const conn = await connect(code, cfg);
+  try {
+    const [rows] = await conn.execute<any>(`
+      SELECT c.countryName AS name, COUNT(*) AS count
+      FROM ${prefix}_tblmanuscript m
+      JOIN ${prefix}_tblcountry c ON c.countryID = m.countryID
+      WHERE m.isActive = 1
+      GROUP BY c.countryName
+      ORDER BY count DESC
+    `);
+    return rows.map((r: any) => ({ name: r.name, count: Number(r.count) }));
   } finally {
     await conn.end();
   }

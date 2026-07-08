@@ -24,6 +24,7 @@ import {
   getJournalArticleTypes,
   getJournalRecentActivity,
   getJournalEmployees,
+  getJournalCountryBreakdown,
   type IjpsCounts,
   type IjpsRevenue,
   type MonthlyPoint,
@@ -38,9 +39,11 @@ import {
   getJpsTypeBreakdown,
   getJpsRecentActivity,
   getJpsEmployees,
+  getJpsCountryBreakdown,
 } from "./jps-queries";
 import { listCombinedExpenses, type JournalExpense } from "./journal-expenses-store";
 import { getGoogleAdsSpend, type GoogleAdsSpend } from "./google-ads";
+import { countryFlag, toTitleCase } from "./country-flags";
 
 // ---------------------------------------------------------------------------
 // Aggregates real data for every connected journal: IJPS/IJSRT/IJMPS/IJES
@@ -166,10 +169,33 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
   // Business expense sheet: real Supabase-tracked expenses (per-journal or
   // combined) plus live Google Ads spend. Isolated from the rest of the
   // dashboard so a Supabase/Google Ads hiccup never blanks the whole page.
-  const [businessExpenses, googleAdsSpend] = await Promise.all([
+  const [businessExpenses, googleAdsSpend, countryResults] = await Promise.all([
     listCombinedExpenses().catch((err) => { console.error("Business expenses failed to load:", err.message); return []; }),
     getGoogleAdsSpend().catch((err) => ({ connected: false, totalSpend: 0, currency: "INR", byJournal: [], periodLabel: "This Month", error: err.message })),
+    Promise.allSettled([
+      ...CONNECTED_JOURNALS.map((j) => getJournalCountryBreakdown(j.code, j.prefix)),
+      getJpsCountryBreakdown(),
+    ]),
   ]);
+
+  // --- top countries: merged (case-insensitive) across every connected journal ---
+  const countryTotals = new Map<string, number>();
+  for (const r of countryResults) {
+    if (r.status !== "fulfilled") continue;
+    for (const c of r.value) {
+      const key = c.name.toUpperCase();
+      countryTotals.set(key, (countryTotals.get(key) ?? 0) + c.count);
+    }
+  }
+  const countrySum = Array.from(countryTotals.values()).reduce((s, n) => s + n, 0);
+  const topCountries = Array.from(countryTotals.entries())
+    .sort(([, a], [, b]) => b - a)
+    .map(([name, count]) => ({
+      name: toTitleCase(name),
+      flag: countryFlag(name),
+      count,
+      pct: countrySum ? Math.round((count / countrySum) * 1000) / 10 : 0,
+    }));
 
   // --- journal performance table: replace every connected journal with real data ---
   const journalPerformance: JournalPerf[] = sampleJournalPerformance.map((j) => {
@@ -362,7 +388,7 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
     employees: employeesOut.length ? employeesOut : sampleEmployees,
     businessExpenses,
     googleAdsSpend,
-    topCountries: [],
+    topCountries,
   };
 }
 
