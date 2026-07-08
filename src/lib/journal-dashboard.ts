@@ -170,7 +170,7 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
   // dashboard so a Supabase/Google Ads hiccup never blanks the whole page.
   const [businessExpenses, googleAdsSpend] = await Promise.all([
     listCombinedExpenses().catch((err) => { console.error("Business expenses failed to load:", err.message); return []; }),
-    getGoogleAdsSpend().catch((err) => ({ connected: false, totalSpend: 0, currency: "INR", campaigns: [], periodLabel: "This Month", error: err.message })),
+    getGoogleAdsSpend().catch((err) => ({ connected: false, totalSpend: 0, currency: "INR", byJournal: [], periodLabel: "This Month", error: err.message })),
   ]);
 
   // --- journal performance table: replace every connected journal with real data ---

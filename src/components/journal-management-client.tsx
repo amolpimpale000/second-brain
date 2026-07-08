@@ -440,17 +440,30 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           </div>
         </div>
 
-        {data.googleAdsSpend.connected && data.googleAdsSpend.campaigns.length > 0 && (
-          <div className="mb-4 rounded-xl border border-border p-3">
-            <p className="mb-2 text-xs font-medium text-muted">Google Ads spend by campaign ({data.googleAdsSpend.periodLabel})</p>
-            <div className="space-y-1.5">
-              {data.googleAdsSpend.campaigns.slice(0, 5).map((c) => (
-                <div key={c.name} className="flex items-center justify-between text-sm">
-                  <span className="truncate text-muted">{c.name}</span>
-                  <span className="font-medium text-ink">{inr(c.cost)}</span>
+        {data.googleAdsSpend.connected && data.googleAdsSpend.byJournal.length > 0 && (
+          <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {data.googleAdsSpend.byJournal.map((j) => (
+              <div key={j.code} className="rounded-xl border border-border p-3">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="rounded-md bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted">{j.code}</span>
+                  <span className={cn("text-[11px]", j.connected ? "text-green-600" : "text-red-500")}>
+                    {j.connected ? "Live" : (j.error ? "Error" : "—")}
+                  </span>
                 </div>
-              ))}
-            </div>
+                <p className="text-lg font-bold text-ink">{j.connected ? inr(j.totalSpend) : "—"}</p>
+                {j.connected && j.campaigns.length > 0 && (
+                  <div className="mt-1.5 space-y-1 border-t border-border pt-1.5">
+                    {j.campaigns.slice(0, 3).map((c) => (
+                      <div key={c.name} className="flex items-center justify-between text-xs">
+                        <span className="truncate text-faint">{c.name}</span>
+                        <span className="text-muted">{inr(c.cost)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!j.connected && j.error && <p className="mt-1 truncate text-[11px] text-faint" title={j.error}>{j.error}</p>}
+              </div>
+            ))}
           </div>
         )}
 
