@@ -14,7 +14,6 @@ import {
   jmAlerts as sampleJmAlerts,
   quickActionsJM as sampleQuickActionsJM,
   employees as sampleEmployees,
-  submissionsTrend as sampleSubmissionsTrend,
   JCOL,
   type JournalPerf,
   type Employee,
@@ -53,7 +52,7 @@ import { getGoogleAdsSpend, type GoogleAdsSpend } from "./google-ads";
 
 export type JournalDashboardData = {
   jmStats: typeof sampleJmStats;
-  submissionsTrend: typeof sampleSubmissionsTrend;
+  submissionsByJournalTrend: { data: Record<string, number | string>[]; series: { key: string; name: string; color: string }[] };
   submissionsByJournal: typeof sampleSubmissionsByJournal;
   jmActivities: typeof sampleJmActivities;
   journalPerformance: JournalPerf[];
@@ -206,20 +205,25 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
   ];
   normalizePercentages(articleStatus);
 
-  // --- monthly submissions trend: merged across every connected journal ---
-  const monthlyMap = new Map<string, { total: number; accepted: number }>();
-  for (const rj of realJournals) {
-    for (const m of rj.monthly) {
-      const existing = monthlyMap.get(m.month) ?? { total: 0, accepted: 0 };
-      existing.total += m.submissions;
-      existing.accepted += m.accepted;
-      monthlyMap.set(m.month, existing);
+  // --- monthly submissions per journal: one line per journal, last 12 months ---
+  // Every journal now reports its month key in the same "YYYY-MM" format (a
+  // format mismatch between MySQL's "YYYY-MM" and JPS's old "Mon YYYY" used
+  // to make merged/sorted months interleave incorrectly on the x-axis).
+  const monthKeys = new Set<string>();
+  for (const rj of realJournals) for (const m of rj.monthly) monthKeys.add(m.month);
+  const sortedMonths = Array.from(monthKeys).sort().slice(-12);
+  const submissionsByJournalData = sortedMonths.map((month) => {
+    const row: Record<string, number | string> = { label: month };
+    for (const rj of realJournals) {
+      row[rj.code] = rj.monthly.find((m) => m.month === month)?.submissions ?? 0;
     }
-  }
-  const mergedTrend = Array.from(monthlyMap.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([label, v]) => ({ label, total: v.total, review: 0, accepted: v.accepted, rejected: 0 }));
-  const submissionsTrend = mergedTrend.length ? mergedTrend : sampleSubmissionsTrend;
+    return row;
+  });
+  const submissionsByJournalSeries = realJournals.map((rj) => ({
+    key: rj.code,
+    name: rj.code,
+    color: JCOL[rj.code as keyof typeof JCOL] ?? "#94a3b8",
+  }));
 
   // --- recent activities: real logs from every connected journal, newest first ---
   const realActivities = realJournals.flatMap((rj) =>
@@ -353,7 +357,7 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
 
   return {
     jmStats,
-    submissionsTrend,
+    submissionsByJournalTrend: { data: submissionsByJournalData, series: submissionsByJournalSeries },
     submissionsByJournal,
     jmActivities,
     journalPerformance,

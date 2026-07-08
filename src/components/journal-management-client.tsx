@@ -474,18 +474,13 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
 
       {/* Overview + donut + activities */}
       <div className="grid gap-5 xl:grid-cols-4">
-        <Panel title="Manuscripts Overview" action={period} className="xl:col-span-2">
+        <Panel title="Manuscripts Overview" className="xl:col-span-2">
           <div className="mb-2 flex flex-wrap gap-4 text-xs">
-            {[["Total Submitted", "#6366f1"], ["Under Review", "#3b82f6"], ["Accepted", "#22c55e"], ["Rejected", "#ef4444"]].map(([n, c]) => (
-              <span key={n} className="flex items-center gap-1.5 text-muted"><span className="h-2 w-2 rounded-full" style={{ background: c }} />{n}</span>
+            {data.submissionsByJournalTrend.series.map((s) => (
+              <span key={s.key} className="flex items-center gap-1.5 text-muted"><span className="h-2 w-2 rounded-full" style={{ background: s.color }} />{s.name}</span>
             ))}
           </div>
-          <MultiLineChart data={data.submissionsTrend} series={[
-            { key: "total", name: "Total Submitted", color: "#6366f1" },
-            { key: "review", name: "Under Review", color: "#3b82f6" },
-            { key: "accepted", name: "Accepted", color: "#22c55e" },
-            { key: "rejected", name: "Rejected", color: "#ef4444" },
-          ]} />
+          <MultiLineChart data={data.submissionsByJournalTrend.data} series={data.submissionsByJournalTrend.series} />
         </Panel>
 
         <Panel title="Manuscripts by Journal">

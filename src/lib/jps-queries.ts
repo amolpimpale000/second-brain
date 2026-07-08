@@ -181,7 +181,7 @@ export async function getJpsMonthlyTrends(): Promise<JpsMonthlyPoint[]> {
   const client = await createJpsConnection();
   try {
     const res = await client.query(
-      `SELECT to_char(date_trunc('month', submission_date), 'Mon YYYY') AS month,
+      `SELECT to_char(date_trunc('month', submission_date), 'YYYY-MM') AS month,
               date_trunc('month', submission_date) AS sort_key,
               count(*) AS count
        FROM manuscripts
@@ -202,7 +202,7 @@ export async function getJpsMonthlyRevenue(): Promise<JpsMonthlyRevenuePoint[]> 
   const client = await createJpsConnection();
   try {
     const res = await client.query(
-      `SELECT to_char(date_trunc('month', paid_at), 'Mon YYYY') AS month,
+      `SELECT to_char(date_trunc('month', paid_at), 'YYYY-MM') AS month,
               date_trunc('month', paid_at) AS sort_key,
               coalesce(sum(amount), 0) AS total
        FROM payments
