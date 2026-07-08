@@ -92,8 +92,12 @@ export async function readManifest(): Promise<StoredDoc[]> {
 export async function writeManifest(docs: StoredDoc[]) {
   const sb = admin();
   const body = new Blob([JSON.stringify(docs, null, 2)], { type: "application/json" });
+  // cacheControl: "0" avoids Supabase Storage's default 1hr Cache-Control,
+  // which can otherwise serve a stale read shortly after a write and cause
+  // the next write to silently persist that stale state (see the same fix
+  // in journal-expenses-store.ts for the incident that surfaced this).
   const { error } = await sb.storage
     .from(DOC_BUCKET)
-    .upload(MANIFEST, body, { upsert: true, contentType: "application/json" });
+    .upload(MANIFEST, body, { upsert: true, contentType: "application/json", cacheControl: "0" });
   if (error) throw error;
 }
