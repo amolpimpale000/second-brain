@@ -199,6 +199,44 @@ export function StackedBars({
   );
 }
 
+// -------- Multi-series grouped bar (monthly revenue by business) --------
+export function GroupedBars({
+  data,
+  series,
+}: {
+  data: Record<string, number | string>[];
+  series: { key: string; name: string; color: string }[];
+}) {
+  return (
+    <ResponsiveContainer width="100%" height={300} debounce={200}>
+      <BarChart data={data} margin={{ left: 6, right: 6, top: 10 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+        <XAxis dataKey="label" {...axis} />
+        <YAxis {...axis} width={52} tickFormatter={(v) => inr(Number(v), { compact: true })} />
+        <Tooltip
+          cursor={{ fill: "var(--surface-2)" }}
+          content={({ active, payload, label }) =>
+            active && payload?.length ? (
+              <Box>
+                <p className="mb-1 font-medium text-ink">{label}</p>
+                {payload.map((p) => (
+                  <p key={p.name} className="flex items-center gap-1.5 text-muted">
+                    <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
+                    {p.name}: <span className="font-medium text-ink">{inr(Number(p.value))}</span>
+                  </p>
+                ))}
+              </Box>
+            ) : null
+          }
+        />
+        {series.map((s) => (
+          <Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} radius={[4, 4, 0, 0]} maxBarSize={18} />
+        ))}
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
 // -------- Portfolio growth line --------
 export function GrowthLine({ data }: { data: { month: string; value: number }[] }) {
   return (

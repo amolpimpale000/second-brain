@@ -49,6 +49,11 @@ export type MonthlyPoint = {
   accepted: number;
 };
 
+export type MonthlyRevenuePoint = {
+  month: string;
+  amount: number;
+};
+
 export type ArticleTypeStat = {
   name: string;
   count: number;
@@ -284,6 +289,49 @@ export async function getJournalRevenue(
       plagiarism: Math.round(plagiarism),
       total: Math.round(apc + plagiarism),
     };
+  } finally {
+    await conn.end();
+  }
+}
+
+export async function getJournalMonthlyRevenue(
+  code: string,
+  prefix: string,
+  cfg?: JournalConnectionConfig,
+  months = 12
+): Promise<MonthlyRevenuePoint[]> {
+  const conn = await connect(code, cfg);
+  try {
+    const paymentTable = await resolvePaymentTable(conn, code, prefix);
+    const [rows] = await conn.execute<any>(
+      `
+      SELECT DATE_FORMAT(created_date, '%Y-%m') AS month,
+             json_details
+      FROM ${paymentTable}
+      WHERE is_deleted = 0 AND created_date >= DATE_SUB(NOW(), INTERVAL ? MONTH)
+      ORDER BY created_date
+    `,
+      [months]
+    );
+
+    const map = new Map<string, number>();
+    for (const row of rows) {
+      try {
+        const json = JSON.parse(row.json_details || "{}");
+        const amount = Number(json.amount);
+        const currency = json.currency || "INR";
+        if (!amount) continue;
+        const amountRs = currency === "INR" ? amount / 100 : amount;
+        const month = row.month;
+        map.set(month, (map.get(month) ?? 0) + amountRs);
+      } catch {
+        // ignore malformed JSON
+      }
+    }
+
+    return Array.from(map.entries())
+      .map(([month, amount]) => ({ month, amount: Math.round(amount) }))
+      .sort((a, b) => a.month.localeCompare(b.month));
   } finally {
     await conn.end();
   }

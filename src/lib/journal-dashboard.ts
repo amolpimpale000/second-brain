@@ -21,6 +21,7 @@ import {
   getJournalCounts,
   getJournalRevenue,
   getJournalMonthlyTrends,
+  getJournalMonthlyRevenue,
   getJournalArticleTypes,
   getJournalRecentActivity,
   getJournalEmployees,
@@ -28,6 +29,7 @@ import {
   type IjpsCounts,
   type IjpsRevenue,
   type MonthlyPoint,
+  type MonthlyRevenuePoint,
   type ArticleTypeStat,
   type IjpsActivity,
   type IjpsEmployee,
@@ -36,13 +38,14 @@ import {
   getJpsCounts,
   getJpsRevenue,
   getJpsMonthlyTrends,
+  getJpsMonthlyRevenue,
   getJpsTypeBreakdown,
   getJpsRecentActivity,
   getJpsEmployees,
   getJpsCountryBreakdown,
 } from "./jps-queries";
 import { listCombinedExpenses, type JournalExpense } from "./journal-expenses-store";
-import { getGoogleAdsSpend, type GoogleAdsSpend } from "./google-ads";
+import { getGoogleAdsSpend, getGoogleAdsSpendByMonth, type GoogleAdsSpend, type MonthlyAdsSpend } from "./google-ads";
 import { countryFlag, toTitleCase } from "./country-flags";
 
 // ---------------------------------------------------------------------------
@@ -71,6 +74,18 @@ export type JournalDashboardData = {
   businessExpenses: JournalExpense[];
   googleAdsSpend: GoogleAdsSpend;
   topCountries: { name: string; flag: string; count: number; pct: number }[];
+  businessProfitability: BusinessProfitability[];
+  monthlyRevenueByBusiness: { data: Record<string, number | string>[]; series: { key: string; name: string; color: string }[] };
+};
+
+export type BusinessProfitability = {
+  code: string;
+  name: string;
+  color: string;
+  revenue: number;
+  expenses: number;
+  profit: number;
+  margin: number;
 };
 
 const CONNECTED_JOURNALS: { code: string; prefix: string; name: string }[] = [
@@ -79,6 +94,11 @@ const CONNECTED_JOURNALS: { code: string; prefix: string; name: string }[] = [
   { code: "IJMPS", prefix: "ijmps", name: "International Journal of Medical & Pharmaceutical Sciences" },
   { code: "IJES", prefix: "ijes", name: "International Journal of Engineering & Science" },
 ];
+
+function journalName(code: string): string {
+  if (code === "JPS") return "Journal of Pharmaceutical Sciences";
+  return CONNECTED_JOURNALS.find((j) => j.code === code)?.name ?? code;
+}
 
 type RealJournalData = {
   code: string;
@@ -154,6 +174,46 @@ async function fetchJps(): Promise<RealJournalData> {
   };
 }
 
+async function fetchMonthlyRevenue(): Promise<Map<string, MonthlyRevenuePoint[]>> {
+  const results = await Promise.allSettled([
+    ...CONNECTED_JOURNALS.map(async (j) => ({ code: j.code, data: await getJournalMonthlyRevenue(j.code, j.prefix, undefined, 12) })),
+    (async () => ({ code: "JPS", data: await getJpsMonthlyRevenue() }))(),
+  ]);
+  const map = new Map<string, MonthlyRevenuePoint[]>();
+  results.forEach((r) => {
+    if (r.status === "fulfilled") map.set(r.value.code, r.value.data);
+    else console.error("Monthly revenue fetch failed:", r.reason);
+  });
+  return map;
+}
+
+async function fetchMonthlyAdsSpend(): Promise<Map<string, MonthlyAdsSpend[]>> {
+  const end = new Date().toISOString().slice(0, 10);
+  const start = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 9, 1)).toISOString().slice(0, 10);
+  const results = await Promise.allSettled(
+    ["IJPS", "IJSRT", "IJMPS", "IJES", "JPS"].map(async (code) => ({
+      code,
+      data: await getGoogleAdsSpendByMonth(code, { start, end }),
+    }))
+  );
+  const map = new Map<string, MonthlyAdsSpend[]>();
+  results.forEach((r) => {
+    if (r.status === "fulfilled") map.set(r.value.code, r.value.data);
+    else console.error("Monthly ads spend fetch failed:", r.reason);
+  });
+  return map;
+}
+
+function lastNMonthKeys(n: number): string[] {
+  const now = new Date();
+  const keys: string[] = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    keys.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`);
+  }
+  return keys;
+}
+
 export async function getJournalDashboardData(): Promise<JournalDashboardData> {
   const results = await Promise.allSettled([
     ...CONNECTED_JOURNALS.map((j) => fetchJournal(j.code, j.prefix)),
@@ -169,13 +229,15 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
   // Business expense sheet: real Supabase-tracked expenses (per-journal or
   // combined) plus live Google Ads spend. Isolated from the rest of the
   // dashboard so a Supabase/Google Ads hiccup never blanks the whole page.
-  const [businessExpenses, googleAdsSpend, countryResults] = await Promise.all([
+  const [businessExpenses, googleAdsSpend, countryResults, monthlyRevenueMap, monthlyAdsMap] = await Promise.all([
     listCombinedExpenses().catch((err) => { console.error("Business expenses failed to load:", err.message); return []; }),
     getGoogleAdsSpend().catch((err) => ({ connected: false, totalSpend: 0, currency: "INR", byJournal: [], periodLabel: "This Month", error: err.message })),
     Promise.allSettled([
       ...CONNECTED_JOURNALS.map((j) => getJournalCountryBreakdown(j.code, j.prefix)),
       getJpsCountryBreakdown(),
     ]),
+    fetchMonthlyRevenue().catch((err) => { console.error("Monthly revenue fetch failed:", err.message); return new Map<string, MonthlyRevenuePoint[]>(); }),
+    fetchMonthlyAdsSpend().catch((err) => { console.error("Monthly ads spend fetch failed:", err.message); return new Map<string, MonthlyAdsSpend[]>(); }),
   ]);
 
   // --- top countries: merged (case-insensitive) across every connected journal ---
@@ -370,6 +432,42 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
     })
   );
 
+  // --- business profitability (current month) + monthly revenue by business ---
+  const revenueMonthKeys = lastNMonthKeys(10);
+
+  const businessProfitability: BusinessProfitability[] = realJournals.map((rj) => {
+    const revenue = monthlyRevenueMap.get(rj.code)?.find((m) => m.month === currentMonthKey)?.amount ?? 0;
+    const manualExpenses = businessExpenses
+      .filter((e) => e.journalCode === rj.code && e.date.slice(0, 7) === currentMonthKey)
+      .reduce((s, e) => s + e.amount, 0);
+    const adsSpend = monthlyAdsMap.get(rj.code)?.find((m) => m.month === currentMonthKey)?.spend ?? 0;
+    const expenses = manualExpenses + adsSpend;
+    const profit = revenue - expenses;
+    const margin = revenue > 0 ? Math.round((profit / revenue) * 1000) / 10 : 0;
+    return {
+      code: rj.code,
+      name: journalName(rj.code),
+      color: JCOL[rj.code as keyof typeof JCOL] ?? "#94a3b8",
+      revenue,
+      expenses,
+      profit,
+      margin,
+    };
+  });
+
+  const monthlyRevenueByBusinessData = revenueMonthKeys.map((month) => {
+    const row: Record<string, number | string> = { label: month };
+    for (const rj of realJournals) {
+      row[rj.code] = monthlyRevenueMap.get(rj.code)?.find((m) => m.month === month)?.amount ?? 0;
+    }
+    return row;
+  });
+  const monthlyRevenueByBusinessSeries = realJournals.map((rj) => ({
+    key: rj.code,
+    name: rj.code,
+    color: JCOL[rj.code as keyof typeof JCOL] ?? "#94a3b8",
+  }));
+
   return {
     jmStats,
     submissionsByJournalTrend: { data: submissionsByJournalData, series: submissionsByJournalSeries },
@@ -389,6 +487,8 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
     businessExpenses,
     googleAdsSpend,
     topCountries,
+    businessProfitability,
+    monthlyRevenueByBusiness: { data: monthlyRevenueByBusinessData, series: monthlyRevenueByBusinessSeries },
   };
 }
 

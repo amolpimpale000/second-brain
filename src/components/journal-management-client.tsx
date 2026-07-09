@@ -6,10 +6,10 @@ import {
   BookOpen, FileText, CheckCircle2, Clock, Users, IndianRupee, ArrowUpRight, ArrowDownRight,
   Plus, Bell, TrendingUp,
   Pencil, Trash2, Eye, ChevronLeft, ChevronRight, MousePointerClick, Target,
-  Flower2, Leaf, Stethoscope, GraduationCap, Flower, Star,
+  Flower2, Leaf, Stethoscope, GraduationCap, Flower, Star, Building2, CalendarDays,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-import { MultiLineChart, SegmentedGauge } from "@/components/charts";
+import { MultiLineChart, SegmentedGauge, GroupedBars } from "@/components/charts";
 import { Dropdown, Modal } from "@/components/vault-ui";
 import { GoogleAdsLogo } from "@/components/google-ads-logo";
 import { cn, inr } from "@/lib/utils";
@@ -53,11 +53,14 @@ function Delta({ v, className }: { v: number; className?: string }) {
   );
 }
 
-function Panel({ title, action, children, className }: { title: string; action?: React.ReactNode; children: React.ReactNode; className?: string }) {
+function Panel({ title, subtitle, action, children, className }: { title: React.ReactNode; subtitle?: React.ReactNode; action?: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
     <div className={cn("rounded-2xl border border-border bg-card p-5 shadow-card", className)}>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h3 className="font-semibold text-ink">{title}</h3>
+        <div>
+          <h3 className="font-semibold text-ink">{title}</h3>
+          {subtitle && <p className="text-xs text-faint">{subtitle}</p>}
+        </div>
         {action}
       </div>
       {children}
@@ -545,6 +548,80 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           </div>
         </div>
       </div>
+
+      {/* Business Profitability */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Building2 className="h-5 w-5 text-indigo-500" />
+          <h2 className="text-lg font-semibold text-ink">Business Profitability</h2>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          {data.businessProfitability.map((b) => (
+            <div
+              key={b.code}
+              className="relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-card"
+              style={{ background: `linear-gradient(135deg, ${b.color}08 0%, transparent 60%)` }}
+            >
+              <div className="relative z-10">
+                <div className="mb-3 flex items-center gap-2">
+                  <div
+                    className="grid h-8 w-8 place-items-center rounded-lg text-white"
+                    style={{ background: b.color }}
+                  >
+                    <Building2 className="h-4 w-4" />
+                  </div>
+                  <span className="truncate text-sm font-semibold text-ink">{b.name}</span>
+                </div>
+                <p className="text-[10px] font-medium uppercase tracking-wider text-faint">Revenue</p>
+                <p className="text-xl font-bold" style={{ color: b.color }}>{inr(b.revenue)}</p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-xl border border-border/60 bg-surface-2/60 p-2">
+                    <p className="text-[10px] text-faint">Expenses</p>
+                    <p className="text-sm font-semibold text-ink">{inr(b.expenses)}</p>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-surface-2/60 p-2">
+                    <p className="text-[10px] text-faint">Profit</p>
+                    <p className="text-sm font-semibold text-emerald-600">{inr(b.profit)}</p>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <div className="mb-1 flex items-center justify-between text-[10px]">
+                    <span className="text-faint">Margin</span>
+                    <span className="font-semibold text-emerald-600">{b.margin.toFixed(1)}%</span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
+                    <div
+                      className="h-full rounded-full bg-emerald-500"
+                      style={{ width: `${Math.max(0, Math.min(100, b.margin))}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Monthly Revenue by Business */}
+      <Panel
+        title={
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-indigo-500" />
+            <span>Monthly Revenue by Business</span>
+          </div>
+        }
+        subtitle="Last 10 months revenue across all businesses"
+      >
+        <GroupedBars data={data.monthlyRevenueByBusiness.data} series={data.monthlyRevenueByBusiness.series} />
+        <div className="mt-3 flex flex-wrap justify-center gap-4 text-xs">
+          {data.monthlyRevenueByBusiness.series.map((s) => (
+            <span key={s.key} className="flex items-center gap-1.5 text-muted">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
+              {s.name} Journal
+            </span>
+          ))}
+        </div>
+      </Panel>
 
       {/* Overview + donut + activities */}
       <div className="grid gap-5 xl:grid-cols-4">

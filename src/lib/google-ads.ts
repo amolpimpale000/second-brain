@@ -59,6 +59,17 @@ function monthRange(monthKey?: string): { start: string; end: string; label: str
   return { start: fmt(start), end: fmt(end), label };
 }
 
+/** Returns a {start, end} range covering the last `n` complete months including the current one. */
+function lastNMonthsRange(n: number): { start: string; end: string } {
+  const now = new Date();
+  const endYear = now.getUTCFullYear();
+  const endMonth = now.getUTCMonth();
+  const start = new Date(Date.UTC(endYear, endMonth - n + 1, 1));
+  const end = new Date(Date.UTC(endYear, endMonth + 1, 0));
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  return { start: fmt(start), end: fmt(end) };
+}
+
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
 async function getAccessToken(): Promise<string> {
@@ -219,6 +230,57 @@ export async function getAllTimeGoogleAdsSpendForJournal(code: string): Promise<
   } catch (err) {
     console.error(`All-time Google Ads spend failed for ${code}:`, err instanceof Error ? err.message : err);
     return 0;
+  }
+}
+
+export type MonthlyAdsSpend = { month: string; spend: number };
+
+/** Monthly Google Ads spend for a single journal across a date range.
+ *  Used for the /journal-management monthly revenue/profitability sections. */
+export async function getGoogleAdsSpendByMonth(
+  code: string,
+  range: { start: string; end: string }
+): Promise<MonthlyAdsSpend[]> {
+  const customerId = getCustomerId(code);
+  if (!baseConfigured() || !customerId) return [];
+  const loginCustomerId = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID?.replace(/-/g, "");
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${await getAccessToken()}`,
+    "developer-token": process.env.GOOGLE_ADS_DEVELOPER_TOKEN!,
+    "Content-Type": "application/json",
+  };
+  if (loginCustomerId) headers["login-customer-id"] = loginCustomerId;
+
+  const query = `
+    SELECT segments.date, metrics.cost_micros
+    FROM campaign
+    WHERE segments.date BETWEEN '${range.start}' AND '${range.end}'
+  `;
+
+  try {
+    const res = await fetch(
+      `https://googleads.googleapis.com/${API_VERSION}/customers/${customerId}/googleAds:search`,
+      { method: "POST", headers, body: JSON.stringify({ query }) }
+    );
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(`Google Ads monthly spend API error for ${code}:`, text.slice(0, 200));
+      return [];
+    }
+    const json = await res.json();
+    const rows: any[] = json.results || [];
+    const byMonth = new Map<string, number>();
+    for (const row of rows) {
+      const month = row.segments?.date?.slice(0, 7);
+      if (!month) continue;
+      byMonth.set(month, (byMonth.get(month) ?? 0) + Number(row.metrics?.costMicros || 0) / 1_000_000);
+    }
+    return Array.from(byMonth.entries())
+      .map(([month, spend]) => ({ month, spend: Math.round(spend) }))
+      .sort((a, b) => a.month.localeCompare(b.month));
+  } catch (err) {
+    console.error(`Google Ads monthly spend failed for ${code}:`, err instanceof Error ? err.message : err);
+    return [];
   }
 }
 
