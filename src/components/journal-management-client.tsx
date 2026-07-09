@@ -42,8 +42,6 @@ const PERIOD_OPTIONS = [
 ];
 const journalLabel = (code: string) => JOURNAL_OPTIONS.find((j) => j.code === code)?.label ?? code;
 
-// Public website domains — used to pull each journal's real favicon/logo
-// (same Clearbit → favicon → monogram fallback the Investments page uses).
 const JOURNAL_DOMAIN: Record<string, string> = {
   IJPS: "ijpsjournal.com",
   IJSRT: "ijsrtjournal.com",
