@@ -14,7 +14,7 @@ import {
   getJpsRecentTransactions,
 } from "./jps-queries";
 import { listExpenses } from "./journal-expenses-store";
-import { getGoogleAdsCardData } from "./google-ads";
+import { getGoogleAdsCardData, getAllTimeGoogleAdsSpendForJournal } from "./google-ads";
 import { getRazorpayIncomeForJournal } from "./razorpay";
 import type { JournalPageData } from "./journal-page-data";
 
@@ -56,16 +56,20 @@ export async function getJpsPageData(): Promise<JournalPageData> {
     console.error("JPS expenses failed to load:", err instanceof Error ? err.message : err);
     return [];
   });
-  const googleAds = await getGoogleAdsCardData("JPS").catch((err) => {
-    console.error("JPS Google Ads spend failed to load:", err instanceof Error ? err.message : err);
-    return { connected: false, totalSpend: 0, delta: 0, impressions: 0, clicks: 0, conversions: 0, metrics: [] };
-  });
+  const [googleAds, googleAdsAllTimeSpend] = await Promise.all([
+    getGoogleAdsCardData("JPS").catch((err) => {
+      console.error("JPS Google Ads spend failed to load:", err instanceof Error ? err.message : err);
+      return { connected: false, totalSpend: 0, delta: 0, impressions: 0, clicks: 0, conversions: 0, metrics: [] };
+    }),
+    getAllTimeGoogleAdsSpendForJournal("JPS"),
+  ]);
   const razorpayLive = await getRazorpayIncomeForJournal("JPS").catch((err) => {
     console.error("JPS Razorpay income failed to load:", err instanceof Error ? err.message : err);
     return { connected: false, total: 0, delta: 0, sources: [], transactionCount: 0, periodLabel: "This Month", error: "Request failed" };
   });
 
-  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+  const manualExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+  const totalExpenses = manualExpenses + googleAdsAllTimeSpend;
   const netProfit = revenue.completed - totalExpenses;
   const acceptanceRate = (counts.publishedArticles / Math.max(counts.totalManuscripts, 1)) * 100;
 
@@ -80,9 +84,9 @@ export async function getJpsPageData(): Promise<JournalPageData> {
       case "Total Revenue":
         return { ...k, value: `₹ ${revenue.completed.toLocaleString("en-IN")}` };
       case "Total Expenses":
-        return { ...k, value: `₹ ${totalExpenses.toLocaleString("en-IN")}` };
+        return { ...k, value: `₹ ${totalExpenses.toLocaleString("en-IN")}`, sub: "Manual + Google Ads" };
       case "Net Profit / Loss":
-        return { ...k, value: `₹ ${netProfit.toLocaleString("en-IN")}` };
+        return { ...k, value: `₹ ${netProfit.toLocaleString("en-IN")}`, sub: "After all expenses" };
       default:
         return k;
     }
@@ -136,13 +140,14 @@ export async function getJpsPageData(): Promise<JournalPageData> {
 
   const catMap = new Map<string, number>();
   for (const e of expenses) catMap.set(e.category, (catMap.get(e.category) ?? 0) + e.amount);
+  if (googleAdsAllTimeSpend > 0) catMap.set("Google Ads", googleAdsAllTimeSpend);
   const expensesBreakdownIjps = Array.from(catMap.entries())
     .sort(([, a], [, b]) => b - a)
     .map(([name, value], i) => ({
       name,
       value,
       pct: totalExpenses ? Math.round((value / totalExpenses) * 100) : 0,
-      color: EXPENSE_COLORS[i % EXPENSE_COLORS.length],
+      color: name === "Google Ads" ? "#6366f1" : EXPENSE_COLORS[i % EXPENSE_COLORS.length],
     }));
 
   const trendMap = new Map<string, number>();
@@ -197,6 +202,7 @@ export async function getJpsPageData(): Promise<JournalPageData> {
     expensesTable,
     totalExpenses,
     netProfit,
+    googleAdsAllTimeSpend,
     journalCode: "JPS",
   };
 }

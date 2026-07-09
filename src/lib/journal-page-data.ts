@@ -14,7 +14,7 @@ import {
   getJournalRecentTransactions,
 } from "./journal-queries";
 import { listExpenses, type JournalExpense } from "./journal-expenses-store";
-import { getGoogleAdsCardData, type GoogleAdsCardData } from "./google-ads";
+import { getGoogleAdsCardData, getAllTimeGoogleAdsSpendForJournal, type GoogleAdsCardData } from "./google-ads";
 import { getRazorpayIncomeForJournal } from "./razorpay";
 
 // ---------------------------------------------------------------------------
@@ -49,6 +49,7 @@ export type JournalPageData = {
   }[];
   totalExpenses: number;
   netProfit: number;
+  googleAdsAllTimeSpend: number;
   journalCode: string;
 };
 
@@ -83,17 +84,21 @@ export async function getJournalPageData(code: string, prefix: string): Promise<
     console.error(`${code} expenses failed to load:`, err instanceof Error ? err.message : err);
     return [];
   });
-  const googleAds = await getGoogleAdsCardData(code).catch((err) => {
-    console.error(`${code} Google Ads spend failed to load:`, err instanceof Error ? err.message : err);
-    return { connected: false, totalSpend: 0, delta: 0, impressions: 0, clicks: 0, conversions: 0, metrics: [] };
-  });
+  const [googleAds, googleAdsAllTimeSpend] = await Promise.all([
+    getGoogleAdsCardData(code).catch((err) => {
+      console.error(`${code} Google Ads spend failed to load:`, err instanceof Error ? err.message : err);
+      return { connected: false, totalSpend: 0, delta: 0, impressions: 0, clicks: 0, conversions: 0, metrics: [] };
+    }),
+    getAllTimeGoogleAdsSpendForJournal(code),
+  ]);
   const razorpayLive = await getRazorpayIncomeForJournal(code).catch((err) => {
     console.error(`${code} Razorpay income failed to load:`, err instanceof Error ? err.message : err);
     return { connected: false, total: 0, delta: 0, sources: [], transactionCount: 0, periodLabel: "This Month", error: "Request failed" };
   });
 
-  // --- real expense totals (this journal's Supabase-tracked expenses) ---
-  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+  // --- real expense totals (manual Supabase expenses + all-time Google Ads) ---
+  const manualExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+  const totalExpenses = manualExpenses + googleAdsAllTimeSpend;
   const netProfit = revenue.total - totalExpenses;
 
   // --- KPI cards ---
@@ -110,9 +115,9 @@ export async function getJournalPageData(code: string, prefix: string): Promise<
       case "Total Revenue":
         return { ...k, value: `₹ ${revenue.total.toLocaleString("en-IN")}` };
       case "Total Expenses":
-        return { ...k, value: `₹ ${totalExpenses.toLocaleString("en-IN")}` };
+        return { ...k, value: `₹ ${totalExpenses.toLocaleString("en-IN")}`, sub: "Manual + Google Ads" };
       case "Net Profit / Loss":
-        return { ...k, value: `₹ ${netProfit.toLocaleString("en-IN")}` };
+        return { ...k, value: `₹ ${netProfit.toLocaleString("en-IN")}`, sub: "After all expenses" };
       default:
         return k;
     }
@@ -178,16 +183,17 @@ export async function getJournalPageData(code: string, prefix: string): Promise<
           : [],
       };
 
-  // --- real expenses breakdown (by category) ---
+  // --- real expenses breakdown (by category, including Google Ads) ---
   const catMap = new Map<string, number>();
   for (const e of expenses) catMap.set(e.category, (catMap.get(e.category) ?? 0) + e.amount);
+  if (googleAdsAllTimeSpend > 0) catMap.set("Google Ads", googleAdsAllTimeSpend);
   const expensesBreakdownIjps = Array.from(catMap.entries())
     .sort(([, a], [, b]) => b - a)
     .map(([name, value], i) => ({
       name,
       value,
       pct: totalExpenses ? Math.round((value / totalExpenses) * 100) : 0,
-      color: EXPENSE_COLORS[i % EXPENSE_COLORS.length],
+      color: name === "Google Ads" ? "#6366f1" : EXPENSE_COLORS[i % EXPENSE_COLORS.length],
     }));
 
   // --- real expense trend (by month, from actual entered expenses) ---
@@ -238,6 +244,7 @@ export async function getJournalPageData(code: string, prefix: string): Promise<
     expensesTable,
     totalExpenses,
     netProfit,
+    googleAdsAllTimeSpend,
     journalCode: code,
   };
 }

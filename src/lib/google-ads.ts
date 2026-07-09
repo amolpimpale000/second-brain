@@ -204,6 +204,24 @@ export type GoogleAdsCardData = {
   error?: string;
 };
 
+/** All-time spend for a single journal. Used to make the journal page's
+ *  "Total Expenses" and "Net Profit" KPIs match the combined view in
+ *  /journal-management's Expense Journal matrix. */
+export async function getAllTimeGoogleAdsSpendForJournal(code: string): Promise<number> {
+  const customerId = getCustomerId(code);
+  if (!baseConfigured() || !customerId) return 0;
+  const end = new Date().toISOString().slice(0, 10);
+  const range = { start: "2020-01-01", end };
+  try {
+    const accessToken = await getAccessToken();
+    const result = await fetchJournalSpend(code, customerId, accessToken, range);
+    return result.connected ? result.totalSpend : 0;
+  } catch (err) {
+    console.error(`All-time Google Ads spend failed for ${code}:`, err instanceof Error ? err.message : err);
+    return 0;
+  }
+}
+
 /** This-month spend + delta vs last month + top campaigns, shaped for a single journal's own dashboard card. */
 export async function getGoogleAdsCardData(code: string): Promise<GoogleAdsCardData> {
   const [thisMonth, prevMonth] = await Promise.all([

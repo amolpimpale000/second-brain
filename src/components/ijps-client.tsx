@@ -170,8 +170,9 @@ export function IjpsClient({
 
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(null), 2500); };
 
-  // --- live-recomputed totals (reflect expense CRUD immediately, no reload) ---
-  const totalExpenses = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
+  // --- live-recomputed totals (manual expenses + all-time Google Ads) ---
+  const manualExpenses = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
+  const totalExpenses = manualExpenses + data.googleAdsAllTimeSpend;
   const totalManuscripts = data.manuscriptsByStatus.reduce((s, m) => s + m.value, 0);
   const totalRevenue = data.revenueBreakdownIjps.reduce((s, r) => s + r.value, 0);
   const netProfit = totalRevenue - totalExpenses;
@@ -190,14 +191,15 @@ export function IjpsClient({
     const colors = ["#6366f1", "#3b82f6", "#ef4444", "#f59e0b", "#8b5cf6", "#94a3b8", "#14b8a6", "#ec4899"];
     const map = new Map<string, number>();
     for (const e of expenses) map.set(e.category, (map.get(e.category) ?? 0) + e.amount);
+    if (data.googleAdsAllTimeSpend > 0) map.set("Google Ads", data.googleAdsAllTimeSpend);
     return Array.from(map.entries())
       .sort(([, a], [, b]) => b - a)
       .map(([name, value], i) => ({
         name, value,
         pct: totalExpenses ? Math.round((value / totalExpenses) * 100) : 0,
-        color: colors[i % colors.length],
+        color: name === "Google Ads" ? "#6366f1" : colors[i % colors.length],
       }));
-  }, [expenses, totalExpenses]);
+  }, [expenses, totalExpenses, data.googleAdsAllTimeSpend]);
 
   const shownManuscriptOverview = filterByMonth(data.manuscriptOverview, moManuscript);
   const shownRevenueData = filterByMonth(data.revenueData, moRevenue);
@@ -400,7 +402,7 @@ export function IjpsClient({
               <p className="text-xl font-semibold tracking-tight text-ink">{value}</p>
               <div className="flex items-center gap-1.5">
                 <Delta value={kpi.delta} />
-                <span className="text-[11px] text-faint">vs Apr 2025</span>
+                <span className="text-[11px] text-faint">{(kpi as any).sub || "vs Apr 2025"}</span>
               </div>
             </div>
           );
@@ -699,7 +701,9 @@ export function IjpsClient({
           <div className="mb-4">
             <p className="text-xs text-muted">Total Expenses</p>
             <p className="text-2xl font-semibold text-ink mt-0.5">{inrFmt(totalExpenses)}</p>
-            <p className="text-[11px] text-faint mt-1">{expenses.length} recorded expense{expenses.length === 1 ? "" : "s"}</p>
+            <p className="text-[11px] text-faint mt-1">
+              {expenses.length} manual + Google Ads ({inrFmt(data.googleAdsAllTimeSpend)} all-time)
+            </p>
           </div>
           {expensesBreakdownLive.length === 0 ? (
             <div className="grid place-items-center py-10 text-center">
