@@ -52,6 +52,7 @@ import {
 import { cn, inr } from "@/lib/utils";
 import { INVESTMENT_TYPES } from "@/lib/investment-types";
 import type { DashboardData } from "@/lib/dashboard-queries";
+import { ConsolidatedPnL } from "@/components/consolidated-pnl";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Shared primitives
@@ -937,6 +938,9 @@ export function DashboardClient({ data }: { data: DashboardData }) {
       {/* Row 1 */}
       <KpiCards cards={vm.kpiCards} />
       <AccountsOverviewCard accounts={vm.accountsOverview} onAdd={() => router.push("/finances?quickAdd=account")} />
+
+      {/* Consolidated journal P&L — full width, with month toggle */}
+      <ConsolidatedPnL className="xl:col-span-4" />
 
       {/* Row 2 */}
       <CashFlowOverview data={vm.cashFlowMonthly} />

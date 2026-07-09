@@ -213,6 +213,31 @@ export async function getRazorpayIncomeForJournalPeriod(code: string, period: Ra
   }
 }
 
+/**
+ * Real captured income per calendar month for one journal, over the last
+ * `months` months, from a single windowed fetch (bucketed client-side). Used
+ * by the consolidated P&L. Returns a Map<"YYYY-MM", rupees>. Months with no
+ * captured payments are simply absent. UTC month boundaries, matching the
+ * single-journal card's "this month" so the two agree.
+ */
+export async function getRazorpayMonthlyIncomeForJournal(code: string, months: number): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  const creds = getCreds(code);
+  if (!creds) return out;
+  const now = new Date();
+  const from = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1) / 1000);
+  const to = Math.floor(now.getTime() / 1000);
+  const maxPages = Math.min(400, months * 20);
+  const payments = await fetchAllPayments(creds.keyId, creds.keySecret, from, to, maxPages);
+  for (const p of payments) {
+    if (p.status !== "captured") continue;
+    const d = new Date(p.created_at * 1000);
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    out.set(key, (out.get(key) ?? 0) + p.amount / 100);
+  }
+  return out;
+}
+
 export type RazorpayJournalIncome = { code: string } & RazorpayIncome;
 
 /** Real income across every configured journal's Razorpay account, for one month (defaults to current). */

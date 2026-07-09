@@ -14,6 +14,7 @@ import { Dropdown, Modal } from "@/components/vault-ui";
 import { GoogleAdsLogo } from "@/components/google-ads-logo";
 import { Logo } from "@/components/logo";
 import { AlertsBell } from "@/components/alerts-drawer";
+import { ConsolidatedPnL } from "@/components/consolidated-pnl";
 import { cn, inr } from "@/lib/utils";
 import { type JournalDashboardData } from "@/lib/journal-dashboard";
 import { type JournalExpense } from "@/lib/journal-expenses-store";
@@ -561,6 +562,10 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           <Building2 className="h-5 w-5 text-indigo-500" />
           <h2 className="text-lg font-semibold text-ink">Business Profitability</h2>
         </div>
+
+        {/* Consolidated P&L across all journals, with month toggle */}
+        <ConsolidatedPnL />
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {data.businessProfitability.map((b) => (
             <div
