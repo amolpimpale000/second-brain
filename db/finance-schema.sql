@@ -48,11 +48,19 @@ create table finance_loans (
 create table finance_investments (
   id text primary key,
   name text not null,
-  type text not null default 'Mutual Funds', -- Mutual Funds | Stocks | PPF | Gold | FD | Crypto | Other
+  type text not null default 'Mutual Funds', -- Stocks | US Stocks | Mutual Funds | ETFs | Gold | Bonds | REITs | NPS | PPF | FD | Crypto | Other
   invested numeric not null,
   current_value numeric not null,
+  subtitle text,       -- small grey line, e.g. "548 qty · avg ₹153.36" or "Equity · Flexi Cap"
+  logo_domain text,    -- company favicon/logo, e.g. "tatamotors.com"
+  sip_amount numeric,  -- monthly SIP amount (mutual funds)
   created_at timestamptz not null default now()
 );
+-- If finance_investments already existed, run once instead:
+-- alter table finance_investments
+--   add column if not exists subtitle text,
+--   add column if not exists logo_domain text,
+--   add column if not exists sip_amount numeric;
 
 create table finance_bills (
   id text primary key,
