@@ -16,6 +16,7 @@ import {
   LineChart, Line,
 } from "recharts";
 import { cn, inr } from "@/lib/utils";
+import { INVESTMENT_TYPES } from "@/lib/investment-types";
 import type {
   FinanceData, FinanceEntity, FinAccount, FinTransaction, FinGoal, FinLoan, FinInvestment,
   FinBill, FinDue, FinBudget,
@@ -130,16 +131,6 @@ const LOAN_KINDS = [
 ];
 const loanMeta = (kind: string) => LOAN_KINDS.find((k) => k.value === kind) ?? LOAN_KINDS[1];
 
-const INVESTMENT_TYPES = [
-  { value: "Mutual Funds", color: "#6366f1" },
-  { value: "Stocks", color: "#22c55e" },
-  { value: "PPF", color: "#f59e0b" },
-  { value: "Gold", color: "#eab308" },
-  { value: "FD", color: "#3b82f6" },
-  { value: "Crypto", color: "#8b5cf6" },
-  { value: "Other", color: "#94a3b8" },
-];
-const investColor = (t: string) => INVESTMENT_TYPES.find((i) => i.value === t)?.color ?? "#94a3b8";
 
 const INSTITUTIONS = [
   { value: "hdfc", label: "HDFC Bank" },
@@ -555,17 +546,26 @@ function computeHealth(income: number, expense: number, assets: number, liabilit
 /* ═══════════════════════════════════════════════════════════════════════════
    Main component
    ═══════════════════════════════════════════════════════════════════════════ */
-const TABS = ["Overview", "Expenses", "Loans", "Investments", "Savings Goals"] as const;
+const TABS = ["Overview", "Expenses", "Loans", "Savings Goals"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_ICONS: Record<Tab, React.ElementType> = {
-  Overview: LayoutGrid, Expenses: Receipt, Loans: Landmark, Investments: TrendingUp, "Savings Goals": Target,
+  Overview: LayoutGrid, Expenses: Receipt, Loans: Landmark, "Savings Goals": Target,
 };
+// Investments lives on its own page (/investments) but appears in this tab
+// bar for a seamless section switcher; same data (finance_investments) feeds
+// the KPIs and the Investments Summary card here.
+const NAV_ITEMS: ({ tab: Tab } | { href: string; label: string; icon: React.ElementType })[] = [
+  { tab: "Overview" },
+  { tab: "Expenses" },
+  { tab: "Loans" },
+  { href: "/investments", label: "Investments", icon: TrendingUp },
+  { tab: "Savings Goals" },
+];
 
 type ModalState =
   | { kind: "txn" | "account" | "goal" | "loan" | "investment" | "bill" | "due" | "budget"; editing?: Record<string, unknown> }
   | { kind: "goalMoney"; goal: FinGoal }
   | { kind: "loanPayment"; loan: FinLoan }
-  | { kind: "investValue"; investment: FinInvestment }
   | { kind: "healthReport" }
   | null;
 
@@ -1192,7 +1192,7 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
 
   const investmentsCard = (
     <Card>
-      <Head title="Investments Summary" right={<button onClick={() => switchTab("Investments")} className="text-xs font-medium text-muted hover:text-ink transition-colors">View All</button>} />
+      <Head title="Investments Summary" right={<button onClick={() => router.push("/investments")} className="text-xs font-medium text-muted hover:text-ink transition-colors">View All</button>} />
       {db.investments.length === 0 ? (
         <EmptyHint text="No investments tracked." cta="Add Investment" onClick={() => setModal({ kind: "investment" })} />
       ) : (
@@ -1576,107 +1576,6 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
     </div>
   );
 
-  const investmentsTab = (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {[
-          { label: "Total Invested", value: `₹ ${M.investInvested.toLocaleString("en-IN")}`, color: "#6366f1" },
-          { label: "Current Value", value: `₹ ${M.investCurrent.toLocaleString("en-IN")}`, color: "#22c55e" },
-          { label: "Total Gain / Loss", value: `${M.investCurrent - M.investInvested >= 0 ? "+" : "-"}₹ ${Math.abs(M.investCurrent - M.investInvested).toLocaleString("en-IN")}`, color: M.investCurrent - M.investInvested >= 0 ? "#22c55e" : "#ef4444" },
-          { label: "Overall Return", value: `${M.investGainPct >= 0 ? "+" : ""}${M.investGainPct}%`, color: M.investGainPct >= 0 ? "#22c55e" : "#ef4444" },
-        ].map((k) => (
-          <Card key={k.label} className="!p-4">
-            <p className="text-[11px] font-medium text-muted">{k.label}</p>
-            <p className="mt-1 text-[20px] font-semibold" style={{ color: k.color }}>{k.value}</p>
-          </Card>
-        ))}
-      </div>
-      <div className="grid items-start gap-4 xl:grid-cols-[320px_1fr]">
-        <Card>
-          <Head title="Allocation" />
-          {M.investByType.length === 0 ? (
-            <EmptyHint text="No investments yet." />
-          ) : (
-            <>
-              <div className="relative mx-auto w-fit">
-                <ResponsiveContainer width={190} height={190} debounce={200}>
-                  <PieChart>
-                    <Pie data={M.investByType} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="95%" paddingAngle={2} stroke="none">
-                      {M.investByType.map((d, i) => <Cell key={i} fill={d.color} />)}
-                    </Pie>
-                    <Tooltip content={({ active, payload }) =>
-                      active && payload?.length ? (
-                        <Tip><p className="font-medium text-ink">{String(payload[0].name)}</p><p className="text-muted">{inr(Number(payload[0].value))}</p></Tip>
-                      ) : null
-                    } />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <p className="text-sm font-bold text-ink">₹ {M.investCurrent.toLocaleString("en-IN")}</p>
-                  <p className="text-[10px] text-faint">Current</p>
-                </div>
-              </div>
-              <div className="mt-2 space-y-1.5">
-                {M.investByType.map((t) => (
-                  <div key={t.name} className="flex items-center gap-2 text-[12px]">
-                    <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: t.color }} />
-                    <span className="flex-1 text-muted">{t.name}</span>
-                    <span className="font-medium text-ink">₹ {t.value.toLocaleString("en-IN")}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </Card>
-        <Card>
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-[15px] font-semibold tracking-tight text-ink">Holdings</h3>
-            <button onClick={() => setModal({ kind: "investment" })} className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 transition-colors">
-              <Plus className="h-3.5 w-3.5" /> Add Investment
-            </button>
-          </div>
-          {db.investments.length === 0 ? (
-            <EmptyHint text="Track mutual funds, stocks, PPF, gold and more." cta="Add Investment" onClick={() => setModal({ kind: "investment" })} />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[560px] text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-[11px] font-medium uppercase tracking-wide text-faint">
-                    <th className="pb-2">Name</th><th className="pb-2">Type</th><th className="pb-2 text-right">Invested</th>
-                    <th className="pb-2 text-right">Current</th><th className="pb-2 text-right">Return</th><th className="pb-2 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {db.investments.map((i) => {
-                    const gain = i.invested > 0 ? Math.round(((i.currentValue - i.invested) / i.invested) * 1000) / 10 : 0;
-                    return (
-                      <tr key={i.id} className="group border-b border-border last:border-0 hover:bg-surface-2/40">
-                        <td className="py-2.5 text-[13px] font-medium text-ink">{i.name}</td>
-                        <td className="py-2.5">
-                          <span className="rounded-md px-2 py-0.5 text-[11px] font-medium" style={{ background: `${investColor(i.type)}18`, color: investColor(i.type) }}>{i.type}</span>
-                        </td>
-                        <td className="py-2.5 text-right text-[12px] text-muted">₹ {i.invested.toLocaleString("en-IN")}</td>
-                        <td className="py-2.5 text-right text-[13px] font-semibold text-ink">₹ {i.currentValue.toLocaleString("en-IN")}</td>
-                        <td className={cn("py-2.5 text-right text-[12px] font-semibold", gain >= 0 ? "text-green-600" : "text-red-500")}>{gain >= 0 ? "+" : ""}{gain}%</td>
-                        <td className="py-2.5">
-                          <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => setModal({ kind: "investValue", investment: i })} title="Update value" className="grid h-6 w-6 place-items-center rounded-md text-faint hover:bg-surface-2 hover:text-ink"><TrendingUp className="h-3 w-3" /></button>
-                            <button onClick={() => setModal({ kind: "investment", editing: i as unknown as Record<string, unknown> })} className="grid h-6 w-6 place-items-center rounded-md text-faint hover:bg-surface-2 hover:text-ink"><Pencil className="h-3 w-3" /></button>
-                            <button onClick={() => deleteRow("investments", i.id, `Delete "${i.name}"?`)} className="grid h-6 w-6 place-items-center rounded-md text-faint hover:bg-red-50 hover:text-red-500"><Trash2 className="h-3 w-3" /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      </div>
-    </div>
-  );
-
   const goalsTab = (
     <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
       {db.goals.map((g) => {
@@ -1892,18 +1791,6 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
         />
       </Modal>
 
-      {modal?.kind === "investValue" && (
-        <Modal open onClose={() => setModal(null)} title={`Update Value — ${modal.investment.name}`}>
-          <EntityForm
-            fields={[{ name: "currentValue", label: "Current Value (₹)", type: "number" }]}
-            initial={{ currentValue: String(modal.investment.currentValue) }}
-            submitLabel="Update Value"
-            busy={busy}
-            onSubmit={(d) => updateRow("investments", modal.investment.id, { currentValue: Number(d.currentValue) || 0 }, "Value updated")}
-          />
-        </Modal>
-      )}
-
       <Modal open={modal?.kind === "bill"} onClose={() => setModal(null)} title={editing ? "Edit Bill" : "Add Bill / Subscription"}>
         <EntityForm
           key={String((editing as { id?: string })?.id ?? "new")}
@@ -2004,7 +1891,20 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
       {/* Tab bar + Quick Add */}
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-card p-1.5 shadow-[0_2px_8px_rgba(16,24,40,0.04)]">
         <div className="flex flex-wrap items-center gap-1">
-          {TABS.map((t) => {
+          {NAV_ITEMS.map((item) => {
+            if ("href" in item) {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.label}
+                  onClick={() => router.push(item.href)}
+                  className="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-medium text-muted transition-all hover:bg-surface-2 hover:text-ink"
+                >
+                  <Icon className="h-4 w-4" /> {item.label}
+                </button>
+              );
+            }
+            const t = item.tab;
             const Icon = TAB_ICONS[t];
             return (
               <button
@@ -2046,7 +1946,6 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
       {tab === "Overview" && overviewTab}
       {tab === "Expenses" && expensesTab}
       {tab === "Loans" && loansTab}
-      {tab === "Investments" && investmentsTab}
       {tab === "Savings Goals" && goalsTab}
 
       {modals}
