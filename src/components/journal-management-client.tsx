@@ -6,12 +6,13 @@ import {
   BookOpen, FileText, CheckCircle2, Clock, Users, IndianRupee, ArrowUpRight, ArrowDownRight,
   Plus, Bell, TrendingUp,
   Pencil, Trash2, Eye, ChevronLeft, ChevronRight, MousePointerClick, Target,
-  Flower2, Leaf, Stethoscope, GraduationCap, Flower, Star, Building2, CalendarDays,
+  Star, Building2, CalendarDays,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { MultiLineChart, SegmentedGauge, GroupedBars } from "@/components/charts";
 import { Dropdown, Modal } from "@/components/vault-ui";
 import { GoogleAdsLogo } from "@/components/google-ads-logo";
+import { Logo } from "@/components/logo";
 import { cn, inr } from "@/lib/utils";
 import { type JournalDashboardData } from "@/lib/journal-dashboard";
 import { type JournalExpense } from "@/lib/journal-expenses-store";
@@ -40,8 +41,15 @@ const PERIOD_OPTIONS = [
   { value: "yearly", label: "Yearly", months: 12 },
 ];
 const journalLabel = (code: string) => JOURNAL_OPTIONS.find((j) => j.code === code)?.label ?? code;
-const JOURNAL_ICON: Record<string, React.ElementType> = {
-  IJPS: Flower2, IJSRT: Leaf, IJMPS: Stethoscope, IJES: GraduationCap, JPS: Flower,
+
+// Public website domains — used to pull each journal's real favicon/logo
+// (same Clearbit → favicon → monogram fallback the Investments page uses).
+const JOURNAL_DOMAIN: Record<string, string> = {
+  IJPS: "ijpsjournal.com",
+  IJSRT: "ijsrtjournal.com",
+  IJMPS: "ijmpsjournal.com",
+  IJES: "ijesjournal.com",
+  JPS: "jpsjournal.com",
 };
 
 function Delta({ v, className }: { v: number; className?: string }) {
@@ -503,13 +511,10 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
       {/* Per-journal identity cards */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         {data.journalPerformance.map((j) => {
-          const Icon = JOURNAL_ICON[j.code] ?? BookOpen;
           return (
             <div key={j.code} className="rounded-2xl border border-border bg-card p-4 shadow-card">
               <div className="flex items-center gap-2.5">
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full border-2" style={{ borderColor: `${j.color}55`, color: j.color, background: `${j.color}12` }}>
-                  <Icon className="h-5 w-5" />
-                </div>
+                <Logo domain={JOURNAL_DOMAIN[j.code]} label={j.code} size={40} rounded="rounded-full" />
                 <div className="min-w-0">
                   <p className="text-sm font-bold" style={{ color: j.color }}>{j.code}</p>
                   <p className="truncate text-[11px] text-faint">{j.name}</p>
@@ -559,46 +564,38 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           {data.businessProfitability.map((b) => (
             <div
               key={b.code}
-              className="relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-card"
-              style={{ background: `linear-gradient(135deg, ${b.color}08 0%, transparent 60%)` }}
+              className="rounded-2xl border border-border bg-card p-4 shadow-card"
             >
-              <div className="relative z-10">
-                <div className="mb-3 flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
+                <Logo domain={JOURNAL_DOMAIN[b.code]} label={b.code} size={36} rounded="rounded-lg" />
+                <span className="truncate text-sm font-semibold text-ink">{b.name}</span>
+              </div>
+              <p className="mt-3 text-[10px] font-medium uppercase tracking-wider text-faint">Revenue</p>
+              <p className="text-xl font-bold text-ink">{inr(b.revenue)}</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="rounded-xl border border-border bg-surface-2 p-2">
+                  <p className="text-[10px] text-faint">Expenses</p>
+                  <p className="text-sm font-semibold text-ink">{inr(b.expenses)}</p>
+                </div>
+                <div className="rounded-xl border border-border bg-surface-2 p-2">
+                  <p className="text-[10px] text-faint">Profit</p>
+                  <p className={cn("text-sm font-semibold", b.profit >= 0 ? "text-emerald-600" : "text-rose-500")}>
+                    {inr(b.profit)}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="mb-1 flex items-center justify-between text-[10px]">
+                  <span className="text-faint">Margin</span>
+                  <span className={cn("font-semibold", b.margin >= 0 ? "text-emerald-600" : "text-rose-500")}>
+                    {b.margin.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
                   <div
-                    className="grid h-8 w-8 place-items-center rounded-lg text-white"
-                    style={{ background: b.color }}
-                  >
-                    <Building2 className="h-4 w-4" />
-                  </div>
-                  <span className="truncate text-sm font-semibold text-ink">{b.name}</span>
-                </div>
-                <p className="text-[10px] font-medium uppercase tracking-wider text-faint">Revenue</p>
-                <p className="text-xl font-bold" style={{ color: b.color }}>{inr(b.revenue)}</p>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <div className="rounded-xl border border-border/60 bg-surface-2/60 p-2">
-                    <p className="text-[10px] text-faint">Expenses</p>
-                    <p className="text-sm font-semibold text-ink">{inr(b.expenses)}</p>
-                  </div>
-                  <div className="rounded-xl border border-border/60 bg-surface-2/60 p-2">
-                    <p className="text-[10px] text-faint">Profit</p>
-                    <p className={cn("text-sm font-semibold", b.profit >= 0 ? "text-emerald-600" : "text-rose-500")}>
-                      {inr(b.profit)}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <div className="mb-1 flex items-center justify-between text-[10px]">
-                    <span className="text-faint">Margin</span>
-                    <span className={cn("font-semibold", b.margin >= 0 ? "text-emerald-600" : "text-rose-500")}>
-                      {b.margin.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
-                    <div
-                      className={cn("h-full rounded-full", b.margin >= 0 ? "bg-emerald-500" : "bg-rose-500")}
-                      style={{ width: `${Math.max(0, Math.min(100, Math.abs(b.margin)))}%` }}
-                    />
-                  </div>
+                    className={cn("h-full rounded-full", b.margin >= 0 ? "bg-emerald-500" : "bg-rose-500")}
+                    style={{ width: `${Math.max(0, Math.min(100, Math.abs(b.margin)))}%` }}
+                  />
                 </div>
               </div>
             </div>
