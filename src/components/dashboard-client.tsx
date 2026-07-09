@@ -1,6 +1,8 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Wallet,
   TrendingUp,
@@ -48,21 +50,8 @@ import {
   Area,
 } from "recharts";
 import { cn, inr } from "@/lib/utils";
-import {
-  kpiCards,
-  accountsOverview,
-  cashFlowMonthly,
-  expenseCategories,
-  upcomingTasks,
-  savingsGoals,
-  investmentsPortfolio,
-  loansOverview,
-  quickNotes,
-  businessOverview,
-  recentTransactions,
-  passwordsManager,
-  quickActions,
-} from "@/lib/dashboard-data";
+import { INVESTMENT_TYPES } from "@/lib/investment-types";
+import type { DashboardData } from "@/lib/dashboard-queries";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Shared primitives
@@ -116,7 +105,7 @@ function yFmt(v: number) {
 function SparkLine({ data, color, fill }: { data: number[]; color: string; fill?: string }) {
   const d = data.map((v, i) => ({ i, v }));
   return (
-    <ResponsiveContainer width="100%" height={44}>
+    <ResponsiveContainer width="100%" height={44} debounce={200}>
       <AreaChart data={d} margin={{ top: 4, bottom: 0, left: 0, right: 0 }}>
         <defs>
           <linearGradient id={`grad-${color.replace("#", "")}`} x1="0" y1="0" x2="0" y2="1">
@@ -131,6 +120,7 @@ function SparkLine({ data, color, fill }: { data: number[]; color: string; fill?
           strokeWidth={2}
           fill={fill ?? `url(#grad-${color.replace("#", "")})`}
           dot={false}
+          isAnimationActive={false}
         />
       </AreaChart>
     </ResponsiveContainer>
@@ -140,9 +130,9 @@ function SparkLine({ data, color, fill }: { data: number[]; color: string; fill?
 function MiniSpark({ data, color }: { data: number[]; color: string }) {
   const d = data.map((v, i) => ({ i, v }));
   return (
-    <ResponsiveContainer width="100%" height={34}>
+    <ResponsiveContainer width="100%" height={34} debounce={200}>
       <LineChart data={d} margin={{ top: 2, bottom: 2, left: 0, right: 0 }}>
-        <Line type="monotone" dataKey="v" stroke={color} strokeWidth={2} dot={false} />
+        <Line type="monotone" dataKey="v" stroke={color} strokeWidth={2} dot={false} isAnimationActive={false} />
       </LineChart>
     </ResponsiveContainer>
   );
@@ -155,6 +145,15 @@ function Delta({ value }: { value: number }) {
       {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
       {Math.abs(value)}%
     </span>
+  );
+}
+
+function EmptyState({ text, cta, onClick }: { text: string; cta: string; onClick: () => void }) {
+  return (
+    <div className="flex flex-col items-center gap-2 py-8 text-center">
+      <p className="text-xs text-faint">{text}</p>
+      <button onClick={onClick} className="text-xs font-medium text-brand hover:underline">{cta}</button>
+    </div>
   );
 }
 
@@ -173,6 +172,9 @@ const goalIcon: Record<string, React.ElementType> = {
   gift: Gift,
   plane: Plane,
   shield: Shield,
+  home: Home,
+  piggy: Wallet,
+  bike: Car,
 };
 
 const investIcon: Record<string, React.ElementType> = {
@@ -181,6 +183,7 @@ const investIcon: Record<string, React.ElementType> = {
   circle: Circle,
   moreHorizontal: MoreHorizontal,
 };
+const INVEST_ICON_KEYS = ["barChart", "trendingUp", "circle", "moreHorizontal"] as const;
 
 const txnIcon: Record<string, React.ElementType> = {
   wallet: Wallet,
@@ -202,14 +205,68 @@ const actionIcon: Record<string, React.ElementType> = {
   target: Target,
 };
 
+/* ── Presentation palettes (derived data → color, not fabricated values) ──── */
+const ACCOUNT_META: Record<string, { color: string; bg: string }> = {
+  hdfc: { color: "#ef4444", bg: "#fee2e2" },
+  sbi: { color: "#3b82f6", bg: "#dbeafe" },
+  icici: { color: "#f97316", bg: "#fed7aa" },
+  cash: { color: "#22c55e", bg: "#dcfce7" },
+  other: { color: "#64748b", bg: "#f1f5f9" },
+};
+
+const CAT_COLOR: Record<string, string> = {
+  Housing: "#22c55e", "Food & Dining": "#f59e0b", Transport: "#3b82f6", Shopping: "#ec4899",
+  Utilities: "#8b5cf6", Entertainment: "#ef4444", Health: "#14b8a6", Education: "#6366f1",
+  "Loan EMI": "#f97316", Others: "#94a3b8", Salary: "#22c55e", Business: "#3b82f6",
+  Freelance: "#8b5cf6", Interest: "#14b8a6", Refund: "#f59e0b", "Other Income": "#94a3b8",
+};
+
+const LOAN_META: Record<string, { icon: string; color: string; bg: string }> = {
+  home: { icon: "home", color: "#8b5cf6", bg: "#ede9fe" },
+  personal: { icon: "user", color: "#ef4444", bg: "#fee2e2" },
+  vehicle: { icon: "car", color: "#f59e0b", bg: "#fef3c7" },
+  education: { icon: "user", color: "#14b8a6", bg: "#ccfbf1" },
+};
+
+const PRIORITY_META: Record<string, { color: string; bg: string }> = {
+  high: { color: "#ef4444", bg: "#fee2e2" },
+  medium: { color: "#f59e0b", bg: "#fef3c7" },
+  low: { color: "#3b82f6", bg: "#dbeafe" },
+};
+
+const VAULT_ICON: Record<string, string> = {
+  Banking: "lock", Email: "mail", "Social Media": "instagram", Shopping: "lock", Business: "lock", Entertainment: "lock",
+};
+
+function txnIconKeyFor(category: string): string {
+  const c = category.toLowerCase();
+  if (["salary", "business", "freelance", "interest", "refund", "other income"].includes(c)) return "wallet";
+  if (c.includes("shop")) return "shoppingBag";
+  if (c.includes("util") || c.includes("electric")) return "zap";
+  return "briefcase";
+}
+
+function fmtTxnDate(iso: string): string {
+  const today = new Date().toISOString().slice(0, 10);
+  const yest = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  if (iso === today) return "Today";
+  if (iso === yest) return "Yesterday";
+  return new Date(iso + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function round1(n: number) {
+  return Math.round(n * 10) / 10;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    KPI Cards
    ═══════════════════════════════════════════════════════════════════════════ */
-function KpiCards() {
+type KpiCard = { label: string; value: number; delta: number; deltaLabel: string; color: string; bg: string; icon: string; spark: number[] };
+
+function KpiCards({ cards }: { cards: KpiCard[] }) {
   return (
     <div className="xl:col-span-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {kpiCards.map((k) => {
+      {cards.map((k) => {
         const Icon = kpiIcon[k.icon] ?? Wallet;
         return (
           <Card key={k.label} className="!p-4 flex flex-col">
@@ -219,7 +276,7 @@ function KpiCards() {
               </div>
               <p className="text-xs font-medium text-muted">{k.label}</p>
             </div>
-            <p className="mt-3 text-[22px] font-bold text-ink">₹ {k.value.toLocaleString("en-IN")}</p>
+            <p className="mt-3 text-[22px] font-bold text-ink">₹ {Math.round(k.value).toLocaleString("en-IN")}</p>
             <div className="mt-1 flex items-center gap-2">
               <Delta value={k.delta} />
               <span className="text-[11px] text-faint">{k.deltaLabel}</span>
@@ -237,31 +294,37 @@ function KpiCards() {
 /* ═══════════════════════════════════════════════════════════════════════════
    Accounts Overview
    ═══════════════════════════════════════════════════════════════════════════ */
-function AccountsOverviewCard() {
+type AccountVM = { id: string; bank: string; type: string; balance: number; accountNumber: string; color: string; bg: string };
+
+function AccountsOverviewCard({ accounts, onAdd }: { accounts: AccountVM[]; onAdd: () => void }) {
   return (
     <Card className="xl:col-span-1">
       <Head title="Accounts Overview" right={<ViewAll href="/finances" />} />
-      <div className="space-y-3">
-        {accountsOverview.map((a) => (
-          <div
-            key={a.id}
-            className="flex items-center gap-3 rounded-xl border border-border bg-surface-2/40 p-3"
-          >
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl" style={{ background: a.bg }}>
-              <Landmark className="h-5 w-5" style={{ color: a.color }} />
+      {accounts.length === 0 ? (
+        <EmptyState text="No accounts added yet." cta="Add your first account" onClick={onAdd} />
+      ) : (
+        <div className="space-y-3">
+          {accounts.map((a) => (
+            <div
+              key={a.id}
+              className="flex items-center gap-3 rounded-xl border border-border bg-surface-2/40 p-3"
+            >
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl" style={{ background: a.bg }}>
+                <Landmark className="h-5 w-5" style={{ color: a.color }} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-ink">{a.bank}</p>
+                <p className="text-xs text-muted">{a.type}</p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-sm font-bold text-ink">₹ {Math.round(a.balance).toLocaleString("en-IN")}</p>
+                <p className="text-[10px] text-faint">**** {a.accountNumber}</p>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-ink">{a.bank}</p>
-              <p className="text-xs text-muted">{a.type}</p>
-            </div>
-            <div className="text-right shrink-0">
-              <p className="text-sm font-bold text-ink">₹ {a.balance.toLocaleString("en-IN")}</p>
-              <p className="text-[10px] text-faint">**** {a.accountNumber}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-      <button className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border py-2.5 text-xs font-medium text-muted hover:bg-surface-2 transition-colors">
+          ))}
+        </div>
+      )}
+      <button onClick={onAdd} className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border py-2.5 text-xs font-medium text-muted hover:bg-surface-2 transition-colors">
         <Plus className="h-3.5 w-3.5" /> Add New Account
       </button>
     </Card>
@@ -271,7 +334,9 @@ function AccountsOverviewCard() {
 /* ═══════════════════════════════════════════════════════════════════════════
    Cash Flow Overview
    ═══════════════════════════════════════════════════════════════════════════ */
-function CashFlowOverview() {
+type CashFlowPoint = { month: string; income: number; expenses: number; savings: number };
+
+function CashFlowOverview({ data }: { data: CashFlowPoint[] }) {
   return (
     <Card className="xl:col-span-2">
       <Head title="Cash Flow Overview" right={<MonthBtn />} />
@@ -283,8 +348,8 @@ function CashFlowOverview() {
           </span>
         ))}
       </div>
-      <ResponsiveContainer width="100%" height={240}>
-        <BarChart data={cashFlowMonthly} margin={{ left: -6, right: 4, top: 5 }} barCategoryGap="22%">
+      <ResponsiveContainer width="100%" height={240} debounce={200}>
+        <BarChart data={data} margin={{ left: -6, right: 4, top: 5 }} barCategoryGap="22%">
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
           <XAxis dataKey="month" {...axis} interval={0} />
           <YAxis {...axis} width={50} tickFormatter={yFmt} />
@@ -316,54 +381,60 @@ function CashFlowOverview() {
 /* ═══════════════════════════════════════════════════════════════════════════
    Expense Categories
    ═══════════════════════════════════════════════════════════════════════════ */
-function ExpenseCategoriesCard() {
-  const total = expenseCategories.reduce((s, c) => s + c.value, 0);
+type ExpenseCat = { name: string; value: number; pct: number; color: string };
+
+function ExpenseCategoriesCard({ categories }: { categories: ExpenseCat[] }) {
+  const total = categories.reduce((s, c) => s + c.value, 0);
   return (
     <Card className="xl:col-span-1">
       <Head title="Expense Categories" right={<MonthBtn />} />
-      <div className="flex items-center gap-4">
-        <div className="relative shrink-0">
-          <ResponsiveContainer width={170} height={170}>
-            <PieChart>
-              <Pie
-                data={expenseCategories}
-                dataKey="value"
-                nameKey="name"
-                innerRadius="62%"
-                outerRadius="92%"
-                paddingAngle={1}
-                stroke="none"
-              >
-                {expenseCategories.map((d, i) => <Cell key={i} fill={d.color} />)}
-              </Pie>
-              <Tooltip
-                content={({ active, payload }) =>
-                  active && payload?.length ? (
-                    <Tip>
-                      <p className="font-medium text-ink">{String(payload[0].name)}</p>
-                      <p className="text-muted">{inr(Number(payload[0].value))}</p>
-                    </Tip>
-                  ) : null
-                }
-              />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-            <p className="text-xs text-muted">Total</p>
-            <p className="text-base font-bold text-ink">₹ {total.toLocaleString("en-IN")}</p>
+      {categories.length === 0 ? (
+        <p className="py-10 text-center text-xs text-faint">No expenses recorded this month.</p>
+      ) : (
+        <div className="flex items-center gap-4">
+          <div className="relative shrink-0">
+            <ResponsiveContainer width={170} height={170} debounce={200}>
+              <PieChart>
+                <Pie
+                  data={categories}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius="62%"
+                  outerRadius="92%"
+                  paddingAngle={1}
+                  stroke="none"
+                >
+                  {categories.map((d, i) => <Cell key={i} fill={d.color} />)}
+                </Pie>
+                <Tooltip
+                  content={({ active, payload }) =>
+                    active && payload?.length ? (
+                      <Tip>
+                        <p className="font-medium text-ink">{String(payload[0].name)}</p>
+                        <p className="text-muted">{inr(Number(payload[0].value))}</p>
+                      </Tip>
+                    ) : null
+                  }
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <p className="text-xs text-muted">Total</p>
+              <p className="text-base font-bold text-ink">₹ {total.toLocaleString("en-IN")}</p>
+            </div>
+          </div>
+          <div className="flex-1 space-y-2.5">
+            {categories.map((c) => (
+              <div key={c.name} className="flex items-center gap-2 text-xs">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: c.color }} />
+                <span className="flex-1 truncate text-muted">{c.name}</span>
+                <span className="w-7 text-right font-medium text-ink">{c.pct}%</span>
+                <span className="w-14 text-right font-semibold text-ink">₹ {c.value.toLocaleString("en-IN")}</span>
+              </div>
+            ))}
           </div>
         </div>
-        <div className="flex-1 space-y-2.5">
-          {expenseCategories.map((c) => (
-            <div key={c.name} className="flex items-center gap-2 text-xs">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: c.color }} />
-              <span className="flex-1 truncate text-muted">{c.name}</span>
-              <span className="w-7 text-right font-medium text-ink">{c.pct}%</span>
-              <span className="w-14 text-right font-semibold text-ink">₹ {c.value.toLocaleString("en-IN")}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
     </Card>
   );
 }
@@ -371,73 +442,84 @@ function ExpenseCategoriesCard() {
 /* ═══════════════════════════════════════════════════════════════════════════
    Upcoming Tasks
    ═══════════════════════════════════════════════════════════════════════════ */
-function UpcomingTasksCard() {
+type TaskVM = { id: string; title: string; category: string; completed: boolean; due: string; categoryColor: string; categoryBg: string };
+
+function UpcomingTasksCard({ tasks, available }: { tasks: TaskVM[]; available: boolean }) {
   return (
     <Card className="xl:col-span-1">
       <Head title="Upcoming Tasks" right={<ViewAll href="/tasks" />} />
-      <div className="space-y-3">
-        {upcomingTasks.map((t) => (
-          <div key={t.id} className="flex items-start gap-3">
-            <div className="mt-0.5 shrink-0">
-              {t.completed ? (
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
-              ) : (
-                <Circle className="h-5 w-5 text-faint" />
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className={cn("text-sm font-medium leading-tight", t.completed ? "text-muted line-through" : "text-ink")}>
-                {t.title}
-              </p>
-              <div className="mt-1.5 flex items-center gap-2">
-                <span
-                  className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-                  style={{ background: t.categoryBg, color: t.categoryColor }}
-                >
-                  {t.category}
-                </span>
-                <span className="text-[10px] text-faint">{t.due}</span>
+      {!available ? (
+        <EmptyState text="No tasks yet." cta="Add a task" onClick={() => { window.location.href = "/tasks"; }} />
+      ) : (
+        <div className="space-y-3">
+          {tasks.map((t) => (
+            <div key={t.id} className="flex items-start gap-3">
+              <div className="mt-0.5 shrink-0">
+                {t.completed ? (
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                ) : (
+                  <Circle className="h-5 w-5 text-faint" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className={cn("text-sm font-medium leading-tight", t.completed ? "text-muted line-through" : "text-ink")}>
+                  {t.title}
+                </p>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <span
+                    className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                    style={{ background: t.categoryBg, color: t.categoryColor }}
+                  >
+                    {t.category}
+                  </span>
+                  <span className="text-[10px] text-faint">{t.due}</span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </Card>
   );
 }
 
-
 /* ═══════════════════════════════════════════════════════════════════════════
    Savings Goals
    ═══════════════════════════════════════════════════════════════════════════ */
-function SavingsGoalsCard() {
+type GoalVM = { id: string; name: string; current: number; target: number; pct: number; color: string; bg: string; icon: string };
+
+function SavingsGoalsCard({ goals, onAdd }: { goals: GoalVM[]; onAdd: () => void }) {
   return (
     <Card className="xl:col-span-1">
-      <Head title="Savings Goals" right={<ViewAll href="/goals" />} />
-      <div className="space-y-4">
-        {savingsGoals.map((g) => {
-          const GI = goalIcon[g.icon] ?? Wallet;
-          return (
-            <div key={g.id} className="flex items-start gap-3">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: g.bg }}>
-                <GI className="h-5 w-5" style={{ color: g.color }} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-ink">{g.name}</p>
-                  <span className="text-xs font-bold text-ink">{g.pct}%</span>
+      <Head title="Savings Goals" right={<ViewAll href="/finances?tab=Savings Goals" />} />
+      {goals.length === 0 ? (
+        <EmptyState text="No savings goals yet." cta="Add a goal" onClick={onAdd} />
+      ) : (
+        <div className="space-y-4">
+          {goals.map((g) => {
+            const GI = goalIcon[g.icon] ?? Wallet;
+            return (
+              <div key={g.id} className="flex items-start gap-3">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: g.bg }}>
+                  <GI className="h-5 w-5" style={{ color: g.color }} />
                 </div>
-                <p className="mt-0.5 text-[11px] text-muted">
-                  ₹ {g.current.toLocaleString("en-IN")} / ₹ {g.target.toLocaleString("en-IN")}
-                </p>
-                <div className="mt-2 h-1.5 w-full rounded-full bg-surface-2">
-                  <div className="h-full rounded-full" style={{ width: `${g.pct}%`, background: g.color }} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-ink">{g.name}</p>
+                    <span className="text-xs font-bold text-ink">{g.pct}%</span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-muted">
+                    ₹ {Math.round(g.current).toLocaleString("en-IN")} / ₹ {Math.round(g.target).toLocaleString("en-IN")}
+                  </p>
+                  <div className="mt-2 h-1.5 w-full rounded-full bg-surface-2">
+                    <div className="h-full rounded-full" style={{ width: `${g.pct}%`, background: g.color }} />
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </Card>
   );
 }
@@ -445,46 +527,55 @@ function SavingsGoalsCard() {
 /* ═══════════════════════════════════════════════════════════════════════════
    Investments Portfolio
    ═══════════════════════════════════════════════════════════════════════════ */
-function InvestmentsPortfolioCard() {
+type InvestItemVM = { name: string; value: number; pct: number; color: string; bg: string; icon: string };
+type InvestPortfolioVM = { totalValue: number; delta: number; spark: number[]; items: InvestItemVM[] };
+
+function InvestmentsPortfolioCard({ portfolio }: { portfolio: InvestPortfolioVM }) {
   return (
     <Card className="xl:col-span-1">
       <Head title="Investments Portfolio" right={<ViewAll href="/investments" />} />
-      <div className="mb-4 flex items-end justify-between">
-        <div>
-          <p className="text-xl font-bold text-ink">₹ {investmentsPortfolio.totalValue.toLocaleString("en-IN")}</p>
-          <div className="mt-1 flex items-center gap-1">
-            <Delta value={investmentsPortfolio.delta} />
-            <span className="text-[11px] text-faint">from last month</span>
-          </div>
-        </div>
-        <div className="h-10 w-24">
-          <SparkLine data={investmentsPortfolio.spark} color="#22c55e" />
-        </div>
-      </div>
-      <div className="space-y-3">
-        {investmentsPortfolio.items.map((item) => {
-          const Icon = investIcon[item.icon] ?? BarChart3;
-          return (
-            <div key={item.name} className="flex items-center gap-3">
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ background: item.bg }}>
-                <Icon className="h-4 w-4" style={{ color: item.color }} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-ink">{item.name}</p>
-                  <span className="text-xs font-medium text-muted">{item.pct}%</span>
-                </div>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <div className="h-1.5 flex-1 rounded-full bg-surface-2">
-                    <div className="h-full rounded-full" style={{ width: `${item.pct}%`, background: item.color }} />
-                  </div>
-                  <span className="w-16 text-right text-xs font-semibold text-ink">₹ {item.value.toLocaleString("en-IN")}</span>
-                </div>
+      {portfolio.items.length === 0 ? (
+        <EmptyState text="No investments tracked yet." cta="Add an investment" onClick={() => { window.location.href = "/investments"; }} />
+      ) : (
+        <>
+          <div className="mb-4 flex items-end justify-between">
+            <div>
+              <p className="text-xl font-bold text-ink">₹ {Math.round(portfolio.totalValue).toLocaleString("en-IN")}</p>
+              <div className="mt-1 flex items-center gap-1">
+                <Delta value={portfolio.delta} />
+                <span className="text-[11px] text-faint">overall return</span>
               </div>
             </div>
-          );
-        })}
-      </div>
+            <div className="h-10 w-24">
+              <SparkLine data={portfolio.spark} color="#22c55e" />
+            </div>
+          </div>
+          <div className="space-y-3">
+            {portfolio.items.map((item) => {
+              const Icon = investIcon[item.icon] ?? BarChart3;
+              return (
+                <div key={item.name} className="flex items-center gap-3">
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ background: item.bg }}>
+                    <Icon className="h-4 w-4" style={{ color: item.color }} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-ink">{item.name}</p>
+                      <span className="text-xs font-medium text-muted">{item.pct}%</span>
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <div className="h-1.5 flex-1 rounded-full bg-surface-2">
+                        <div className="h-full rounded-full" style={{ width: `${item.pct}%`, background: item.color }} />
+                      </div>
+                      <span className="w-16 text-right text-xs font-semibold text-ink">₹ {Math.round(item.value).toLocaleString("en-IN")}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </Card>
   );
 }
@@ -492,38 +583,44 @@ function InvestmentsPortfolioCard() {
 /* ═══════════════════════════════════════════════════════════════════════════
    Loans Overview
    ═══════════════════════════════════════════════════════════════════════════ */
-function LoansOverviewCard() {
+type LoanVM = { id: string; name: string; balance: number; rate: number; color: string; bg: string; icon: string; progress: number };
+
+function LoansOverviewCard({ loans, onAdd }: { loans: LoanVM[]; onAdd: () => void }) {
   return (
     <Card className="xl:col-span-1">
-      <Head title="Loans Overview" right={<ViewAll href="/loans" />} />
-      <div className="space-y-4">
-        {loansOverview.map((l) => {
-          const Icon = l.icon === "home" ? Home : l.icon === "car" ? Car : User;
-          return (
-            <div key={l.id}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-start gap-3">
-                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: l.bg }}>
-                    <Icon className="h-5 w-5" style={{ color: l.color }} />
+      <Head title="Loans Overview" right={<ViewAll href="/finances?tab=Loans" />} />
+      {loans.length === 0 ? (
+        <EmptyState text="No loans tracked." cta="Add a loan" onClick={onAdd} />
+      ) : (
+        <div className="space-y-4">
+          {loans.map((l) => {
+            const Icon = l.icon === "home" ? Home : l.icon === "car" ? Car : User;
+            return (
+              <div key={l.id}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-3">
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: l.bg }}>
+                      <Icon className="h-5 w-5" style={{ color: l.color }} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-ink">{l.name}</p>
+                      <p className="text-[11px] text-muted">Balance</p>
+                      <p className="text-sm font-bold text-ink">₹ {Math.round(l.balance).toLocaleString("en-IN")}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-ink">{l.name}</p>
-                    <p className="text-[11px] text-muted">Balance</p>
-                    <p className="text-sm font-bold text-ink">₹ {l.balance.toLocaleString("en-IN")}</p>
+                  <div className="text-right shrink-0">
+                    <p className="text-[11px] text-muted">Interest Rate</p>
+                    <p className="text-sm font-bold text-ink">{l.rate}%</p>
                   </div>
                 </div>
-                <div className="text-right shrink-0">
-                  <p className="text-[11px] text-muted">Interest Rate</p>
-                  <p className="text-sm font-bold text-ink">{l.rate}%</p>
+                <div className="mt-2 h-1.5 w-full rounded-full bg-surface-2">
+                  <div className="h-full rounded-full" style={{ width: `${l.progress}%`, background: l.color }} />
                 </div>
               </div>
-              <div className="mt-2 h-1.5 w-full rounded-full bg-surface-2">
-                <div className="h-full rounded-full" style={{ width: `${l.progress}%`, background: l.color }} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </Card>
   );
 }
@@ -531,53 +628,64 @@ function LoansOverviewCard() {
 /* ═══════════════════════════════════════════════════════════════════════════
    Quick Notes
    ═══════════════════════════════════════════════════════════════════════════ */
-function QuickNotesCard() {
+type NoteVM = { id: string; text: string; time: string };
+
+function QuickNotesCard({ notes, available, onAdd }: { notes: NoteVM[]; available: boolean; onAdd: () => void }) {
   return (
     <Card className="xl:col-span-1">
       <Head
         title="Quick Notes"
         right={
-          <button className="text-xs font-medium text-muted hover:text-ink transition-colors flex items-center gap-1">
+          <button onClick={onAdd} className="text-xs font-medium text-muted hover:text-ink transition-colors flex items-center gap-1">
             <Plus className="h-3 w-3" /> Add Note
           </button>
         }
       />
-      <div className="space-y-2">
-        {quickNotes.map((n) => (
-          <div key={n.id} className="rounded-xl border border-border bg-surface-2/40 p-3">
-            <p className="text-sm font-medium text-ink">{n.text}</p>
-            <p className="mt-1 text-[10px] text-faint">{n.time}</p>
-          </div>
-        ))}
-      </div>
+      {!available ? (
+        <EmptyState text="No notes yet." cta="Add a note" onClick={onAdd} />
+      ) : (
+        <div className="space-y-2">
+          {notes.map((n) => (
+            <div key={n.id} className="rounded-xl border border-border bg-surface-2/40 p-3">
+              <p className="text-sm font-medium text-ink">{n.text}</p>
+              <p className="mt-1 text-[10px] text-faint">{n.time}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </Card>
   );
 }
 
-
 /* ═══════════════════════════════════════════════════════════════════════════
    Business Overview
    ═══════════════════════════════════════════════════════════════════════════ */
-function BusinessOverviewCard() {
+type BizMetric = { label: string; value: number; delta: number; color: string; bg: string };
+
+function BusinessOverviewCard({ metrics, sparklines }: { metrics: BizMetric[] | null; sparklines: number[][] }) {
   return (
     <Card className="xl:col-span-1">
       <Head title="Business Overview" right={<MonthBtn />} />
-      <div className="grid grid-cols-2 gap-3">
-        {businessOverview.metrics.map((m, idx) => (
-          <div key={m.label} className="rounded-xl border border-border bg-surface-2/40 p-3">
-            <p className="text-[11px] font-medium text-muted">{m.label}</p>
-            <p className="mt-1 text-base font-bold text-ink">
-              {m.label === "Clients" ? m.value.toLocaleString("en-IN") : `₹ ${m.value.toLocaleString("en-IN")}`}
-            </p>
-            <div className="mt-1">
-              <Delta value={m.delta} />
+      {!metrics ? (
+        <p className="py-8 text-center text-xs text-faint">Journal business data is temporarily unavailable.</p>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          {metrics.map((m, idx) => (
+            <div key={m.label} className="rounded-xl border border-border bg-surface-2/40 p-3">
+              <p className="text-[11px] font-medium text-muted">{m.label}</p>
+              <p className="mt-1 text-base font-bold text-ink">
+                {m.label === "Clients" ? m.value.toLocaleString("en-IN") : `₹ ${Math.round(m.value).toLocaleString("en-IN")}`}
+              </p>
+              <div className="mt-1">
+                <Delta value={m.delta} />
+              </div>
+              <div className="mt-2">
+                <MiniSpark data={sparklines[idx] ?? [0, 0]} color={m.color} />
+              </div>
             </div>
-            <div className="mt-2">
-              <MiniSpark data={businessOverview.sparklines[idx]} color={m.color} />
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </Card>
   );
 }
@@ -585,33 +693,39 @@ function BusinessOverviewCard() {
 /* ═══════════════════════════════════════════════════════════════════════════
    Recent Transactions
    ═══════════════════════════════════════════════════════════════════════════ */
-function RecentTransactionsCard() {
+type TxnVM = { id: string; name: string; category: string; amount: number; type: "credit" | "debit"; date: string; color: string; bg: string; icon: string };
+
+function RecentTransactionsCard({ transactions, onAdd }: { transactions: TxnVM[]; onAdd: () => void }) {
   return (
     <Card className="xl:col-span-1">
       <Head title="Recent Transactions" right={<ViewAll href="/finances" />} />
-      <div className="space-y-1">
-        {recentTransactions.map((t) => {
-          const Icon = txnIcon[t.icon] ?? Wallet;
-          const credit = t.type === "credit";
-          return (
-            <div key={t.id} className="flex items-center gap-3 rounded-xl px-1 py-2">
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ background: t.bg }}>
-                <Icon className="h-4 w-4" style={{ color: t.color }} />
+      {transactions.length === 0 ? (
+        <EmptyState text="No transactions recorded yet." cta="Add a transaction" onClick={onAdd} />
+      ) : (
+        <div className="space-y-1">
+          {transactions.map((t) => {
+            const Icon = txnIcon[t.icon] ?? Wallet;
+            const credit = t.type === "credit";
+            return (
+              <div key={t.id} className="flex items-center gap-3 rounded-xl px-1 py-2">
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ background: t.bg }}>
+                  <Icon className="h-4 w-4" style={{ color: t.color }} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-ink">{t.name}</p>
+                  <p className="text-[11px] text-muted">{t.category}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className={cn("text-sm font-bold", credit ? "text-green-600" : "text-red-500")}>
+                    {credit ? "+" : "-"} ₹ {Math.round(t.amount).toLocaleString("en-IN")}
+                  </p>
+                  <p className="text-[10px] text-faint">{t.date}</p>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-ink">{t.name}</p>
-                <p className="text-[11px] text-muted">{t.category}</p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className={cn("text-sm font-bold", credit ? "text-green-600" : "text-red-500")}>
-                  {credit ? "+" : "-"} ₹ {t.amount.toLocaleString("en-IN")}
-                </p>
-                <p className="text-[10px] text-faint">{t.date}</p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </Card>
   );
 }
@@ -619,29 +733,36 @@ function RecentTransactionsCard() {
 /* ═══════════════════════════════════════════════════════════════════════════
    Passwords Manager
    ═══════════════════════════════════════════════════════════════════════════ */
-function PasswordsManagerCard() {
+type VaultVM = { id: string; name: string; username: string; color: string; bg: string; icon: string };
+
+function PasswordsManagerCard({ accounts, available }: { accounts: VaultVM[]; available: boolean }) {
+  const router = useRouter();
   return (
     <Card className="xl:col-span-1">
       <Head title="Passwords Manager" right={<ViewAll href="/vault" />} />
-      <div className="space-y-1">
-        {passwordsManager.map((p) => {
-          const Icon = pwdIcon[p.icon] ?? Lock;
-          return (
-            <div key={p.id} className="flex items-center gap-3 rounded-xl px-1 py-2">
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ background: p.bg }}>
-                <Icon className="h-4 w-4" style={{ color: p.color }} />
+      {!available ? (
+        <EmptyState text="No saved passwords yet." cta="Add one in the Vault" onClick={() => router.push("/vault")} />
+      ) : (
+        <div className="space-y-1">
+          {accounts.map((p) => {
+            const Icon = pwdIcon[p.icon] ?? Lock;
+            return (
+              <div key={p.id} className="flex items-center gap-3 rounded-xl px-1 py-2">
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ background: p.bg }}>
+                  <Icon className="h-4 w-4" style={{ color: p.color }} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-ink">{p.name}</p>
+                  <p className="text-[11px] text-muted truncate">{p.username}</p>
+                </div>
+                <button onClick={() => router.push("/vault")} className="text-faint hover:text-ink transition-colors shrink-0">
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-ink">{p.name}</p>
-                <p className="text-[11px] text-muted truncate">{p.username}</p>
-              </div>
-              <button className="text-faint hover:text-ink transition-colors shrink-0">
-                <MoreHorizontal className="h-4 w-4" />
-              </button>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </Card>
   );
 }
@@ -649,16 +770,19 @@ function PasswordsManagerCard() {
 /* ═══════════════════════════════════════════════════════════════════════════
    Quick Actions
    ═══════════════════════════════════════════════════════════════════════════ */
-function QuickActionsCard() {
+type ActionVM = { id: string; label: string; color: string; bg: string; icon: string; onClick: () => void };
+
+function QuickActionsCard({ actions }: { actions: ActionVM[] }) {
   return (
     <Card className="xl:col-span-1">
       <Head title="Quick Actions" />
       <div className="grid grid-cols-2 gap-3">
-        {quickActions.map((a) => {
+        {actions.map((a) => {
           const Icon = actionIcon[a.icon] ?? PlusCircle;
           return (
             <button
               key={a.id}
+              onClick={a.onClick}
               className="flex flex-col items-center justify-center gap-2 rounded-xl border border-border p-4 hover:bg-surface-2 transition-colors"
             >
               <div className="grid h-10 w-10 place-items-center rounded-xl" style={{ background: a.bg }}>
@@ -674,31 +798,162 @@ function QuickActionsCard() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Main dashboard
+   Main dashboard — computes real view-models from live data, same layout
    ═══════════════════════════════════════════════════════════════════════════ */
-export function DashboardClient() {
+export function DashboardClient({ data }: { data: DashboardData }) {
+  const router = useRouter();
+  const { finance, tasks, notes, vault, business } = data;
+
+  const vm = useMemo(() => {
+    const now = new Date();
+    const thisKey = now.toISOString().slice(0, 7);
+
+    // rolling last-12-months window (real transactions, real dates)
+    const months = Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (11 - i), 1));
+      return { key: d.toISOString().slice(0, 7), label: d.toLocaleDateString("en-US", { month: "short" }) };
+    });
+    const cashFlowMonthly: CashFlowPoint[] = months.map(({ key, label }) => {
+      const txns = finance.transactions.filter((t) => t.date.slice(0, 7) === key);
+      const income = txns.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
+      const expenses = txns.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+      return { month: label, income, expenses, savings: Math.max(0, income - expenses) };
+    });
+    const lastKey = months[10].key;
+
+    const txnsThisMonth = finance.transactions.filter((t) => t.date.slice(0, 7) === thisKey);
+    const incomeThis = txnsThisMonth.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
+    const incomeLast = finance.transactions.filter((t) => t.type === "income" && t.date.slice(0, 7) === lastKey).reduce((s, t) => s + t.amount, 0);
+    const expenseThis = txnsThisMonth.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+    const expenseLast = finance.transactions.filter((t) => t.type === "expense" && t.date.slice(0, 7) === lastKey).reduce((s, t) => s + t.amount, 0);
+    const incomeDelta = incomeLast > 0 ? round1(((incomeThis - incomeLast) / incomeLast) * 100) : 0;
+    const expenseDelta = expenseLast > 0 ? round1(((expenseThis - expenseLast) / expenseLast) * 100) : 0;
+
+    const totalBalance = finance.accounts.reduce((s, a) => s + a.balance, 0);
+    const netThisMonth = incomeThis - expenseThis;
+    const priorBalance = totalBalance - netThisMonth;
+    const balanceDelta = priorBalance > 0 ? round1((netThisMonth / priorBalance) * 100) : 0;
+
+    const totalInvested = finance.investments.reduce((s, i) => s + i.invested, 0);
+    const totalCurrent = finance.investments.reduce((s, i) => s + i.currentValue, 0);
+    const investDelta = totalInvested > 0 ? round1(((totalCurrent - totalInvested) / totalInvested) * 100) : 0;
+
+    const balanceSpark = (() => {
+      const netByMonth = cashFlowMonthly.map((m) => m.income - m.expenses);
+      let running = totalBalance - netByMonth.reduce((s, n) => s + n, 0);
+      return netByMonth.map((n) => { running += n; return running; });
+    })();
+    const investSpark = [...finance.investments].sort((a, b) => a.currentValue - b.currentValue)
+      .reduce<number[]>((acc, i) => [...acc, (acc[acc.length - 1] ?? 0) + i.currentValue], []);
+
+    const kpiCards: KpiCard[] = [
+      { label: "Total Balance", value: totalBalance, delta: balanceDelta, deltaLabel: "net this month", color: "#8b5cf6", bg: "#ede9fe", icon: "wallet", spark: balanceSpark.length ? balanceSpark : [0, 0] },
+      { label: "Monthly Income", value: incomeThis, delta: incomeDelta, deltaLabel: incomeLast > 0 ? "from last month" : "no data last month", color: "#22c55e", bg: "#dcfce7", icon: "income", spark: cashFlowMonthly.map((m) => m.income) },
+      { label: "Monthly Expenses", value: expenseThis, delta: expenseDelta, deltaLabel: expenseLast > 0 ? "from last month" : "no data last month", color: "#f59e0b", bg: "#fef3c7", icon: "expense", spark: cashFlowMonthly.map((m) => m.expenses) },
+      { label: "Total Investments", value: totalCurrent, delta: investDelta, deltaLabel: "overall return", color: "#3b82f6", bg: "#dbeafe", icon: "investment", spark: investSpark.length ? investSpark : [0, 0] },
+    ];
+
+    const accountsOverview: AccountVM[] = [...finance.accounts]
+      .sort((a, b) => b.balance - a.balance)
+      .slice(0, 4)
+      .map((a) => {
+        const meta = ACCOUNT_META[a.institution?.toLowerCase()] ?? ACCOUNT_META.other;
+        return { id: a.id, bank: a.name, type: a.type, balance: a.balance, accountNumber: a.last4, color: meta.color, bg: meta.bg };
+      });
+
+    const catMap = new Map<string, number>();
+    for (const t of txnsThisMonth.filter((t) => t.type === "expense")) catMap.set(t.category, (catMap.get(t.category) ?? 0) + t.amount);
+    const totalCat = Array.from(catMap.values()).reduce((s, v) => s + v, 0);
+    const expenseCategories: ExpenseCat[] = Array.from(catMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, value]) => ({ name, value, pct: totalCat ? Math.round((value / totalCat) * 100) : 0, color: CAT_COLOR[name] ?? "#94a3b8" }));
+
+    const upcomingTasks: TaskVM[] = (tasks ?? []).slice(0, 4).map((t) => {
+      const meta = PRIORITY_META[t.priority] ?? PRIORITY_META.medium;
+      return { id: t.id, title: t.title, category: t.project, completed: t.done, due: t.due, categoryColor: meta.color, categoryBg: meta.bg };
+    });
+
+    const savingsGoals: GoalVM[] = finance.goals.map((g) => ({
+      id: g.id, name: g.name, current: g.saved, target: g.target,
+      pct: g.target > 0 ? Math.min(100, Math.round((g.saved / g.target) * 100)) : 0,
+      color: g.color, bg: `${g.color}20`, icon: g.icon,
+    }));
+
+    const byType = INVESTMENT_TYPES
+      .map((t, idx) => {
+        const list = finance.investments.filter((i) => i.type === t.value);
+        const value = list.reduce((s, i) => s + i.currentValue, 0);
+        return { name: t.value, value, pct: totalCurrent ? Math.round((value / totalCurrent) * 100) : 0, color: t.color, bg: `${t.color}20`, icon: INVEST_ICON_KEYS[idx % 4] };
+      })
+      .filter((t) => t.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 4);
+    const investmentsPortfolio: InvestPortfolioVM = { totalValue: totalCurrent, delta: investDelta, spark: investSpark.length ? investSpark : [0, 0], items: byType };
+
+    const loansOverview: LoanVM[] = finance.loans.map((l) => {
+      const meta = LOAN_META[l.kind] ?? LOAN_META.personal;
+      return { id: l.id, name: l.name, balance: l.outstanding, rate: l.rate, color: meta.color, bg: meta.bg, icon: meta.icon, progress: l.principal > 0 ? Math.round(((l.principal - l.outstanding) / l.principal) * 100) : 0 };
+    });
+
+    const quickNotes: NoteVM[] = (notes ?? []).slice(0, 3).map((n) => ({ id: n.id, text: n.title, time: n.updated }));
+
+    const businessMetrics: BizMetric[] | null = business ? [
+      { label: "Revenue", value: business.revenue, delta: business.revenueDelta, color: "#8b5cf6", bg: "#ede9fe" },
+      { label: "Expenses", value: business.expenses, delta: business.expensesDelta, color: "#ef4444", bg: "#fee2e2" },
+      { label: "Profit", value: business.profit, delta: business.profitDelta, color: "#22c55e", bg: "#dcfce7" },
+      { label: "Clients", value: business.clients, delta: 0, color: "#3b82f6", bg: "#dbeafe" },
+    ] : null;
+    const businessSparklines = business ? [business.revenueSpark, business.expenseSpark, business.profitSpark, business.clientsSpark] : [];
+
+    const recentTransactions: TxnVM[] = [...finance.transactions]
+      .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 4)
+      .map((t) => ({
+        id: t.id, name: t.description || t.category, category: t.category, amount: t.amount,
+        type: t.type === "income" ? "credit" : "debit", date: fmtTxnDate(t.date),
+        color: CAT_COLOR[t.category] ?? "#94a3b8", bg: `${CAT_COLOR[t.category] ?? "#94a3b8"}20`, icon: txnIconKeyFor(t.category),
+      }));
+
+    const passwordsManager: VaultVM[] = (vault ?? []).slice(0, 4).map((v) => ({
+      id: v.id, name: v.name, username: v.username, color: v.color, bg: `${v.color}20`, icon: VAULT_ICON[v.category] ?? "lock",
+    }));
+
+    const quickActions: ActionVM[] = [
+      { id: "qa1", label: "Add Expense", color: "#8b5cf6", bg: "#ede9fe", icon: "calendarPlus", onClick: () => router.push("/finances?quickAdd=txn") },
+      { id: "qa2", label: "Add Income", color: "#22c55e", bg: "#dcfce7", icon: "plusCircle", onClick: () => router.push("/finances?quickAdd=txn") },
+      { id: "qa3", label: "Transfer Money", color: "#f59e0b", bg: "#fef3c7", icon: "arrowRightLeft", onClick: () => router.push("/finances") },
+      { id: "qa4", label: "Add Goal", color: "#3b82f6", bg: "#dbeafe", icon: "target", onClick: () => router.push("/finances?quickAdd=goal") },
+    ];
+
+    return {
+      kpiCards, accountsOverview, cashFlowMonthly, expenseCategories, upcomingTasks, savingsGoals,
+      investmentsPortfolio, loansOverview, quickNotes, businessMetrics, businessSparklines, recentTransactions,
+      passwordsManager, quickActions,
+    };
+  }, [finance, tasks, notes, vault, business, router]);
+
   return (
     <div className="animate-fade-up grid grid-cols-1 gap-4 xl:grid-cols-4">
       {/* Row 1 */}
-      <KpiCards />
-      <AccountsOverviewCard />
+      <KpiCards cards={vm.kpiCards} />
+      <AccountsOverviewCard accounts={vm.accountsOverview} onAdd={() => router.push("/finances?quickAdd=account")} />
 
       {/* Row 2 */}
-      <CashFlowOverview />
-      <ExpenseCategoriesCard />
-      <UpcomingTasksCard />
+      <CashFlowOverview data={vm.cashFlowMonthly} />
+      <ExpenseCategoriesCard categories={vm.expenseCategories} />
+      <UpcomingTasksCard tasks={vm.upcomingTasks} available={tasks !== null} />
 
       {/* Row 3 */}
-      <SavingsGoalsCard />
-      <InvestmentsPortfolioCard />
-      <LoansOverviewCard />
-      <QuickNotesCard />
+      <SavingsGoalsCard goals={vm.savingsGoals} onAdd={() => router.push("/finances?quickAdd=goal")} />
+      <InvestmentsPortfolioCard portfolio={vm.investmentsPortfolio} />
+      <LoansOverviewCard loans={vm.loansOverview} onAdd={() => router.push("/finances?quickAdd=loan")} />
+      <QuickNotesCard notes={vm.quickNotes} available={notes !== null} onAdd={() => router.push("/notes")} />
 
       {/* Row 4 */}
-      <BusinessOverviewCard />
-      <RecentTransactionsCard />
-      <PasswordsManagerCard />
-      <QuickActionsCard />
+      <BusinessOverviewCard metrics={vm.businessMetrics} sparklines={vm.businessSparklines} />
+      <RecentTransactionsCard transactions={vm.recentTransactions} onAdd={() => router.push("/finances?quickAdd=txn")} />
+      <PasswordsManagerCard accounts={vm.passwordsManager} available={vault !== null} />
+      <QuickActionsCard actions={vm.quickActions} />
     </div>
   );
 }

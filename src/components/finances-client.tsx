@@ -563,7 +563,7 @@ const NAV_ITEMS: ({ tab: Tab } | { href: string; label: string; icon: React.Elem
 ];
 
 type ModalState =
-  | { kind: "txn" | "account" | "goal" | "loan" | "investment" | "bill" | "due" | "budget"; editing?: Record<string, unknown> }
+  | { kind: "txn" | "account" | "goal" | "loan" | "bill" | "due" | "budget"; editing?: Record<string, unknown> }
   | { kind: "goalMoney"; goal: FinGoal }
   | { kind: "loanPayment"; loan: FinLoan }
   | { kind: "healthReport" }
@@ -591,6 +591,10 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
   useEffect(() => {
     const t = searchParams.get("tab");
     if (t && (TABS as readonly string[]).includes(t)) setTab(t as Tab);
+    const qa = searchParams.get("quickAdd");
+    if (qa === "txn" || qa === "account" || qa === "goal" || qa === "loan" || qa === "bill" || qa === "due" || qa === "budget") {
+      setModal({ kind: qa });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1194,7 +1198,7 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
     <Card>
       <Head title="Investments Summary" right={<button onClick={() => router.push("/investments")} className="text-xs font-medium text-muted hover:text-ink transition-colors">View All</button>} />
       {db.investments.length === 0 ? (
-        <EmptyHint text="No investments tracked." cta="Add Investment" onClick={() => setModal({ kind: "investment" })} />
+        <EmptyHint text="No investments tracked." cta="Add Investment" onClick={() => router.push("/investments")} />
       ) : (
         <>
           <p className="text-[11px] text-muted">Total Investments</p>
@@ -1771,26 +1775,6 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
         </Modal>
       )}
 
-      <Modal open={modal?.kind === "investment"} onClose={() => setModal(null)} title={editing ? "Edit Investment" : "Add Investment"}>
-        <EntityForm
-          key={String((editing as { id?: string })?.id ?? "new")}
-          fields={[
-            { name: "name", label: "Name", placeholder: "e.g. Nifty 50 Index Fund" },
-            { name: "type", label: "Type", type: "select", options: INVESTMENT_TYPES.map((t) => ({ value: t.value, label: t.value })) },
-            { name: "invested", label: "Amount Invested (₹)", type: "number", placeholder: "0", half: true },
-            { name: "currentValue", label: "Current Value (₹)", type: "number", placeholder: "0", half: true },
-          ]}
-          initial={editing ? { name: String(editing.name), type: String(editing.type), invested: String(editing.invested), currentValue: String(editing.currentValue) } : undefined}
-          submitLabel={editing ? "Save Changes" : "Add Investment"}
-          busy={busy}
-          onSubmit={(d) => {
-            const data = { name: d.name, type: d.type, invested: Number(d.invested) || 0, currentValue: Number(d.currentValue) || 0 };
-            if (editing) updateRow("investments", String((editing as { id: string }).id), data, "Investment updated");
-            else createRow("investments", data, "Investment added");
-          }}
-        />
-      </Modal>
-
       <Modal open={modal?.kind === "bill"} onClose={() => setModal(null)} title={editing ? "Edit Bill" : "Add Bill / Subscription"}>
         <EntityForm
           key={String((editing as { id?: string })?.id ?? "new")}
@@ -1874,7 +1858,6 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
     { label: "Account", kind: "account" },
     { label: "Savings Goal", kind: "goal" },
     { label: "Loan", kind: "loan" },
-    { label: "Investment", kind: "investment" },
     { label: "Bill / Subscription", kind: "bill" },
     { label: "Money Due", kind: "due" },
     { label: "Budget", kind: "budget" },
@@ -1938,6 +1921,12 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
                   {q.label}
                 </button>
               ))}
+              <button
+                onClick={() => { setQuickOpen(false); router.push("/investments"); }}
+                className="block w-full rounded-lg px-3 py-2 text-left text-[13px] text-muted hover:bg-surface-2 hover:text-ink"
+              >
+                Investment
+              </button>
             </div>
           )}
         </div>
