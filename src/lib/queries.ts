@@ -11,7 +11,7 @@
 // ============================================================================
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import * as sample from "./data";
-import type { Txn, Holding, Loan, Goal, Business, Task, Note, VaultAccount } from "./data";
+import type { Txn, Holding, Business, Task, Note, VaultAccount } from "./data";
 
 let _client: SupabaseClient | null = null;
 
@@ -58,49 +58,6 @@ export async function getHoldings(): Promise<Holding[]> {
     }));
   } catch {
     return sample.holdings;
-  }
-}
-
-export async function getLoans(): Promise<Loan[]> {
-  try {
-    const supabase = db();
-    if (!supabase) return sample.loans;
-    const { data, error } = await supabase.from("loans").select("*").order("position");
-    if (error || !data?.length) return sample.loans;
-    return data.map((r) => ({
-      id: r.id,
-      name: r.name,
-      lender: r.lender,
-      principal: Number(r.principal),
-      outstanding: Number(r.outstanding),
-      emi: Number(r.emi),
-      rate: Number(r.rate),
-      tenureLeft: r.tenure_left,
-      nextDue: r.next_due,
-    }));
-  } catch {
-    return sample.loans;
-  }
-}
-
-export async function getGoals(): Promise<Goal[]> {
-  try {
-    const supabase = db();
-    if (!supabase) return sample.goals;
-    const { data, error } = await supabase.from("goals").select("*").order("position");
-    if (error || !data?.length) return sample.goals;
-    return data.map((r) => ({
-      id: r.id,
-      name: r.name,
-      icon: r.icon,
-      target: Number(r.target),
-      saved: Number(r.saved),
-      deadline: r.deadline,
-      monthly: Number(r.monthly),
-      color: r.color,
-    }));
-  } catch {
-    return sample.goals;
   }
 }
 

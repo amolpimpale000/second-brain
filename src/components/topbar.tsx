@@ -11,7 +11,7 @@ const quickLinks = [
   { label: "Expense", href: "/journal-management?addExpense=1" },
   { label: "Note", href: "/notes" },
   { label: "Task", href: "/tasks" },
-  { label: "Goal", href: "/goals" },
+  { label: "Goal", href: "/finances?quickAdd=goal" },
 ];
 
 export function Topbar() {

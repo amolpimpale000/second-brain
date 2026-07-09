@@ -7,8 +7,6 @@ import {
   LayoutDashboard,
   Wallet,
   TrendingUp,
-  Landmark,
-  Target,
   StickyNote,
   CheckSquare,
   KeyRound,
@@ -40,8 +38,6 @@ const nav: NavSection[] = [
   { section: "Money", items: [
     { href: "/finances", label: "Personal Finances", icon: Wallet },
     { href: "/investments", label: "Investments", icon: TrendingUp },
-    { href: "/loans", label: "Loans", icon: Landmark },
-    { href: "/goals", label: "Savings Goals", icon: Target },
   ]},
   { section: "Business", items: [
     { href: "/journal-management", label: "Journal Management", icon: BookOpen,
