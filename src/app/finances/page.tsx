@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { FinancesClient } from "@/components/finances-client";
+import { getFinanceData } from "@/lib/finance-store";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,7 @@ export const metadata: Metadata = {
   description: "Every rupee in and out — income, expenses, and cash flow.",
 };
 
-export default function FinancesPage() {
-  return <FinancesClient />;
+export default async function FinancesPage() {
+  const initial = await getFinanceData();
+  return <FinancesClient initial={initial} />;
 }
