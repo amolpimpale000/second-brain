@@ -20,8 +20,12 @@ export type RazorpayIncome = {
 };
 
 function getCreds(code: string): { keyId: string; keySecret: string } | null {
-  const keyId = process.env[`Razorpay_Key_ID_${code}`];
-  const keySecret = process.env[`Razorpay_Key_Secret_${code}`];
+  // Accept both the conventional UPPERCASE names (RAZORPAY_KEY_ID_IJPS, as set
+  // in Hostinger) and the mixed-case names used in local .env.local
+  // (Razorpay_Key_ID_IJPS) — env-var names are case-sensitive on Linux, so we
+  // check both rather than depending on one casing being used everywhere.
+  const keyId = process.env[`RAZORPAY_KEY_ID_${code}`] || process.env[`Razorpay_Key_ID_${code}`];
+  const keySecret = process.env[`RAZORPAY_KEY_SECRET_${code}`] || process.env[`Razorpay_Key_Secret_${code}`];
   if (!keyId || !keySecret) return null;
   return { keyId, keySecret };
 }
