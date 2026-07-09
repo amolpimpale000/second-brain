@@ -16,7 +16,7 @@ import {
 } from "./jps-queries";
 import { listExpenses } from "./journal-expenses-store";
 import { getGoogleAdsCardData, getAllTimeGoogleAdsSpendForJournal } from "./google-ads";
-import { getRazorpayIncomeForJournal } from "./razorpay";
+import { getRazorpayIncomeForJournalPeriod } from "./razorpay";
 import type { JournalPageData } from "./journal-page-data";
 
 // ---------------------------------------------------------------------------
@@ -64,7 +64,7 @@ async function fetchJpsPageData(): Promise<JournalPageData> {
     }),
     getAllTimeGoogleAdsSpendForJournal("JPS"),
   ]);
-  const razorpayLive = await getRazorpayIncomeForJournal("JPS").catch((err) => {
+  const razorpayLive = await getRazorpayIncomeForJournalPeriod("JPS", "last_30_days").catch((err) => {
     console.error("JPS Razorpay income failed to load:", err instanceof Error ? err.message : err);
     return { connected: false, total: 0, delta: 0, sources: [], transactionCount: 0, periodLabel: "This Month", error: "Request failed" };
   });

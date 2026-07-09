@@ -53,24 +53,39 @@ type RazorpayPayment = {
   created_at: number;
 };
 
-async function fetchAllPayments(keyId: string, keySecret: string, from: number, to: number): Promise<RazorpayPayment[]> {
+async function fetchPage(auth: string, from: number, to: number, skip: number): Promise<RazorpayPayment[]> {
+  const res = await fetch(
+    `https://api.razorpay.com/v1/payments?from=${from}&to=${to}&count=100&skip=${skip}`,
+    { headers: { Authorization: `Basic ${auth}` } }
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Razorpay API error (${res.status}): ${text.slice(0, 200)}`);
+  }
+  const json = await res.json();
+  return (json.items || []) as RazorpayPayment[];
+}
+
+// Pages through /v1/payments (100 per page, max). Fetches pages in concurrent
+// batches instead of one-at-a-time so large windows (this year / all time,
+// which can be thousands of payments = dozens of pages) resolve in seconds
+// rather than minutes. A page shorter than 100 marks the end.
+async function fetchAllPayments(keyId: string, keySecret: string, from: number, to: number, maxPages = 20): Promise<RazorpayPayment[]> {
   const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+  const BATCH = 10; // concurrent requests per round
   const all: RazorpayPayment[] = [];
-  let skip = 0;
-  for (let page = 0; page < 20; page++) {
-    const res = await fetch(
-      `https://api.razorpay.com/v1/payments?from=${from}&to=${to}&count=100&skip=${skip}`,
-      { headers: { Authorization: `Basic ${auth}` } }
-    );
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Razorpay API error (${res.status}): ${text.slice(0, 200)}`);
+  let base = 0;
+  let done = false;
+
+  while (!done && base < maxPages) {
+    const skips: number[] = [];
+    for (let i = 0; i < BATCH && base + i < maxPages; i++) skips.push((base + i) * 100);
+    const pages = await Promise.all(skips.map((skip) => fetchPage(auth, from, to, skip)));
+    for (const items of pages) {
+      all.push(...items);
+      if (items.length < 100) done = true; // reached the last page in this window
     }
-    const json = await res.json();
-    const items: RazorpayPayment[] = json.items || [];
-    all.push(...items);
-    if (items.length < 100) break;
-    skip += 100;
+    base += BATCH;
   }
   return all;
 }
@@ -118,6 +133,79 @@ export async function getRazorpayIncomeForJournal(code: string, monthKey?: strin
     };
   } catch (err) {
     return { connected: false, total: 0, delta: 0, sources: [], transactionCount: 0, periodLabel: range.label, error: err instanceof Error ? err.message : "Request failed" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Selectable-period income (drives the dropdown on each journal's Razorpay
+// card). "This Month" = current calendar month; "Last 30 Days" = rolling
+// window matching Razorpay's own dashboard default; plus year / all-time.
+// ---------------------------------------------------------------------------
+
+export type RazorpayPeriod = "this_month" | "last_30_days" | "this_year" | "all_time";
+
+export const RAZORPAY_PERIODS: { value: RazorpayPeriod; label: string }[] = [
+  { value: "last_30_days", label: "Last 30 Days" },
+  { value: "this_month", label: "This Month" },
+  { value: "this_year", label: "This Year" },
+  { value: "all_time", label: "All Time" },
+];
+
+function periodRange(period: RazorpayPeriod): { from: number; to: number; label: string; maxPages: number } {
+  const now = new Date();
+  const to = Math.floor(now.getTime() / 1000);
+  switch (period) {
+    case "this_month": {
+      const from = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1) / 1000);
+      const monthName = now.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+      return { from, to, label: `This month (${monthName})`, maxPages: 40 };
+    }
+    case "last_30_days":
+      return { from: to - 30 * 86400, to, label: "Last 30 days", maxPages: 40 };
+    case "this_year": {
+      const from = Math.floor(Date.UTC(now.getUTCFullYear(), 0, 1) / 1000);
+      return { from, to, label: `This year (${now.getUTCFullYear()})`, maxPages: 150 };
+    }
+    case "all_time":
+      return { from: Math.floor(Date.UTC(2015, 0, 1) / 1000), to, label: "All time", maxPages: 400 };
+  }
+}
+
+/** Real captured income for one journal's Razorpay account over a selectable period. */
+export async function getRazorpayIncomeForJournalPeriod(code: string, period: RazorpayPeriod): Promise<RazorpayIncome> {
+  const creds = getCreds(code);
+  const { from, to, label, maxPages } = periodRange(period);
+  if (!creds) {
+    return { connected: false, total: 0, delta: 0, sources: [], transactionCount: 0, periodLabel: label, error: "Razorpay credentials are not configured for this journal." };
+  }
+  try {
+    const payments = await fetchAllPayments(creds.keyId, creds.keySecret, from, to, maxPages);
+    const captured = payments.filter((p) => p.status === "captured");
+    const total = Math.round(captured.reduce((s, p) => s + p.amount, 0) / 100);
+
+    const byMethod = new Map<string, number>();
+    for (const p of captured) {
+      const method = (p.method || "other").toUpperCase();
+      byMethod.set(method, (byMethod.get(method) ?? 0) + p.amount / 100);
+    }
+    const sources: RazorpaySource[] = Array.from(byMethod.entries())
+      .map(([name, amount]) => ({ name, amount: Math.round(amount), pct: total ? Math.round((amount / total) * 100) : 0 }))
+      .sort((a, b) => b.amount - a.amount);
+
+    // Delta vs the immediately-preceding equal-length window — only for the
+    // two short, cheap windows (comparing a whole prior year/all-time would
+    // double an already-expensive fetch for little value).
+    let delta = 0;
+    if (period === "this_month" || period === "last_30_days") {
+      const span = to - from;
+      const prev = await fetchAllPayments(creds.keyId, creds.keySecret, from - span, from - 1, maxPages).catch(() => []);
+      const prevTotal = Math.round(prev.filter((p) => p.status === "captured").reduce((s, p) => s + p.amount, 0) / 100);
+      delta = prevTotal > 0 ? Math.round(((total - prevTotal) / prevTotal) * 1000) / 10 : 0;
+    }
+
+    return { connected: true, total, delta, sources, transactionCount: captured.length, periodLabel: label };
+  } catch (err) {
+    return { connected: false, total: 0, delta: 0, sources: [], transactionCount: 0, periodLabel: label, error: err instanceof Error ? err.message : "Request failed" };
   }
 }
 

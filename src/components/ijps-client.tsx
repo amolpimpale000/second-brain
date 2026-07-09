@@ -5,7 +5,7 @@ import {
   FileText, BookOpen, CheckCircle2, DollarSign, TrendingDown, TrendingUp,
   ArrowUpRight, ArrowDownRight, ChevronDown, ChevronRight, Eye, Pencil, Trash2,
   Upload, Send, Receipt, FileBarChart, BarChart3, Download, Filter, X, Check,
-  MousePointerClick, Target,
+  MousePointerClick, Target, Loader2,
 } from "lucide-react";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -129,6 +129,136 @@ function filterByMonth<T extends { label?: string; month?: string }>(series: T[]
     return series.filter((t) => key(t).startsWith(year));
   }
   return series; // All Time
+}
+
+// ---------- Razorpay income card (real, selectable period) ----------
+const RZP_PERIODS = [
+  { value: "last_30_days", label: "Last 30 Days" },
+  { value: "this_month", label: "This Month" },
+  { value: "this_year", label: "This Year" },
+  { value: "all_time", label: "All Time" },
+] as const;
+type RzpPeriod = (typeof RZP_PERIODS)[number]["value"];
+
+type RzpSource = { name: string; amount: number; pct: number };
+type RzpIncome = {
+  total: number;
+  delta: number;
+  sources: RzpSource[];
+  transactionCount?: number;
+  periodLabel?: string;
+  error?: string;
+};
+
+function RazorpayCard({ journalCode, initial }: { journalCode: string; initial: { total: number; delta: number; sources: RzpSource[] } }) {
+  // Initial paint is the server-rendered "Last 30 Days" figure, so the card
+  // matches Razorpay's own dashboard default out of the box. Other periods are
+  // fetched on demand (and cached server-side per code+period).
+  const [period, setPeriod] = useState<RzpPeriod>("last_30_days");
+  const [income, setIncome] = useState<RzpIncome>({ ...initial, periodLabel: "Last 30 days" });
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+
+  async function selectPeriod(p: RzpPeriod) {
+    setOpen(false);
+    if (p === period && !err) return;
+    setPeriod(p);
+    setLoading(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/journals/razorpay?code=${journalCode}&period=${p}`, { cache: "no-store" });
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || "Failed to load");
+      setIncome(json);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed to load");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const activeLabel = RZP_PERIODS.find((p) => p.value === period)?.label ?? "Last 30 Days";
+  const showDelta = (period === "last_30_days" || period === "this_month") && income.delta !== 0;
+  const deltaSuffix = period === "this_month" ? "vs last month" : "vs prev. 30 days";
+
+  return (
+    <div id="razorpay-card" className="card card-pad scroll-mt-4">
+      <div className="flex items-start justify-between mb-1">
+        <h3 className="font-semibold text-ink">Income (Razorpay)</h3>
+        {/* Period dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setOpen((o) => !o)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-2 transition-colors"
+          >
+            {activeLabel} <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
+          </button>
+          {open && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+              <div className="absolute right-0 z-50 mt-1 min-w-[150px] rounded-xl border border-border bg-card p-1 shadow-card-lg">
+                {RZP_PERIODS.map((o) => (
+                  <button
+                    key={o.value}
+                    onClick={() => selectPeriod(o.value)}
+                    className={cn("block w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-surface-2", o.value === period ? "font-semibold text-ink" : "text-muted")}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <p className="text-xs text-muted">Collected · {income.periodLabel ?? activeLabel}</p>
+        <div className="flex items-center gap-3 mt-0.5">
+          <p className="text-2xl font-semibold text-ink">
+            {loading ? <Loader2 className="h-6 w-6 animate-spin text-faint" /> : inrFmt(income.total)}
+          </p>
+          <span className="inline-flex items-center rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+            <svg viewBox="0 0 24 24" className="h-4 w-4 mr-1" fill="currentColor"><path d="M7.076 2h2.368l-1.6 4.667h2.789L6.5 14l1.263-5.333H5.394L7.076 2zm5.448 0h2.368l-1.6 4.667h2.789L11.948 14l1.263-5.333h-2.369L12.524 2z" /></svg>
+            Razorpay
+          </span>
+        </div>
+        <div className="flex items-center gap-2 mt-1">
+          {showDelta && !loading && <Delta value={income.delta} />}
+          {showDelta && !loading && <span className="text-[11px] text-faint">{deltaSuffix}</span>}
+          {income.transactionCount != null && !loading && (
+            <span className="text-[11px] text-faint">{income.transactionCount.toLocaleString("en-IN")} payments</span>
+          )}
+        </div>
+        {err && <p className="mt-1 text-[11px] text-rose-500">{err}</p>}
+      </div>
+
+      <div className="mb-2">
+        <p className="text-sm font-medium text-ink mb-3">Top Payment Sources</p>
+        {income.sources.length === 0 ? (
+          <p className="text-xs text-faint">{loading ? "Loading…" : "No payment-method data for this period."}</p>
+        ) : (
+          <div className={cn("space-y-3 transition-opacity", loading && "opacity-40")}>
+            {income.sources.map((s) => (
+              <div key={s.name}>
+                <div className="flex items-center justify-between text-sm mb-1.5">
+                  <span className="text-muted">{s.name}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-medium text-ink">{s.pct}%</span>
+                    <span className="text-xs text-faint">{inrFmt(s.amount)}</span>
+                  </div>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-surface-2">
+                  <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${s.pct}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 type IjpsClientProps = {
@@ -568,51 +698,8 @@ export function IjpsClient({
           </div>
         </div>
 
-        {/* Income (Razorpay) */}
-        <div id="razorpay-card" className="card card-pad scroll-mt-4">
-          <div className="flex items-start justify-between mb-1">
-            <h3 className="font-semibold text-ink">Income (Razorpay)</h3>
-            <MonthFilter value={moRevenue} onChange={setMoRevenue} />
-          </div>
-          <div className="mb-6">
-            <p className="text-xs text-muted">Total Collected</p>
-            <div className="flex items-center gap-3 mt-0.5">
-              <p className="text-2xl font-semibold text-ink">{inrFmt(data.razorpayIncome.total)}</p>
-              <span className="inline-flex items-center rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                <svg viewBox="0 0 24 24" className="h-4 w-4 mr-1" fill="currentColor"><path d="M7.076 2h2.368l-1.6 4.667h2.789L6.5 14l1.263-5.333H5.394L7.076 2zm5.448 0h2.368l-1.6 4.667h2.789L11.948 14l1.263-5.333h-2.369L12.524 2z" /></svg>
-                Razorpay
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 mt-1">
-              <Delta value={28.6} />
-              <span className="text-[11px] text-faint">vs Apr 2025</span>
-            </div>
-          </div>
-
-          <div className="mb-2">
-            <p className="text-sm font-medium text-ink mb-3">Top Payment Sources</p>
-            {data.razorpayIncome.sources.length === 0 ? (
-              <p className="text-xs text-faint">No payment-method data available yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {data.razorpayIncome.sources.map((s) => (
-                  <div key={s.name}>
-                    <div className="flex items-center justify-between text-sm mb-1.5">
-                      <span className="text-muted">{s.name}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-medium text-ink">{s.pct}%</span>
-                        <span className="text-xs text-faint">{inrFmt(s.amount)}</span>
-                      </div>
-                    </div>
-                    <div className="h-1.5 w-full rounded-full bg-surface-2">
-                      <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${s.pct}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        {/* Income (Razorpay) — real, selectable period */}
+        <RazorpayCard journalCode={journalCode} initial={data.razorpayIncome} />
 
         {/* Google Ads Overview — live from the Google Ads API when this journal's account is configured */}
         <div className="card card-pad">

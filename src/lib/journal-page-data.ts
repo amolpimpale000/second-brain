@@ -16,7 +16,7 @@ import {
 } from "./journal-queries";
 import { listExpenses, type JournalExpense } from "./journal-expenses-store";
 import { getGoogleAdsCardData, getAllTimeGoogleAdsSpendForJournal, type GoogleAdsCardData } from "./google-ads";
-import { getRazorpayIncomeForJournal } from "./razorpay";
+import { getRazorpayIncomeForJournalPeriod } from "./razorpay";
 
 // ---------------------------------------------------------------------------
 // Generic data layer for any single-journal page (/journals/<code>).
@@ -92,7 +92,7 @@ async function fetchJournalPageData(code: string, prefix: string): Promise<Journ
     }),
     getAllTimeGoogleAdsSpendForJournal(code),
   ]);
-  const razorpayLive = await getRazorpayIncomeForJournal(code).catch((err) => {
+  const razorpayLive = await getRazorpayIncomeForJournalPeriod(code, "last_30_days").catch((err) => {
     console.error(`${code} Razorpay income failed to load:`, err instanceof Error ? err.message : err);
     return { connected: false, total: 0, delta: 0, sources: [], transactionCount: 0, periodLabel: "This Month", error: "Request failed" };
   });
