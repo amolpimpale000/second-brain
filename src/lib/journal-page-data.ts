@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import {
   ijpsKpis as sampleIjpsKpis,
   manuscriptOverview as sampleManuscriptOverview,
@@ -66,7 +67,7 @@ function fmtShortDate(iso: string): string {
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export async function getJournalPageData(code: string, prefix: string): Promise<JournalPageData> {
+async function fetchJournalPageData(code: string, prefix: string): Promise<JournalPageData> {
   // The core manuscript/revenue numbers come from each journal's read-only
   // MySQL database and must load correctly for the page to be useful at all,
   // so those failures are allowed to propagate. Expenses live in a separate
@@ -247,6 +248,15 @@ export async function getJournalPageData(code: string, prefix: string): Promise<
     googleAdsAllTimeSpend,
     journalCode: code,
   };
+}
+
+// Live MySQL + Google Ads + Razorpay reads for one journal — cached briefly
+// since this data doesn't need per-request freshness (used by /journals/ijes,
+// /journals/ijmps, /journals/ijsrt, and indirectly /journals/ijps).
+const cachedJournalPageData = unstable_cache(fetchJournalPageData, ["journal-page-data"], { revalidate: 90 });
+
+export async function getJournalPageData(code: string, prefix: string): Promise<JournalPageData> {
+  return cachedJournalPageData(code, prefix);
 }
 
 function normalizePercentages(items: { name: string; value: number; pct: number; color: string }[]) {

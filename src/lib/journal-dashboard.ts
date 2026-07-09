@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import {
   jmStats as sampleJmStats,
   submissionsByJournal as sampleSubmissionsByJournal,
@@ -215,7 +216,7 @@ function lastNMonthKeys(n: number): string[] {
   return keys;
 }
 
-export async function getJournalDashboardData(): Promise<JournalDashboardData> {
+async function fetchJournalDashboardData(): Promise<JournalDashboardData> {
   const results = await Promise.allSettled([
     ...CONNECTED_JOURNALS.map((j) => fetchJournal(j.code, j.prefix)),
     fetchJps(),
@@ -491,6 +492,18 @@ export async function getJournalDashboardData(): Promise<JournalDashboardData> {
     businessProfitability,
     monthlyRevenueByBusiness: { data: monthlyRevenueByBusinessData, series: monthlyRevenueByBusinessSeries },
   };
+}
+
+// This aggregates live reads across 4 MySQL journal DBs + 1 Postgres (JPS) +
+// Google Ads + Razorpay — expensive (~1.5-2s) but doesn't need per-request
+// freshness, so it's cached for a short window. Consumed by both
+// /journal-management and the landing dashboard.
+const cachedJournalDashboardData = unstable_cache(fetchJournalDashboardData, ["journal-dashboard-data"], {
+  revalidate: 90,
+});
+
+export async function getJournalDashboardData(): Promise<JournalDashboardData> {
+  return cachedJournalDashboardData();
 }
 
 function normalizePercentages(items: { name: string; value: number; pct: number; color: string }[]) {

@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import {
   ijpsKpis as sampleIjpsKpis,
   manuscriptOverview as sampleManuscriptOverview,
@@ -43,7 +44,7 @@ function normalizePercentages(items: { name: string; value: number; pct: number;
   for (const item of items) item.pct = total ? Math.round((item.value / total) * 100) : 0;
 }
 
-export async function getJpsPageData(): Promise<JournalPageData> {
+async function fetchJpsPageData(): Promise<JournalPageData> {
   const [counts, revenue, monthly, monthlyRevenue, paymentMethods, recentTransactions] = await Promise.all([
     getJpsCounts(),
     getJpsRevenue(),
@@ -205,4 +206,12 @@ export async function getJpsPageData(): Promise<JournalPageData> {
     googleAdsAllTimeSpend,
     journalCode: "JPS",
   };
+}
+
+// Live Postgres + Google Ads + Razorpay reads for JPS — cached briefly, same
+// rationale as journal-page-data.ts's cache.
+const cachedJpsPageData = unstable_cache(fetchJpsPageData, ["jps-page-data"], { revalidate: 90 });
+
+export async function getJpsPageData(): Promise<JournalPageData> {
+  return cachedJpsPageData();
 }
