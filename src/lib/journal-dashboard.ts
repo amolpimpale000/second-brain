@@ -96,8 +96,9 @@ const CONNECTED_JOURNALS: { code: string; prefix: string; name: string }[] = [
 ];
 
 function journalName(code: string): string {
-  if (code === "JPS") return "Journal of Pharmaceutical Sciences";
-  return CONNECTED_JOURNALS.find((j) => j.code === code)?.name ?? code;
+  if (code === "JPS") return "JPS Journal";
+  const j = CONNECTED_JOURNALS.find((c) => c.code === code);
+  return j ? `${j.code} Journal` : code;
 }
 
 type RealJournalData = {

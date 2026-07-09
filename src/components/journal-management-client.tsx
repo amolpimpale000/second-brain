@@ -581,18 +581,22 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
                   </div>
                   <div className="rounded-xl border border-border/60 bg-surface-2/60 p-2">
                     <p className="text-[10px] text-faint">Profit</p>
-                    <p className="text-sm font-semibold text-emerald-600">{inr(b.profit)}</p>
+                    <p className={cn("text-sm font-semibold", b.profit >= 0 ? "text-emerald-600" : "text-rose-500")}>
+                      {inr(b.profit)}
+                    </p>
                   </div>
                 </div>
                 <div className="mt-3">
                   <div className="mb-1 flex items-center justify-between text-[10px]">
                     <span className="text-faint">Margin</span>
-                    <span className="font-semibold text-emerald-600">{b.margin.toFixed(1)}%</span>
+                    <span className={cn("font-semibold", b.margin >= 0 ? "text-emerald-600" : "text-rose-500")}>
+                      {b.margin.toFixed(1)}%
+                    </span>
                   </div>
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
                     <div
-                      className="h-full rounded-full bg-emerald-500"
-                      style={{ width: `${Math.max(0, Math.min(100, b.margin))}%` }}
+                      className={cn("h-full rounded-full", b.margin >= 0 ? "bg-emerald-500" : "bg-rose-500")}
+                      style={{ width: `${Math.max(0, Math.min(100, Math.abs(b.margin)))}%` }}
                     />
                   </div>
                 </div>
