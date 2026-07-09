@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   BookOpen, FileText, CheckCircle2, Clock, Users, IndianRupee, ArrowUpRight, ArrowDownRight,
-  Plus, Bell, TrendingUp,
+  Plus, TrendingUp,
   Pencil, Trash2, Eye, ChevronLeft, ChevronRight, MousePointerClick, Target,
   Star, Building2, CalendarDays,
 } from "lucide-react";
@@ -13,6 +13,7 @@ import { MultiLineChart, SegmentedGauge, GroupedBars } from "@/components/charts
 import { Dropdown, Modal } from "@/components/vault-ui";
 import { GoogleAdsLogo } from "@/components/google-ads-logo";
 import { Logo } from "@/components/logo";
+import { AlertsBell } from "@/components/alerts-drawer";
 import { cn, inr } from "@/lib/utils";
 import { type JournalDashboardData } from "@/lib/journal-dashboard";
 import { type JournalExpense } from "@/lib/journal-expenses-store";
@@ -26,7 +27,6 @@ const statTone: Record<string, string> = {
 const statIcon: Record<string, React.ElementType> = {
   book: BookOpen, file: FileText, check: CheckCircle2, review: Clock, users: Users, rupee: IndianRupee,
 };
-const alertTone: Record<string, string> = { red: "bg-red-50 text-red-600 border-red-100", amber: "bg-amber-50 text-amber-600 border-amber-100" };
 
 const JOURNAL_OPTIONS = [
   { code: "IJPS", label: "IJPS" },
@@ -470,12 +470,15 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           <h1 className="text-2xl font-bold tracking-tight text-ink">Journal Management</h1>
           <p className="mt-1 text-sm text-muted">Complete analytics and insights across all journals.</p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors"
-        >
-          <Plus className="h-4 w-4" /> Quick Add Expense
-        </button>
+        <div className="flex items-center gap-2">
+          <AlertsBell />
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors"
+          >
+            <Plus className="h-4 w-4" /> Quick Add Expense
+          </button>
+        </div>
       </div>
 
       {toast && (
@@ -981,20 +984,6 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           )}
         </Panel>
       </div>
-
-      {/* Alerts & Notifications */}
-      <Panel title="Alerts & Notifications">
-        <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-          {data.jmAlerts.map((a) => (
-            <div key={a.id} className={cn("flex items-center gap-2.5 rounded-xl border p-3 text-sm", alertTone[a.tone])}>
-              <Bell className="h-4 w-4 shrink-0" />
-              <span className="flex-1">{a.text}</span>
-              <button className="shrink-0 text-xs font-semibold hover:underline">View Now</button>
-            </div>
-          ))}
-        </div>
-        <button className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-surface-2 py-2.5 text-sm font-medium text-muted hover:text-ink">View All Notifications</button>
-      </Panel>
 
       {/* EMPLOYEE PRODUCTIVITY */}
       <Panel
