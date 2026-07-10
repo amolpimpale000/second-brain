@@ -22,6 +22,14 @@ import { getTrackedConfig, type TrackedConfig } from "./journal-alerts-store";
 //                            >3 days.
 //   4. plagiarism_pending  — a plagiarism-check row not marked completed.
 //   5. contact_unresolved  — a Contact-Us query left Pending for >2 days.
+//   6. referral_pending    — a referral request left unpaid/unreviewed.
+//   7. ai_calling_failed   — the AI calling agent's last 3+ calls in a row
+//                            returned HTTP 500 (IJPS only — the only journal
+//                            with this feature). Observed failures are a
+//                            systemic outage (e.g. the calling service's own
+//                            balance running out), not a per-manuscript
+//                            issue, so this fires once for the whole streak
+//                            rather than once per failed call.
 // ---------------------------------------------------------------------------
 
 export type AlertRule =
@@ -29,7 +37,9 @@ export type AlertRule =
   | "employee_idle"
   | "revision_overdue"
   | "plagiarism_pending"
-  | "contact_unresolved";
+  | "contact_unresolved"
+  | "referral_pending"
+  | "ai_calling_failed";
 
 export type AlertSeverity = "high" | "medium" | "low";
 
@@ -262,6 +272,73 @@ async function computeMysqlJournal(
       }
     } catch (e) {
       errors.push(`${code} rule5: ${(e as Error).message}`);
+    }
+
+    // Rule 6 — referral request left pending (unreviewed/unpaid).
+    try {
+      const [rows] = await conn.execute<any>(
+        `SELECT id, name, article_id, title_of_paper, created_date
+         FROM referral_requests
+         WHERE completed_status = 'pending'
+         ORDER BY created_date ASC
+         LIMIT ${PER_RULE_CAP}`
+      );
+      for (const r of rows) {
+        const age = ageDaysFrom(r.created_date);
+        alerts.push({
+          id: `${code}:referral_pending:${r.id}`,
+          rule: "referral_pending",
+          severity: age >= 5 ? "high" : "medium",
+          journal: code,
+          title: `Referral request pending`,
+          detail: `${trim(r.name, 40) || "Applicant"} — "${trim(r.title_of_paper, 50)}"${r.article_id ? ` (${r.article_id})` : ""}, pending ${age}d.`,
+          manuscriptId: r.article_id || undefined,
+          ageDays: age,
+          when: toIso(r.created_date),
+        });
+      }
+    } catch (e) {
+      errors.push(`${code} rule6: ${(e as Error).message}`);
+    }
+
+    // Rule 7 — AI calling agent failing: last 3+ calls in a row returned
+    // HTTP 500 (only IJPS has this table; other journals hit the catch below
+    // and are silently skipped, same as any journal lacking a table a rule
+    // depends on).
+    try {
+      const [rows] = await conn.execute<any>(
+        `SELECT id, uniqueCode, authorName, http_status, response, created_at
+         FROM tbl_ai_call_log
+         ORDER BY created_at DESC
+         LIMIT 10`
+      );
+      let streak = 0;
+      for (const r of rows) {
+        if (Number(r.http_status) === 500) streak++;
+        else break;
+      }
+      if (streak >= 3) {
+        const latest = rows[0];
+        let reason = "Server error";
+        try {
+          const parsed = JSON.parse(latest.response || "{}");
+          reason = parsed.error_description || parsed.error || reason;
+        } catch {
+          // response wasn't valid JSON — keep the generic reason
+        }
+        alerts.push({
+          id: `${code}:ai_calling_failed:${latest.id}`,
+          rule: "ai_calling_failed",
+          severity: "high",
+          journal: code,
+          title: `AI Calling Agent failing — ${streak} calls in a row returned HTTP 500`,
+          detail: `${reason} Last failed call: ${trim(latest.authorName, 40) || "unknown author"} (${latest.uniqueCode || "—"}).`,
+          manuscriptId: latest.uniqueCode || undefined,
+          when: toIso(latest.created_at),
+        });
+      }
+    } catch (e) {
+      errors.push(`${code} rule7: ${(e as Error).message}`);
     }
   } finally {
     await conn.end().catch(() => {});

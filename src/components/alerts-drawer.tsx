@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bell, X, Clock, FileWarning, UserX, RefreshCw, ShieldAlert, MailWarning,
-  Check, RotateCcw, Settings2, ChevronDown, Loader2,
+  Check, RotateCcw, Settings2, ChevronDown, Loader2, Gift, PhoneOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AlertRule, AlertSeverity } from "@/lib/journal-alerts";
@@ -38,6 +38,8 @@ const RULE_META: Record<AlertRule, { label: string; icon: React.ElementType }> =
   revision_overdue: { label: "Corrections overdue", icon: RefreshCw },
   plagiarism_pending: { label: "Plagiarism pending", icon: ShieldAlert },
   contact_unresolved: { label: "Contact query", icon: MailWarning },
+  referral_pending: { label: "Referral pending", icon: Gift },
+  ai_calling_failed: { label: "AI calling failing", icon: PhoneOff },
 };
 
 const SEV_STYLE: Record<AlertSeverity, { dot: string; chip: string }> = {
@@ -144,24 +146,32 @@ export function AlertsBell({ initialData }: { initialData?: AlertsResponse }) {
   return (
     <>
       {/* Bell indicator */}
-      <button
-        onClick={() => setOpen(true)}
-        className="relative grid h-10 w-10 place-items-center rounded-xl border border-border bg-card text-muted shadow-card transition-colors hover:text-ink"
-        title="Alerts & Notifications"
-        aria-label="Open alerts"
-      >
-        <Bell className="h-[18px] w-[18px]" />
+      <div className="relative inline-block">
         {count > 0 && (
-          <span
-            className={cn(
-              "absolute -right-1.5 -top-1.5 grid h-5 min-w-[20px] place-items-center rounded-full px-1 text-[11px] font-bold text-white ring-2 ring-bg",
-              highCount > 0 ? "bg-red-500" : "bg-amber-500"
-            )}
-          >
-            {count > 99 ? "99+" : count}
-          </span>
+          <>
+            <span className={cn("pointer-events-none absolute inset-0 rounded-full animate-ping", highCount > 0 ? "bg-red-500" : "bg-amber-500", "opacity-60")} />
+            <span className={cn("pointer-events-none absolute inset-0 rounded-full animate-ping [animation-delay:0.5s]", highCount > 0 ? "bg-red-500" : "bg-amber-500", "opacity-40")} />
+          </>
         )}
-      </button>
+        <button
+          onClick={() => setOpen(true)}
+          className="relative z-10 grid h-10 w-10 place-items-center rounded-xl border border-border bg-card text-muted shadow-card transition-colors hover:text-ink"
+          title="Alerts & Notifications"
+          aria-label="Open alerts"
+        >
+          <Bell className="h-[18px] w-[18px]" />
+          {count > 0 && (
+            <span
+              className={cn(
+                "absolute -right-1.5 -top-1.5 grid h-5 min-w-[20px] place-items-center rounded-full px-1 text-[11px] font-bold text-white ring-2 ring-bg",
+                highCount > 0 ? "bg-red-500" : "bg-amber-500"
+              )}
+            >
+              {count > 99 ? "99+" : count}
+            </span>
+          )}
+        </button>
+      </div>
 
       {/* Overlay + Drawer */}
       <div className={cn("fixed inset-0 z-50", open ? "" : "pointer-events-none")} aria-hidden={!open}>
