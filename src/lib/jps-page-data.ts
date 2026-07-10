@@ -60,7 +60,7 @@ async function fetchJpsPageData(): Promise<JournalPageData> {
   const [googleAds, googleAdsAllTimeSpend] = await Promise.all([
     getGoogleAdsCardData("JPS").catch((err) => {
       console.error("JPS Google Ads spend failed to load:", err instanceof Error ? err.message : err);
-      return { connected: false, totalSpend: 0, delta: 0, impressions: 0, clicks: 0, conversions: 0, metrics: [] };
+      return { connected: false, totalSpend: 0, delta: 0, impressions: 0, clicks: 0, conversions: 0, metrics: [], budget: null };
     }),
     getAllTimeGoogleAdsSpendForJournal("JPS"),
   ]);

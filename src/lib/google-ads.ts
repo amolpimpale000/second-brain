@@ -262,6 +262,7 @@ export type GoogleAdsCardData = {
   clicks: number;
   conversions: number;
   metrics: { label: string; value: string; delta: number }[];
+  budget: GoogleAdsAccountBudget | null;
   error?: string;
 };
 
@@ -341,7 +342,7 @@ export async function getGoogleAdsCardData(code: string): Promise<GoogleAdsCardD
     getGoogleAdsSpendForJournal(code, lastMonthKey()),
   ]);
   if (!thisMonth.connected) {
-    return { connected: false, totalSpend: 0, delta: 0, impressions: 0, clicks: 0, conversions: 0, metrics: [], error: thisMonth.error };
+    return { connected: false, totalSpend: 0, delta: 0, impressions: 0, clicks: 0, conversions: 0, metrics: [], budget: null, error: thisMonth.error };
   }
   const delta = prevMonth.connected && prevMonth.totalSpend > 0
     ? Math.round(((thisMonth.totalSpend - prevMonth.totalSpend) / prevMonth.totalSpend) * 1000) / 10
@@ -359,5 +360,6 @@ export async function getGoogleAdsCardData(code: string): Promise<GoogleAdsCardD
     clicks: thisMonth.clicks,
     conversions: thisMonth.conversions,
     metrics,
+    budget: thisMonth.budget,
   };
 }

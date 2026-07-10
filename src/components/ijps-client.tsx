@@ -5,7 +5,7 @@ import {
   FileText, BookOpen, CheckCircle2, DollarSign, TrendingDown, TrendingUp,
   ArrowUpRight, ArrowDownRight, ChevronDown, ChevronRight, Eye, Pencil, Trash2,
   Upload, Send, Receipt, FileBarChart, BarChart3, Download, Filter, X, Check,
-  MousePointerClick, Target, Loader2,
+  MousePointerClick, Target, Loader2, Wallet, AlertTriangle,
 } from "lucide-react";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -722,6 +722,38 @@ export function IjpsClient({
                   <span className="text-[11px] text-faint">vs last month</span>
                 </div>
               </div>
+              {data.googleAds.budget && (
+                <div className={cn(
+                  "mb-4 rounded-xl px-3 py-2.5",
+                  data.googleAds.budget.pctRemaining < 5 ? "bg-red-50" : data.googleAds.budget.pctRemaining < 15 ? "bg-amber-50" : "bg-green-50"
+                )}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted">
+                      {data.googleAds.budget.pctRemaining < 15 ? (
+                        <AlertTriangle className={cn("h-3.5 w-3.5 shrink-0", data.googleAds.budget.pctRemaining < 5 ? "text-red-500" : "text-amber-500")} />
+                      ) : (
+                        <Wallet className="h-3.5 w-3.5 shrink-0 text-green-600" />
+                      )}
+                      Balance Remaining
+                    </span>
+                    {data.googleAds.budget.pctRemaining < 15 && (
+                      <span className={cn("rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide",
+                        data.googleAds.budget.pctRemaining < 5 ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600")}>
+                        {data.googleAds.budget.pctRemaining < 5 ? "Critical" : "Low"}
+                      </span>
+                    )}
+                  </div>
+                  <p className={cn(
+                    "mt-1 text-xl font-bold",
+                    data.googleAds.budget.pctRemaining < 5 ? "text-red-600" : data.googleAds.budget.pctRemaining < 15 ? "text-amber-600" : "text-green-700"
+                  )}>
+                    {inrFmt(data.googleAds.budget.remaining)}
+                  </p>
+                  <p className="text-[11px] text-faint">
+                    {data.googleAds.budget.pctRemaining}% of {inrFmt(data.googleAds.budget.approvedLimit + data.googleAds.budget.adjustments)} approved budget
+                  </p>
+                </div>
+              )}
               <div className="mb-4 grid grid-cols-3 gap-2">
                 <div className="rounded-lg bg-surface-2/70 p-2 text-center">
                   <Eye className="mx-auto h-3.5 w-3.5 text-blue-500" />
