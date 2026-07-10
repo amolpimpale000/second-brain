@@ -27,6 +27,22 @@ function Box({ children }: { children: React.ReactNode }) {
   return <div className="rounded-xl border border-border bg-surface px-3 py-2 text-xs shadow-card-lg">{children}</div>;
 }
 
+/** Derives a single-employee card from a multi-employee journal's existing data — no extra fetch needed. */
+function deriveEmployeeCard(journal: JournalProductivity, employeeName: string): JournalProductivity {
+  const days = journal.days.map((d) => {
+    const count = d.series[employeeName] ?? 0;
+    return { date: d.date, series: { [employeeName]: count }, total: count };
+  });
+  return {
+    code: journal.code,
+    name: `${employeeName} (${journal.code})`,
+    seriesKeys: [employeeName],
+    color: { [employeeName]: journal.color[employeeName] ?? "#64748b" },
+    days,
+    totalInPeriod: days.reduce((s, d) => s + d.total, 0),
+  };
+}
+
 function JournalChartCard({ journal, tickInterval }: { journal: JournalProductivity; tickInterval: number }) {
   const chartData = useMemo(
     () => journal.days.map((d) => ({ date: d.date, label: fmtDate(d.date), total: d.total, ...d.series })),
@@ -89,6 +105,7 @@ function JournalChartCard({ journal, tickInterval }: { journal: JournalProductiv
                   fill={journal.color[key]}
                   radius={isTop ? [3, 3, 0, 0] : [0, 0, 0, 0]}
                   maxBarSize={12}
+                  isAnimationActive={false}
                 >
                   {isTop && (
                     <LabelList
@@ -217,9 +234,14 @@ export function EmployeeProductivityPanel() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
-            {journals.map((j) => (
-              <JournalChartCard key={j.code} journal={j} tickInterval={tickInterval} />
-            ))}
+            {journals.flatMap((j) => [
+              <JournalChartCard key={j.code} journal={j} tickInterval={tickInterval} />,
+              ...(j.seriesKeys.length > 1
+                ? j.seriesKeys.map((emp) => (
+                    <JournalChartCard key={`${j.code}-${emp}`} journal={deriveEmployeeCard(j, emp)} tickInterval={tickInterval} />
+                  ))
+                : []),
+            ])}
           </div>
         </>
       )}
