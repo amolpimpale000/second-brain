@@ -503,6 +503,9 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
         })}
       </div>
 
+      {/* Consolidated P&L across all journals, with month toggle */}
+      <ConsolidatedPnL />
+
       {/* Per-journal identity cards */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         {data.journalPerformance.map((j) => {
@@ -555,9 +558,6 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           <Building2 className="h-5 w-5 text-indigo-500" />
           <h2 className="text-lg font-semibold text-ink">Business Profitability</h2>
         </div>
-
-        {/* Consolidated P&L across all journals, with month toggle */}
-        <ConsolidatedPnL />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {data.businessProfitability.map((b) => (
@@ -729,56 +729,72 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
         }
       >
         <p className="mb-3 text-xs text-muted">Complete expense breakdown including Google Ads spend — click any amount to see the entries behind it.</p>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs font-medium text-faint">
-                <th className="pb-2.5 pr-3">Business</th>
-                {EXPENSE_CATEGORIES.map((c) => <th key={c} className="pb-2.5 px-3 text-right">{c}</th>)}
-                <th className="pb-2.5 px-3 text-right bg-indigo-50/60">Google Ads {matrixAdsLoading && "…"}</th>
-                <th className="pb-2.5 pl-3 text-right bg-surface-2">Total Expense</th>
-              </tr>
-            </thead>
-            <tbody>
-              {MATRIX_ROWS.map((row) => (
-                <tr key={row.code} className="border-b border-border last:border-0 hover:bg-surface-2/40">
-                  <td className="py-2.5 pr-3">
-                    <span className="rounded-md bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted">{row.label}</span>
-                  </td>
-                  {EXPENSE_CATEGORIES.map((c) => {
-                    const amt = cellAmount(row.code, c);
-                    return (
-                      <td key={c} className="py-2.5 px-3 text-right">
-                        {amt > 0 ? (
-                          <button onClick={() => setDetailCell({ journal: row.code, category: c, label: `${row.label} — ${c}` })} className="font-medium text-ink hover:text-indigo-600 hover:underline">
-                            {inr(amt)}
-                          </button>
+        <div className="overflow-hidden rounded-2xl border border-border">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[980px] border-collapse text-sm">
+              <thead>
+                <tr className="bg-surface-2/70 text-left text-[11px] font-semibold uppercase tracking-wide text-faint">
+                  <th className="py-3 pl-4 pr-3">Business</th>
+                  {EXPENSE_CATEGORIES.map((c) => <th key={c} className="py-3 px-3 text-right">{c}</th>)}
+                  <th className="py-3 px-3 text-right text-indigo-500">Google Ads {matrixAdsLoading && "…"}</th>
+                  <th className="py-3 pl-3 pr-4 text-right text-ink">Total Expense</th>
+                </tr>
+              </thead>
+              <tbody>
+                {MATRIX_ROWS.map((row, i) => {
+                  const color = data.journalPerformance.find((j) => j.code === row.code)?.color ?? "#64748b";
+                  return (
+                    <tr
+                      key={row.code}
+                      className={cn(
+                        "border-t border-border transition-colors hover:bg-surface-2/50",
+                        i % 2 === 1 && "bg-surface-2/20"
+                      )}
+                    >
+                      <td className="py-3 pl-4 pr-3">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />
+                          <span className="font-medium text-ink">{row.label}</span>
+                        </span>
+                      </td>
+                      {EXPENSE_CATEGORIES.map((c) => {
+                        const amt = cellAmount(row.code, c);
+                        return (
+                          <td key={c} className="py-3 px-3 text-right tabular-nums">
+                            {amt > 0 ? (
+                              <button onClick={() => setDetailCell({ journal: row.code, category: c, label: `${row.label} — ${c}` })} className="font-medium text-ink hover:text-indigo-600 hover:underline">
+                                {inr(amt)}
+                              </button>
+                            ) : (
+                              <span className="text-faint">₹0</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className="py-3 px-3 text-right tabular-nums">
+                        {adsAmount(row.code) > 0 ? (
+                          <span className="font-medium text-indigo-600">{inr(adsAmount(row.code))}</span>
                         ) : (
                           <span className="text-faint">₹0</span>
                         )}
                       </td>
-                    );
-                  })}
-                  <td className="py-2.5 px-3 text-right bg-indigo-50/60">
-                    {adsAmount(row.code) > 0 ? (
-                      <span className="font-medium text-indigo-700">{inr(adsAmount(row.code))}</span>
-                    ) : (
-                      <span className="text-faint">₹0</span>
-                    )}
-                  </td>
-                  <td className="py-2.5 pl-3 text-right font-semibold text-ink bg-surface-2">{inr(rowTotal(row.code))}</td>
+                      <td className="py-3 pl-3 pr-4 text-right font-bold tabular-nums text-ink">{inr(rowTotal(row.code))}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-indigo-200 bg-indigo-50/50 font-bold">
+                  <td className="py-3.5 pl-4 pr-3 text-indigo-700">Grand Total</td>
+                  {EXPENSE_CATEGORIES.map((c) => (
+                    <td key={c} className="py-3.5 px-3 text-right tabular-nums text-ink">{inr(columnTotal(c))}</td>
+                  ))}
+                  <td className="py-3.5 px-3 text-right tabular-nums text-indigo-700">{inr(adsColumnTotal)}</td>
+                  <td className="py-3.5 pl-3 pr-4 text-right tabular-nums text-indigo-700">{inr(grandTotal)}</td>
                 </tr>
-              ))}
-              <tr className="border-t-2 border-border font-semibold">
-                <td className="py-3 pr-3 text-indigo-600">Grand Total</td>
-                {EXPENSE_CATEGORIES.map((c) => (
-                  <td key={c} className="py-3 px-3 text-right text-ink">{inr(columnTotal(c))}</td>
-                ))}
-                <td className="py-3 px-3 text-right text-indigo-700 bg-indigo-50/60">{inr(adsColumnTotal)}</td>
-                <td className="py-3 pl-3 text-right text-ink bg-surface-2">{inr(grandTotal)}</td>
-              </tr>
-            </tbody>
-          </table>
+              </tfoot>
+            </table>
+          </div>
         </div>
       </Panel>
 

@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight, ChevronLeft,
-  ChevronRight, ChevronDown, Loader2, Landmark, Scale,
+  ChevronRight, ChevronDown, Loader2, Landmark, LineChart as LineChartIcon,
+  FileText, Building2, Coins, FlaskConical,
 } from "lucide-react";
+import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import { cn, inr } from "@/lib/utils";
 
 type JournalIncome = { code: string; income: number };
@@ -20,17 +22,55 @@ type MonthlyPnL = {
 const JOURNAL_COLOR: Record<string, string> = {
   IJPS: "#6366f1", IJSRT: "#0ea5e9", IJMPS: "#14b8a6", IJES: "#f59e0b", JPS: "#ec4899",
 };
+const JOURNAL_ICON: Record<string, React.ElementType> = {
+  IJPS: LineChartIcon, IJSRT: FileText, IJMPS: Building2, IJES: Coins, JPS: FlaskConical,
+};
+const SPARK_WINDOW = 6; // trailing months shown in every sparkline, ending at the selected month
 
-function Delta({ v, invert }: { v: number; invert?: boolean }) {
-  if (!v) return <span className="text-[11px] font-medium text-faint">—</span>;
-  // For expenses, "up" is bad, so color inverts.
+function Delta({ v, invert, size = "sm" }: { v: number; invert?: boolean; size?: "sm" | "xs" }) {
+  if (!v) return <span className={cn("font-medium text-faint", size === "sm" ? "text-xs" : "text-[11px]")}>—</span>;
   const good = invert ? v < 0 : v > 0;
   const up = v > 0;
   return (
-    <span className={cn("inline-flex items-center gap-0.5 text-xs font-semibold", good ? "text-emerald-600" : "text-rose-500")}>
+    <span className={cn("inline-flex items-center gap-0.5 font-semibold", size === "sm" ? "text-xs" : "text-[11px]", good ? "text-emerald-600" : "text-rose-500")}>
       {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
       {Math.abs(v).toFixed(1)}%
     </span>
+  );
+}
+
+/** Renders a small filled dot only on the sparkline's last (most recent) point. */
+function makeEndDot(color: string, lastIndex: number) {
+  const EndDot = (props: any) => {
+    const { cx, cy, index } = props;
+    if (index !== lastIndex || cx == null || cy == null) return <g key={`d${index}`} />;
+    return <circle key={`d${index}`} cx={cx} cy={cy} r={4} fill={color} stroke="white" strokeWidth={2} />;
+  };
+  return EndDot;
+}
+
+function Sparkline({ data, color, gradientId }: { data: { value: number }[]; color: string; gradientId: string }) {
+  if (data.length < 2) return <div className="h-full w-full" />;
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <AreaChart data={data} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <Area
+          type="monotone"
+          dataKey="value"
+          stroke={color}
+          strokeWidth={2}
+          fill={`url(#${gradientId})`}
+          isAnimationActive={false}
+          dot={makeEndDot(color, data.length - 1)}
+        />
+      </AreaChart>
+    </ResponsiveContainer>
   );
 }
 
@@ -45,6 +85,8 @@ export function ConsolidatedPnL({ className }: { className?: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [byJournalMetric, setByJournalMetric] = useState<"Total Income">("Total Income");
+  const [metricMenuOpen, setMetricMenuOpen] = useState(false);
   const fetched = useRef(false);
 
   const load = useCallback(async () => {
@@ -84,13 +126,26 @@ export function ConsolidatedPnL({ className }: { className?: string }) {
   const margin = cur && cur.income > 0 ? Math.round((cur.profit / cur.income) * 1000) / 10 : 0;
   const maxJournalIncome = cur ? Math.max(1, ...cur.byJournal.map((j) => j.income)) : 1;
 
+  // Trailing window (oldest → newest) ending at the selected month, reused by every sparkline.
+  const trailing = useMemo(() => months.slice(idx, idx + SPARK_WINDOW).reverse(), [months, idx]);
+  const incomeSpark = trailing.map((m) => ({ value: m.income }));
+  const expensesSpark = trailing.map((m) => ({ value: m.expenses }));
+  const profitSpark = trailing.map((m) => ({ value: m.profit }));
+  const journalSpark = (code: string) => trailing.map((m) => ({ value: m.byJournal.find((j) => j.code === code)?.income ?? 0 }));
+
+  const journalDelta = (code: string): number => {
+    const c = cur?.byJournal.find((j) => j.code === code)?.income ?? 0;
+    const p = prev?.byJournal.find((j) => j.code === code)?.income ?? 0;
+    return p !== 0 ? Math.round(((c - p) / Math.abs(p)) * 1000) / 10 : 0;
+  };
+
   return (
-    <div className={cn("rounded-2xl border border-border bg-card p-5 shadow-card", className)}>
+    <div className={cn("space-y-4", className)}>
       {/* Header + month toggle */}
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <div className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-100 text-indigo-600">
-            <Scale className="h-5 w-5" />
+            <LineChartIcon className="h-5 w-5" />
           </div>
           <div>
             <h3 className="font-semibold text-ink">Consolidated P&amp;L — All Journals</h3>
@@ -149,94 +204,154 @@ export function ConsolidatedPnL({ className }: { className?: string }) {
       </div>
 
       {loading ? (
-        <div className="flex h-40 items-center justify-center text-sm text-faint">
+        <div className="flex h-40 items-center justify-center rounded-2xl border border-border bg-card text-sm text-faint">
           <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading consolidated figures…
         </div>
       ) : error ? (
-        <div className="flex h-40 flex-col items-center justify-center gap-2 text-center">
-          <p className="text-sm font-medium text-rose-500">Couldn&apos;t load P&amp;L</p>
+        <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-2xl border border-border bg-card text-center text-sm">
+          <p className="font-medium text-rose-500">Couldn&apos;t load P&amp;L</p>
           <p className="text-xs text-faint">{error}</p>
           <button onClick={load} className="mt-1 rounded-lg bg-surface-2 px-3 py-1.5 text-xs font-medium text-ink hover:bg-border">Retry</button>
         </div>
       ) : cur ? (
         <>
           {/* Three headline tiles */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <StatTile
               label="Total Income"
               value={cur.income}
               delta={deltas.income}
+              monthLabel={prev?.label ?? "—"}
               icon={<TrendingUp className="h-5 w-5" />}
-              gradient="from-emerald-50 to-teal-50"
-              ring="ring-emerald-100"
               iconBg="bg-emerald-500"
-              valueColor="text-emerald-700"
+              sparkData={incomeSpark}
+              sparkColor="#10b981"
+              gradientId="pnl-grad-income"
             />
             <StatTile
               label="Total Expenses"
               value={cur.expenses}
               delta={deltas.expenses}
               deltaInvert
+              monthLabel={prev?.label ?? "—"}
               icon={<TrendingDown className="h-5 w-5" />}
-              gradient="from-rose-50 to-orange-50"
-              ring="ring-rose-100"
               iconBg="bg-rose-500"
-              valueColor="text-rose-600"
+              sparkData={expensesSpark}
+              sparkColor="#f43f5e"
+              gradientId="pnl-grad-expenses"
             />
             <StatTile
               label="Net Profit"
               value={cur.profit}
               delta={deltas.profit}
+              monthLabel={prev?.label ?? "—"}
               icon={<Wallet className="h-5 w-5" />}
-              gradient={cur.profit >= 0 ? "from-indigo-50 to-violet-50" : "from-rose-50 to-rose-50"}
-              ring={cur.profit >= 0 ? "ring-indigo-100" : "ring-rose-100"}
               iconBg={cur.profit >= 0 ? "bg-indigo-500" : "bg-rose-500"}
-              valueColor={cur.profit >= 0 ? "text-indigo-700" : "text-rose-600"}
-              badge={<span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", cur.profit >= 0 ? "bg-indigo-100 text-indigo-700" : "bg-rose-100 text-rose-600")}>{margin.toFixed(1)}% margin</span>}
+              sparkData={profitSpark}
+              sparkColor={cur.profit >= 0 ? "#6366f1" : "#f43f5e"}
+              gradientId="pnl-grad-profit"
+              badge={
+                <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", cur.profit >= 0 ? "bg-indigo-100 text-indigo-700" : "bg-rose-100 text-rose-600")}>
+                  {margin.toFixed(1)}% margin
+                </span>
+              }
             />
           </div>
 
           {/* Income by journal */}
-          <div className="mt-5">
-            <div className="mb-2.5 flex items-center gap-1.5">
-              <Landmark className="h-3.5 w-3.5 text-faint" />
-              <p className="text-xs font-medium text-muted">Income by journal · {cur.label}</p>
-            </div>
-            <div className="space-y-2">
-              {cur.byJournal.map((j) => (
-                <div key={j.code} className="flex items-center gap-2.5">
-                  <span className="w-12 shrink-0 text-xs font-bold" style={{ color: JOURNAL_COLOR[j.code] ?? "#64748b" }}>{j.code}</span>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-2">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${(j.income / maxJournalIncome) * 100}%`, background: JOURNAL_COLOR[j.code] ?? "#64748b" }} />
-                  </div>
-                  <span className="w-24 shrink-0 text-right text-xs font-medium text-ink">{inr(j.income)}</span>
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="grid h-8 w-8 place-items-center rounded-lg bg-surface-2 text-muted">
+                  <Landmark className="h-4 w-4" />
                 </div>
-              ))}
+                <p className="text-sm font-semibold text-ink">
+                  Income by Journal <span className="font-normal text-faint">· {cur.label}</span>
+                </p>
+              </div>
+              <div className="relative">
+                <button
+                  onClick={() => setMetricMenuOpen((o) => !o)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink hover:bg-surface-2"
+                >
+                  {byJournalMetric} <ChevronDown className={cn("h-3.5 w-3.5 text-faint transition-transform", metricMenuOpen && "rotate-180")} />
+                </button>
+                {metricMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setMetricMenuOpen(false)} />
+                    <div className="absolute right-0 z-50 mt-1 w-40 rounded-xl border border-border bg-card p-1 shadow-card-lg">
+                      <button
+                        onClick={() => { setByJournalMetric("Total Income"); setMetricMenuOpen(false); }}
+                        className="block w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-ink hover:bg-surface-2"
+                      >
+                        Total Income
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-3.5">
+              {cur.byJournal.map((j) => {
+                const Icon = JOURNAL_ICON[j.code] ?? Landmark;
+                const color = JOURNAL_COLOR[j.code] ?? "#64748b";
+                const pct = (j.income / maxJournalIncome) * 100;
+                return (
+                  <div key={j.code} className="grid grid-cols-[76px_1fr_96px_88px_60px] items-center gap-3 sm:grid-cols-[92px_1fr_110px_100px_64px]">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white" style={{ background: color }}>
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <span className="truncate text-sm font-bold text-ink">{j.code}</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-surface-2">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(pct, j.income > 0 ? 2 : 0)}%`, background: color }} />
+                    </div>
+                    <div className="hidden h-8 sm:block">
+                      <Sparkline data={journalSpark(j.code)} color={color} gradientId={`pnl-grad-${j.code}`} />
+                    </div>
+                    <span className="text-right text-sm font-semibold text-ink">{inr(j.income)}</span>
+                    <div className="flex justify-end">
+                      <Delta v={journalDelta(j.code)} size="xs" />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </>
       ) : (
-        <div className="flex h-40 items-center justify-center text-sm text-faint">No data available.</div>
+        <div className="flex h-40 items-center justify-center rounded-2xl border border-border bg-card text-sm text-faint">No data available.</div>
       )}
     </div>
   );
 }
 
 function StatTile({
-  label, value, delta, deltaInvert, icon, gradient, ring, iconBg, valueColor, badge,
+  label, value, delta, deltaInvert, monthLabel, icon, iconBg, sparkData, sparkColor, gradientId, badge,
 }: {
-  label: string; value: number; delta: number; deltaInvert?: boolean;
-  icon: React.ReactNode; gradient: string; ring: string; iconBg: string; valueColor: string; badge?: React.ReactNode;
+  label: string; value: number; delta: number; deltaInvert?: boolean; monthLabel: string;
+  icon: React.ReactNode; iconBg: string; sparkData: { value: number }[]; sparkColor: string; gradientId: string;
+  badge?: React.ReactNode;
 }) {
   return (
-    <div className={cn("rounded-2xl bg-gradient-to-br p-4 ring-1", gradient, ring)}>
-      <div className="flex items-center justify-between">
-        <div className={cn("grid h-9 w-9 place-items-center rounded-xl text-white", iconBg)}>{icon}</div>
-        <Delta v={delta} invert={deltaInvert} />
+    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+      <div className="p-4 pb-3">
+        <div className="flex items-center gap-2.5">
+          <div className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-xl text-white", iconBg)}>{icon}</div>
+          <p className="text-sm font-medium text-muted">{label}</p>
+        </div>
+        <p className="mt-3 text-[26px] font-bold leading-none tracking-tight text-ink">{inr(value)}</p>
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+          <Delta v={delta} invert={deltaInvert} />
+          <span className="text-xs text-faint">vs {monthLabel}</span>
+          {badge}
+        </div>
       </div>
-      <p className="mt-3 text-xs font-medium text-slate-500">{label}</p>
-      <p className={cn("mt-0.5 text-2xl font-bold tracking-tight", valueColor)}>{inr(value)}</p>
-      {badge && <div className="mt-1.5">{badge}</div>}
+      <div className="h-[68px] w-full">
+        <Sparkline data={sparkData} color={sparkColor} gradientId={gradientId} />
+      </div>
     </div>
   );
 }
