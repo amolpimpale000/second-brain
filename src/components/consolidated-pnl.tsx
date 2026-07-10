@@ -25,7 +25,6 @@ const JOURNAL_COLOR: Record<string, string> = {
 const JOURNAL_ICON: Record<string, React.ElementType> = {
   IJPS: LineChartIcon, IJSRT: FileText, IJMPS: Building2, IJES: Coins, JPS: FlaskConical,
 };
-const SPARK_WINDOW = 6; // trailing months shown in every sparkline, ending at the selected month
 
 function Delta({ v, invert, size = "sm" }: { v: number; invert?: boolean; size?: "sm" | "xs" }) {
   if (!v) return <span className={cn("font-medium text-faint", size === "sm" ? "text-xs" : "text-[11px]")}>—</span>;
@@ -126,8 +125,9 @@ export function ConsolidatedPnL({ className }: { className?: string }) {
   const margin = cur && cur.income > 0 ? Math.round((cur.profit / cur.income) * 1000) / 10 : 0;
   const maxJournalIncome = cur ? Math.max(1, ...cur.byJournal.map((j) => j.income)) : 1;
 
-  // Trailing window (oldest → newest) ending at the selected month, reused by every sparkline.
-  const trailing = useMemo(() => months.slice(idx, idx + SPARK_WINDOW).reverse(), [months, idx]);
+  // Every month available (oldest → newest), ending at the selected month — the full trend
+  // "since all time" for however much history the API has loaded (currently 12 months).
+  const trailing = useMemo(() => months.slice(idx).reverse(), [months, idx]);
   const incomeSpark = trailing.map((m) => ({ value: m.income }));
   const expensesSpark = trailing.map((m) => ({ value: m.expenses }));
   const profitSpark = trailing.map((m) => ({ value: m.profit }));
@@ -336,20 +336,20 @@ function StatTile({
   badge?: React.ReactNode;
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
-      <div className="p-4 pb-3">
+    <div className="flex h-[168px] items-stretch overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+      <div className="flex min-w-0 flex-1 flex-col justify-center p-4">
         <div className="flex items-center gap-2.5">
           <div className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-xl text-white", iconBg)}>{icon}</div>
           <p className="text-sm font-medium text-muted">{label}</p>
         </div>
-        <p className="mt-3 text-[26px] font-bold leading-none tracking-tight text-ink">{inr(value)}</p>
-        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        <p className="mt-3 truncate text-[28px] font-bold leading-none tracking-tight text-ink">{inr(value)}</p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <Delta v={delta} invert={deltaInvert} />
           <span className="text-xs text-faint">vs {monthLabel}</span>
-          {badge}
         </div>
+        {badge && <div className="mt-1.5">{badge}</div>}
       </div>
-      <div className="h-[68px] w-full">
+      <div className="h-full w-[42%] shrink-0">
         <Sparkline data={sparkData} color={sparkColor} gradientId={gradientId} />
       </div>
     </div>

@@ -6,7 +6,7 @@ import {
   BookOpen, FileText, CheckCircle2, Clock, Users, IndianRupee, ArrowUpRight, ArrowDownRight,
   Plus,
   Pencil, Trash2, Eye, ChevronLeft, ChevronRight, MousePointerClick, Target,
-  Star, Building2, CalendarDays, Wallet, AlertTriangle,
+  Star, CalendarDays, Wallet, AlertTriangle,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { MultiLineChart, SegmentedGauge, GroupedBars } from "@/components/charts";
@@ -15,6 +15,7 @@ import { GoogleAdsLogo } from "@/components/google-ads-logo";
 import { Logo } from "@/components/logo";
 import { AlertsBell } from "@/components/alerts-drawer";
 import { ConsolidatedPnL } from "@/components/consolidated-pnl";
+import { RevenueOverview } from "@/components/revenue-overview";
 import { EmployeeProductivityPanel } from "@/components/employee-productivity-chart";
 import { cn, inr } from "@/lib/utils";
 import { type JournalDashboardData } from "@/lib/journal-dashboard";
@@ -552,13 +553,7 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
         </div>
       </div>
 
-      {/* Business Profitability */}
       <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Building2 className="h-5 w-5 text-indigo-500" />
-          <h2 className="text-lg font-semibold text-ink">Business Profitability</h2>
-        </div>
-
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {data.businessProfitability.map((b) => (
             <div
@@ -949,27 +944,8 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           </div>
         </Panel>
 
-        <Panel title="Revenue Overview" action={period}>
-          <p className="text-xs text-muted">Total Revenue</p>
-          <div className="flex items-center gap-2">
-            <p className="text-2xl font-bold text-ink">{inr(totalJournalRevenue)}</p>
-            <Delta v={data.financialSummary.find((f) => f.label === "Total Revenue")?.growth ?? 0} />
-          </div>
-          <div className="mt-3 flex items-center gap-3">
-            <Donut data={data.revenueBreakdown} center="" sub="" />
-            <div className="flex-1 space-y-2.5">
-              {data.revenueBreakdown.map((r) => (
-                <div key={r.name} className="text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: r.color }} />
-                    <span className="truncate text-muted">{r.name}</span>
-                    <span className="ml-auto text-xs font-medium text-faint">{r.pct}%</span>
-                  </div>
-                  <p className="pl-[18px] font-medium text-ink">{inr(r.value)}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+        <Panel title="Revenue Overview">
+          <RevenueOverview />
         </Panel>
       </div>
 
@@ -1015,7 +991,7 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
             <p className="py-6 text-center text-sm text-faint">Country data isn't available yet.</p>
           ) : (
             <div className="space-y-2.5">
-              {topCountries.slice(0, 5).map((c) => (
+              {topCountries.slice(0, 8).map((c) => (
                 <div key={c.name} className="flex items-center gap-3 text-sm">
                   <span className="text-lg">{c.flag}</span>
                   <span className="flex-1 text-ink">{c.name}</span>
