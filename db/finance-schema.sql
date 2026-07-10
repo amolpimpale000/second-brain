@@ -54,13 +54,23 @@ create table finance_investments (
   subtitle text,       -- small grey line, e.g. "548 qty · avg ₹153.36" or "Equity · Flexi Cap"
   logo_domain text,    -- company favicon/logo, e.g. "tatamotors.com"
   sip_amount numeric,  -- monthly SIP amount (mutual funds)
+  quantity numeric,                  -- units/shares/grams held — required for live pricing
+  symbol text,                       -- Yahoo ticker (Stocks/US Stocks e.g. "RELIANCE.NS","AAPL"), mfapi.in scheme code (Mutual Funds), unused for Gold
+  sip_day integer,                   -- day of month (1-31) the SIP amount auto-buys units at that day's live price
+  last_sip_credited_month text,      -- "YYYY-MM" — dedup guard so the sync job never double-credits a month's SIP
+  price_updated_at timestamptz,      -- when current_value was last refreshed from a live price (null = manually entered)
   created_at timestamptz not null default now()
 );
 -- If finance_investments already existed, run once instead:
 -- alter table finance_investments
 --   add column if not exists subtitle text,
 --   add column if not exists logo_domain text,
---   add column if not exists sip_amount numeric;
+--   add column if not exists sip_amount numeric,
+--   add column if not exists quantity numeric,
+--   add column if not exists symbol text,
+--   add column if not exists sip_day integer,
+--   add column if not exists last_sip_credited_month text,
+--   add column if not exists price_updated_at timestamptz;
 
 create table finance_bills (
   id text primary key,

@@ -95,7 +95,70 @@ function Modal({ open, onClose, title, children }: { open: boolean; onClose: () 
   );
 }
 
-type InvInput = { name: string; type: string; invested: number; currentValue: number; subtitle?: string; logoDomain?: string; sipAmount?: number };
+type InvInput = {
+  name: string; type: string; invested: number; currentValue: number;
+  subtitle?: string; logoDomain?: string; sipAmount?: number;
+  quantity?: number; symbol?: string; sipDay?: number;
+};
+
+const LIVE_PRICED_TYPES = ["Stocks", "US Stocks", "ETFs", "Mutual Funds", "Gold"];
+
+function MfSymbolInput({ value, onChange }: { value: string; onChange: (schemeCode: string, schemeName: string) => void }) {
+  const [query, setQuery] = useState(value);
+  const [results, setResults] = useState<{ schemeCode: string; schemeName: string }[]>([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (query.trim().length < 3) { setResults([]); return; }
+    let cancelled = false;
+    setLoading(true);
+    const t = setTimeout(() => {
+      fetch(`/api/investments/search-mf?q=${encodeURIComponent(query)}`)
+        .then((r) => r.json())
+        .then((json) => { if (!cancelled) setResults(json.results ?? []); })
+        .catch(() => {})
+        .finally(() => { if (!cancelled) setLoading(false); });
+    }, 350);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [query]);
+
+  return (
+    <div className="relative">
+      <input
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        placeholder="Search fund name, e.g. Axis Small Cap"
+        className={inputCls}
+      />
+      {open && (query.trim().length >= 3) && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 right-0 z-50 mt-1 max-h-52 overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-card-lg">
+            {loading ? (
+              <p className="px-3 py-2 text-xs text-faint">Searching…</p>
+            ) : results.length === 0 ? (
+              <p className="px-3 py-2 text-xs text-faint">No matches.</p>
+            ) : (
+              results.map((r) => (
+                <button
+                  key={r.schemeCode}
+                  type="button"
+                  onClick={() => { onChange(r.schemeCode, r.schemeName); setQuery(r.schemeName); setOpen(false); }}
+                  className="block w-full rounded-lg px-3 py-2 text-left text-xs text-ink hover:bg-surface-2"
+                >
+                  {r.schemeName}
+                  <span className="ml-1 text-faint">#{r.schemeCode}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 function InvestmentForm({ initial, submitLabel, onSubmit, busy }: {
   initial?: Partial<FinInvestment>; submitLabel: string; onSubmit: (d: InvInput) => void; busy: boolean;
@@ -107,6 +170,14 @@ function InvestmentForm({ initial, submitLabel, onSubmit, busy }: {
   const [subtitle, setSubtitle] = useState(initial?.subtitle ?? "");
   const [logoDomain, setLogoDomain] = useState(initial?.logoDomain ?? "");
   const [sipAmount, setSipAmount] = useState(initial?.sipAmount != null ? String(initial.sipAmount) : "");
+  const [quantity, setQuantity] = useState(initial?.quantity != null ? String(initial.quantity) : "");
+  const [symbol, setSymbol] = useState(initial?.symbol ?? "");
+  const [mfName, setMfName] = useState(initial?.symbol ? initial?.subtitle ?? "" : "");
+  const [sipDay, setSipDay] = useState(initial?.sipDay != null ? String(initial.sipDay) : "");
+
+  const isLivePriced = LIVE_PRICED_TYPES.includes(type);
+  const isGold = type === "Gold";
+  const isMf = type === "Mutual Funds";
 
   return (
     <form
@@ -116,6 +187,9 @@ function InvestmentForm({ initial, submitLabel, onSubmit, busy }: {
         if (subtitle.trim()) out.subtitle = subtitle.trim();
         if (logoDomain.trim()) out.logoDomain = logoDomain.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
         if (sipAmount.trim()) out.sipAmount = Number(sipAmount) || 0;
+        if (quantity.trim()) out.quantity = Number(quantity) || 0;
+        if (symbol.trim()) out.symbol = symbol.trim();
+        if (sipDay.trim()) out.sipDay = Math.min(31, Math.max(1, Number(sipDay) || 1));
         onSubmit(out);
       }}
       className="space-y-3"
@@ -140,6 +214,46 @@ function InvestmentForm({ initial, submitLabel, onSubmit, busy }: {
         <label className="mb-1 block text-xs font-medium text-muted">Details <span className="text-faint">(optional — e.g. "548 qty · avg ₹153.36")</span></label>
         <input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder="Equity · Flexi Cap" className={inputCls} />
       </div>
+
+      {isLivePriced && (
+        <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
+          <p className="mb-2 text-xs font-semibold text-indigo-700">Live pricing</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted">
+                {isGold ? "Quantity (grams)" : "Quantity / Units"}
+              </label>
+              <input type="number" step="0.0001" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="0" className={inputCls} />
+            </div>
+            {!isGold && (
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted">
+                  {isMf ? "Fund" : "Ticker Symbol"}
+                </label>
+                {isMf ? (
+                  <MfSymbolInput
+                    value={mfName}
+                    onChange={(code, name) => { setSymbol(code); setMfName(name); }}
+                  />
+                ) : (
+                  <input
+                    value={symbol}
+                    onChange={(e) => setSymbol(e.target.value)}
+                    placeholder={type === "US Stocks" ? "e.g. AAPL, GOOGL" : "e.g. RELIANCE.NS, TCS.NS"}
+                    className={inputCls}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+          <p className="mt-2 text-[11px] text-faint">
+            {isGold
+              ? "Current value refreshes automatically from the live gold price."
+              : "Set quantity + symbol to have Current Value refresh automatically from live market prices."}
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-xs font-medium text-muted">Invested (₹)</label>
@@ -150,10 +264,21 @@ function InvestmentForm({ initial, submitLabel, onSubmit, busy }: {
           <input required type="number" step="0.01" value={currentValue} onChange={(e) => setCurrentValue(e.target.value)} placeholder="0" className={inputCls} />
         </div>
       </div>
-      <div>
-        <label className="mb-1 block text-xs font-medium text-muted">Monthly SIP (₹) <span className="text-faint">(optional)</span></label>
-        <input type="number" step="0.01" value={sipAmount} onChange={(e) => setSipAmount(e.target.value)} placeholder="0" className={inputCls} />
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">Monthly SIP (₹) <span className="text-faint">(optional)</span></label>
+          <input type="number" step="0.01" value={sipAmount} onChange={(e) => setSipAmount(e.target.value)} placeholder="0" className={inputCls} />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">SIP Day <span className="text-faint">(1–31)</span></label>
+          <input type="number" min={1} max={31} value={sipDay} onChange={(e) => setSipDay(e.target.value)} placeholder="e.g. 5" className={inputCls} disabled={!sipAmount.trim()} />
+        </div>
       </div>
+      {sipAmount.trim() && isLivePriced && quantity.trim() && (isGold || symbol.trim()) && (
+        <p className="text-[11px] text-faint">
+          On/after day {sipDay || "…"} each month, ₹{sipAmount || 0} will automatically buy units at that day&apos;s live price and add to this holding.
+        </p>
+      )}
       <button type="submit" disabled={busy} className="w-full rounded-xl bg-emerald-500 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors disabled:opacity-60">
         {busy ? "Saving…" : submitLabel}
       </button>
@@ -310,7 +435,14 @@ export function InvestmentsClient({ initial }: { initial: FinInvestment[] }) {
                     <span className="rounded-md px-2 py-0.5 text-[11px] font-medium" style={{ background: `${investColor(i.type)}18`, color: investColor(i.type) }}>{i.type}</span>
                   </td>
                   <td className="py-3 text-right text-[12px] text-muted whitespace-nowrap">₹ {Math.round(i.invested).toLocaleString("en-IN")}</td>
-                  <td className="py-3 text-right text-[13px] font-semibold text-ink whitespace-nowrap">₹ {Math.round(i.currentValue).toLocaleString("en-IN")}</td>
+                  <td className="py-3 text-right text-[13px] font-semibold text-ink whitespace-nowrap">
+                    <span className="inline-flex items-center justify-end gap-1.5">
+                      {i.priceUpdatedAt && (
+                        <span className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" title={`Live · updated ${new Date(i.priceUpdatedAt).toLocaleString("en-IN")}`} />
+                      )}
+                      ₹ {Math.round(i.currentValue).toLocaleString("en-IN")}
+                    </span>
+                  </td>
                   <td className={cn("py-3 text-right text-[12px] font-semibold whitespace-nowrap", g >= 0 ? "text-green-600" : "text-red-500")}>
                     {g >= 0 ? "+" : "−"}₹ {Math.abs(Math.round(g)).toLocaleString("en-IN")}
                   </td>

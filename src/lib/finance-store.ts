@@ -47,6 +47,8 @@ export type FinLoan = {
 export type FinInvestment = {
   id: string; name: string; type: string; invested: number; currentValue: number;
   subtitle?: string; logoDomain?: string; sipAmount?: number; createdAt: string;
+  quantity?: number; symbol?: string; sipDay?: number;
+  lastSipCreditedMonth?: string; priceUpdatedAt?: string;
 };
 export type FinBill = {
   id: string; name: string; amount: number; dueDay: number; createdAt: string;
@@ -96,7 +98,12 @@ const ENTITY_CONFIG = {
   },
   investments: {
     table: "finance_investments",
-    fields: { name: "name", type: "type", invested: "invested", currentValue: "current_value", subtitle: "subtitle", logoDomain: "logo_domain", sipAmount: "sip_amount" },
+    fields: {
+      name: "name", type: "type", invested: "invested", currentValue: "current_value",
+      subtitle: "subtitle", logoDomain: "logo_domain", sipAmount: "sip_amount",
+      quantity: "quantity", symbol: "symbol", sipDay: "sip_day",
+      lastSipCreditedMonth: "last_sip_credited_month", priceUpdatedAt: "price_updated_at",
+    },
     order: [{ col: "created_at", asc: true }],
   },
   bills: {
@@ -137,7 +144,7 @@ function fromRow(entity: FinanceEntity, row: Record<string, unknown>): Record<st
   for (const [camel, snake] of Object.entries(cfg.fields)) {
     let v = row[snake];
     // numeric columns come back as strings from Postgres — coerce
-    if (["amount", "balance", "target", "saved", "principal", "outstanding", "rate", "emi", "invested", "currentValue", "dueDay", "sipAmount"].includes(camel) || snake === "current_value" || snake === "due_day" || snake === "sip_amount") {
+    if (["amount", "balance", "target", "saved", "principal", "outstanding", "rate", "emi", "invested", "currentValue", "dueDay", "sipAmount", "quantity", "sipDay"].includes(camel) || snake === "current_value" || snake === "due_day" || snake === "sip_amount" || snake === "quantity" || snake === "sip_day") {
       v = v == null ? v : Number(v);
     }
     out[camel] = v ?? (camel === "accountId" || camel === "dueDate" ? null : v);
