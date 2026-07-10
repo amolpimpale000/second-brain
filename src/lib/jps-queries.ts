@@ -262,6 +262,43 @@ export async function getJpsPeriodStats(from: string, to: string): Promise<Perio
   }
 }
 
+export type DailyPublished = { date: string; series: Record<string, number>; total: number };
+
+/**
+ * Per-day published-paper totals for JPS, sourced from status_history's
+ * transitions into 'published' (the moment a manuscript actually became
+ * published, not just its current status). Every day in the window is
+ * present even with zero counts, so the chart renders a continuous range.
+ */
+export async function getJpsDailyPublishedTotal(days: number): Promise<DailyPublished[]> {
+  const client = await createJpsConnection();
+  try {
+    const res = await client.query(
+      `SELECT date_trunc('day', created_at) AS day, count(*) AS cnt
+       FROM status_history
+       WHERE new_status = 'published' AND created_at >= now() - ($1 || ' days')::interval
+       GROUP BY 1
+       ORDER BY 1`,
+      [days]
+    );
+    const byDay = new Map<string, number>();
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setUTCDate(d.getUTCDate() - i);
+      byDay.set(d.toISOString().slice(0, 10), 0);
+    }
+    for (const row of res.rows) {
+      const key = new Date(row.day).toISOString().slice(0, 10);
+      if (byDay.has(key)) byDay.set(key, Number(row.cnt));
+    }
+    return Array.from(byDay.entries()).map(([date, cnt]) => ({ date, series: { Total: cnt }, total: cnt }));
+  } finally {
+    await client.end().catch(() => {});
+  }
+}
+
 export type CountryStat = { name: string; count: number };
 
 export async function getJpsCountryBreakdown(): Promise<CountryStat[]> {

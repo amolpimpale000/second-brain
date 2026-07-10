@@ -622,6 +622,93 @@ function formatRelativeTime(dateInput: string | Date): string {
   return date.toLocaleDateString("en-IN");
 }
 
+export type DailyPublished = { date: string; series: Record<string, number>; total: number };
+
+/**
+ * Per-day published-paper counts, attributed to specific named employees
+ * (article.createdByUserID = employeeID, the same verified attribution used
+ * by the "employee idle" alert). Every day in the window is present even
+ * with zero counts, so charts render a continuous, gap-free range.
+ */
+export async function getJournalDailyPublishedByEmployees(
+  code: string,
+  prefix: string,
+  employeeNames: string[],
+  days: number,
+  cfg?: JournalConnectionConfig
+): Promise<DailyPublished[]> {
+  const conn = await connect(code, cfg);
+  try {
+    const [rows] = await conn.execute<any>(
+      `SELECT DATE(a.createdDate) AS day, e.name AS empName, COUNT(*) AS cnt
+       FROM ${prefix}_tblarticle a
+       JOIN ${prefix}_tblemployee e ON e.employeeID = a.createdByUserID
+       WHERE a.isActive = 1
+         AND a.createdDate >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+         AND e.name IN (${employeeNames.map(() => "?").join(",")})
+       GROUP BY DATE(a.createdDate), e.name
+       ORDER BY day ASC`,
+      [days, ...employeeNames]
+    );
+    return buildDailySeries(rows, employeeNames, days, (r) => r.empName);
+  } finally {
+    await conn.end();
+  }
+}
+
+/** Per-day published-paper totals for the whole journal, no employee breakdown. */
+export async function getJournalDailyPublishedTotal(
+  code: string,
+  prefix: string,
+  days: number,
+  cfg?: JournalConnectionConfig
+): Promise<DailyPublished[]> {
+  const conn = await connect(code, cfg);
+  try {
+    const [rows] = await conn.execute<any>(
+      `SELECT DATE(createdDate) AS day, COUNT(*) AS cnt
+       FROM ${prefix}_tblarticle
+       WHERE isActive = 1 AND createdDate >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+       GROUP BY DATE(createdDate)
+       ORDER BY day ASC`,
+      [days]
+    );
+    return buildDailySeries(rows.map((r: any) => ({ ...r, empName: "Total" })), ["Total"], days, (r) => r.empName);
+  } finally {
+    await conn.end();
+  }
+}
+
+/** Fills every day in [today-days+1, today] with zero, then overlays real counts per series key. */
+function buildDailySeries(
+  rows: any[],
+  seriesKeys: string[],
+  days: number,
+  seriesKeyOf: (row: any) => string
+): DailyPublished[] {
+  const byDay = new Map<string, Record<string, number>>();
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setUTCDate(d.getUTCDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    byDay.set(key, Object.fromEntries(seriesKeys.map((k) => [k, 0])));
+  }
+  for (const row of rows) {
+    const dayKey = row.day instanceof Date ? row.day.toISOString().slice(0, 10) : String(row.day).slice(0, 10);
+    const bucket = byDay.get(dayKey);
+    if (!bucket) continue; // outside the requested window (shouldn't happen given the SQL filter)
+    const key = seriesKeyOf(row);
+    bucket[key] = (bucket[key] ?? 0) + Number(row.cnt);
+  }
+  return Array.from(byDay.entries()).map(([date, series]) => ({
+    date,
+    series,
+    total: Object.values(series).reduce((s, n) => s + n, 0),
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // IJPS-specific wrappers (backward compatible with existing callers)
 // ---------------------------------------------------------------------------

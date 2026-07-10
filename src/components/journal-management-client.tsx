@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   BookOpen, FileText, CheckCircle2, Clock, Users, IndianRupee, ArrowUpRight, ArrowDownRight,
-  Plus, TrendingUp,
+  Plus,
   Pencil, Trash2, Eye, ChevronLeft, ChevronRight, MousePointerClick, Target,
   Star, Building2, CalendarDays, Wallet, AlertTriangle,
 } from "lucide-react";
@@ -15,6 +15,7 @@ import { GoogleAdsLogo } from "@/components/google-ads-logo";
 import { Logo } from "@/components/logo";
 import { AlertsBell } from "@/components/alerts-drawer";
 import { ConsolidatedPnL } from "@/components/consolidated-pnl";
+import { EmployeeProductivityPanel } from "@/components/employee-productivity-chart";
 import { cn, inr } from "@/lib/utils";
 import { type JournalDashboardData } from "@/lib/journal-dashboard";
 import { type JournalExpense } from "@/lib/journal-expenses-store";
@@ -111,7 +112,6 @@ function Legend({ items }: { items: { name: string; value: number; pct?: number;
 }
 
 export function JournalManagementClient({ data }: { data: JournalDashboardData }) {
-  const [sortKey, setSortKey] = useState<"score" | "handled" | "turnaround">("score");
   const [trendRangeLabel, setTrendRangeLabel] = useState<6 | 12>(12);
   const [showAllCountries, setShowAllCountries] = useState(false);
   const topCountries = data.topCountries;
@@ -142,13 +142,6 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snapshotPeriod]);
-  const sortedEmployees = [...data.employees].sort((a, b) =>
-    sortKey === "turnaround" ? a.turnaround - b.turnaround : b[sortKey] - a[sortKey]
-  );
-  const totalHandled = data.employees.reduce((s, e) => s + e.handled, 0);
-  const totalCompleted = data.employees.reduce((s, e) => s + e.completed, 0);
-  const avgTurn = (data.employees.reduce((s, e) => s + e.turnaround, 0) / data.employees.length).toFixed(1);
-  const avgScore = Math.round(data.employees.reduce((s, e) => s + e.score, 0) / data.employees.length);
 
   // Aggregates computed from real + placeholder journal data.
   const totalJournalManuscripts = data.journalPerformance.reduce((s, j) => s + j.manuscripts, 0);
@@ -1020,69 +1013,7 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
       </div>
 
       {/* EMPLOYEE PRODUCTIVITY */}
-      <Panel
-        title="Employee Productivity"
-        action={<Dropdown label={`Sort: ${sortKey === "score" ? "Score" : sortKey === "handled" ? "Manuscripts" : "Turnaround"}`}
-          options={["Score", "Manuscripts", "Turnaround"]}
-          onSelect={(v) => setSortKey(v === "Manuscripts" ? "handled" : v === "Turnaround" ? "turnaround" : "score")} align="right" />}
-      >
-        <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-          {[
-            { label: "Active Staff", value: `${data.employees.length}`, icon: Users, tone: "bg-indigo-50 text-indigo-600" },
-            { label: "Tasks Completed", value: `${totalCompleted}`, icon: CheckCircle2, tone: "bg-green-50 text-green-600" },
-            { label: "Avg Turnaround", value: `${avgTurn} days`, icon: Clock, tone: "bg-amber-50 text-amber-500" },
-            { label: "Avg Productivity", value: `${avgScore}%`, icon: TrendingUp, tone: "bg-emerald-50 text-emerald-600" },
-          ].map((s) => (
-            <div key={s.label} className="flex items-center gap-3 rounded-xl border border-border p-3">
-              <div className={cn("grid h-10 w-10 place-items-center rounded-xl", s.tone)}><s.icon className="h-5 w-5" /></div>
-              <div><p className="text-lg font-bold text-ink">{s.value}</p><p className="text-xs text-muted">{s.label}</p></div>
-            </div>
-          ))}
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs font-medium text-faint">
-                <th className="pb-2.5">Employee</th>
-                <th className="pb-2.5">Journal</th>
-                <th className="pb-2.5 text-right">Handled</th>
-                <th className="pb-2.5 text-right">Completed</th>
-                <th className="pb-2.5 text-right">Pending</th>
-                <th className="pb-2.5 text-right">Avg TAT</th>
-                <th className="pb-2.5">Productivity</th>
-                <th className="pb-2.5 text-right">Trend</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedEmployees.map((e) => (
-                <tr key={e.id} className="border-b border-border last:border-0 hover:bg-surface-2/50">
-                  <td className="py-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold text-white" style={{ background: e.color }}>{e.initials}</div>
-                      <div><p className="font-medium text-ink">{e.name}</p><p className="text-xs text-faint">{e.role}</p></div>
-                    </div>
-                  </td>
-                  <td className="py-3"><span className="rounded-md bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted">{e.journal}</span></td>
-                  <td className="py-3 text-right text-ink">{e.handled}</td>
-                  <td className="py-3 text-right text-green-600">{e.completed}</td>
-                  <td className="py-3 text-right text-amber-500">{e.pending}</td>
-                  <td className="py-3 text-right text-muted">{e.turnaround} d</td>
-                  <td className="py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-24 overflow-hidden rounded-full bg-surface-2">
-                        <div className="h-full rounded-full" style={{ width: `${e.score}%`, background: e.score >= 90 ? "#22c55e" : e.score >= 80 ? "#f59e0b" : "#ef4444" }} />
-                      </div>
-                      <span className="text-xs font-semibold text-ink">{e.score}%</span>
-                    </div>
-                  </td>
-                  <td className="py-3 text-right"><Delta v={e.trend} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
+      <EmployeeProductivityPanel />
 
       {/* All Countries modal */}
       {showAllCountries && (
