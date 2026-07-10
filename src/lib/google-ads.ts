@@ -14,6 +14,14 @@ export const GOOGLE_ADS_JOURNAL_CODES = ["IJPS", "IJSRT", "IJMPS", "IJES", "JPS"
 
 export type GoogleAdsCampaignSpend = { name: string; cost: number; impressions: number; clicks: number; conversions: number };
 
+export type GoogleAdsAccountBudget = {
+  approvedLimit: number;
+  adjustments: number;
+  served: number;
+  remaining: number;
+  pctRemaining: number; // 0-100
+};
+
 export type GoogleAdsJournalSpend = {
   code: string;
   connected: boolean;
@@ -22,6 +30,7 @@ export type GoogleAdsJournalSpend = {
   clicks: number;
   conversions: number;
   campaigns: GoogleAdsCampaignSpend[];
+  budget: GoogleAdsAccountBudget | null;
   error?: string;
 };
 
@@ -93,35 +102,76 @@ async function getAccessToken(): Promise<string> {
   return json.access_token;
 }
 
-async function fetchJournalSpend(
-  code: string,
-  customerId: string,
-  accessToken: string,
-  range: { start: string; end: string }
-): Promise<GoogleAdsJournalSpend> {
+function adsHeaders(accessToken: string): Record<string, string> {
   const loginCustomerId = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID?.replace(/-/g, "");
-  const query = `
-    SELECT campaign.name, metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions
-    FROM campaign
-    WHERE segments.date BETWEEN '${range.start}' AND '${range.end}'
-  `;
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
     "developer-token": process.env.GOOGLE_ADS_DEVELOPER_TOKEN!,
     "Content-Type": "application/json",
   };
   if (loginCustomerId) headers["login-customer-id"] = loginCustomerId;
+  return headers;
+}
 
-  const emptyResult: GoogleAdsJournalSpend = { code, connected: false, totalSpend: 0, impressions: 0, clicks: 0, conversions: 0, campaigns: [] };
-
+// The current approved account budget's remaining balance. Google Ads doesn't
+// expose a literal "prepaid wallet" figure via the API — but for these
+// journals' invoiced monthly-budget setup, account_budget.approved_spending_limit
+// (+ adjustments, e.g. refunds/credits) minus amount_served IS the real
+// remaining balance before the account needs a new budget/top-up to keep
+// serving ads. Picks the most recently created budget (ORDER BY id DESC).
+async function fetchAccountBudget(customerId: string, accessToken: string): Promise<GoogleAdsAccountBudget | null> {
+  const query = `
+    SELECT account_budget.id, account_budget.status, account_budget.approved_spending_limit_micros,
+           account_budget.total_adjustments_micros, account_budget.amount_served_micros
+    FROM account_budget
+    ORDER BY account_budget.id DESC
+    LIMIT 1
+  `;
   try {
     const res = await fetch(
       `https://googleads.googleapis.com/${API_VERSION}/customers/${customerId}/googleAds:search`,
-      { method: "POST", headers, body: JSON.stringify({ query }) }
+      { method: "POST", headers: adsHeaders(accessToken), body: JSON.stringify({ query }) }
     );
+    if (!res.ok) return null;
+    const json = await res.json();
+    const row = json.results?.[0]?.accountBudget;
+    if (!row) return null;
+    const approvedLimit = Number(row.approvedSpendingLimitMicros || 0) / 1_000_000;
+    const adjustments = Number(row.totalAdjustmentsMicros || 0) / 1_000_000;
+    const served = Number(row.amountServedMicros || 0) / 1_000_000;
+    const effectiveLimit = approvedLimit + adjustments;
+    const remaining = Math.round(effectiveLimit - served);
+    const pctRemaining = effectiveLimit > 0 ? Math.max(0, Math.round((remaining / effectiveLimit) * 1000) / 10) : 0;
+    return { approvedLimit: Math.round(approvedLimit), adjustments: Math.round(adjustments), served: Math.round(served), remaining, pctRemaining };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchJournalSpend(
+  code: string,
+  customerId: string,
+  accessToken: string,
+  range: { start: string; end: string }
+): Promise<GoogleAdsJournalSpend> {
+  const query = `
+    SELECT campaign.name, metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions
+    FROM campaign
+    WHERE segments.date BETWEEN '${range.start}' AND '${range.end}'
+  `;
+  const emptyResult: GoogleAdsJournalSpend = { code, connected: false, totalSpend: 0, impressions: 0, clicks: 0, conversions: 0, campaigns: [], budget: null };
+
+  try {
+    const [res, budget] = await Promise.all([
+      fetch(
+        `https://googleads.googleapis.com/${API_VERSION}/customers/${customerId}/googleAds:search`,
+        { method: "POST", headers: adsHeaders(accessToken), body: JSON.stringify({ query }) }
+      ),
+      fetchAccountBudget(customerId, accessToken),
+    ]);
     if (!res.ok) {
       const text = await res.text();
-      return { ...emptyResult, error: `API error (${res.status}): ${text.slice(0, 200)}` };
+      return { ...emptyResult, budget, error: `API error (${res.status}): ${text.slice(0, 200)}` };
     }
     const json = await res.json();
     const rows: any[] = json.results || [];
@@ -148,7 +198,7 @@ async function fetchJournalSpend(
     const impressions = campaigns.reduce((s, c) => s + c.impressions, 0);
     const clicks = campaigns.reduce((s, c) => s + c.clicks, 0);
     const conversions = Math.round(campaigns.reduce((s, c) => s + c.conversions, 0) * 10) / 10;
-    return { code, connected: true, totalSpend, impressions, clicks, conversions, campaigns };
+    return { code, connected: true, totalSpend, impressions, clicks, conversions, campaigns, budget };
   } catch (err) {
     return { ...emptyResult, error: err instanceof Error ? err.message : "Request failed" };
   }
@@ -187,14 +237,14 @@ export async function getGoogleAdsSpendForJournal(code: string, monthKey?: strin
   const range = monthRange(monthKey);
   const customerId = getCustomerId(code);
   if (!baseConfigured() || !customerId) {
-    return { code, connected: false, totalSpend: 0, impressions: 0, clicks: 0, conversions: 0, campaigns: [], periodLabel: range.label, error: "Not configured for this journal." };
+    return { code, connected: false, totalSpend: 0, impressions: 0, clicks: 0, conversions: 0, campaigns: [], budget: null, periodLabel: range.label, error: "Not configured for this journal." };
   }
   try {
     const accessToken = await getAccessToken();
     const result = await fetchJournalSpend(code, customerId, accessToken, range);
     return { ...result, periodLabel: range.label };
   } catch (err) {
-    return { code, connected: false, totalSpend: 0, impressions: 0, clicks: 0, conversions: 0, campaigns: [], periodLabel: range.label, error: err instanceof Error ? err.message : "Request failed" };
+    return { code, connected: false, totalSpend: 0, impressions: 0, clicks: 0, conversions: 0, campaigns: [], budget: null, periodLabel: range.label, error: err instanceof Error ? err.message : "Request failed" };
   }
 }
 

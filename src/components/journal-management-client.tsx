@@ -6,7 +6,7 @@ import {
   BookOpen, FileText, CheckCircle2, Clock, Users, IndianRupee, ArrowUpRight, ArrowDownRight,
   Plus, TrendingUp,
   Pencil, Trash2, Eye, ChevronLeft, ChevronRight, MousePointerClick, Target,
-  Star, Building2, CalendarDays,
+  Star, Building2, CalendarDays, Wallet, AlertTriangle,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { MultiLineChart, SegmentedGauge, GroupedBars } from "@/components/charts";
@@ -824,6 +824,35 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
                 </div>
                 <div className="p-2.5">
                   <p className="text-lg font-bold text-ink">{j.connected ? inr(j.totalSpend) : "—"}</p>
+                  {j.connected && j.budget && (
+                    <div className={cn(
+                      "mt-2 rounded-md px-2 py-1.5",
+                      j.budget.pctRemaining < 5 ? "bg-red-50" : j.budget.pctRemaining < 15 ? "bg-amber-50" : "bg-green-50"
+                    )}>
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted">
+                          {j.budget.pctRemaining < 15 ? (
+                            <AlertTriangle className={cn("h-3 w-3 shrink-0", j.budget.pctRemaining < 5 ? "text-red-500" : "text-amber-500")} />
+                          ) : (
+                            <Wallet className="h-3 w-3 shrink-0 text-green-600" />
+                          )}
+                          Balance
+                        </span>
+                        {j.budget.pctRemaining < 15 && (
+                          <span className={cn("text-[8px] font-bold uppercase tracking-wide", j.budget.pctRemaining < 5 ? "text-red-600" : "text-amber-600")}>
+                            {j.budget.pctRemaining < 5 ? "Critical" : "Low"}
+                          </span>
+                        )}
+                      </div>
+                      <p className={cn(
+                        "mt-0.5 text-sm font-bold",
+                        j.budget.pctRemaining < 5 ? "text-red-600" : j.budget.pctRemaining < 15 ? "text-amber-600" : "text-green-700"
+                      )}>
+                        {inr(j.budget.remaining)}
+                      </p>
+                      <p className="text-[9px] text-faint">{j.budget.pctRemaining}% of {inr(j.budget.approvedLimit + j.budget.adjustments, { compact: true })} approved</p>
+                    </div>
+                  )}
                   {j.connected && (
                     <div className="mt-2 grid grid-cols-3 gap-1">
                       <div className="rounded-md bg-surface-2/70 p-1 text-center">
