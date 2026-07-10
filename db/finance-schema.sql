@@ -77,8 +77,11 @@ create table finance_bills (
   name text not null,
   amount numeric not null,
   due_day integer not null default 1, -- day of month (1-31)
+  logo_domain text,    -- company favicon/logo, e.g. "netflix.com" — same Logo component as SIPs
   created_at timestamptz not null default now()
 );
+-- If finance_bills already existed, run once instead:
+-- alter table finance_bills add column if not exists logo_domain text;
 
 create table finance_dues (
   id text primary key,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   getFinanceData,
   createEntity,
+  bulkCreateEntity,
   updateEntity,
   deleteEntity,
   isFinanceEntity,
@@ -23,11 +24,12 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { entity, action, id, data } = body as {
+    const { entity, action, id, data, items } = body as {
       entity: string;
-      action: "create" | "update" | "delete";
+      action: "create" | "bulkCreate" | "update" | "delete";
       id?: string;
       data?: Record<string, unknown>;
+      items?: Record<string, unknown>[];
     };
 
     if (!entity || !isFinanceEntity(entity)) {
@@ -38,6 +40,13 @@ export async function POST(request: NextRequest) {
       if (!data) return NextResponse.json({ error: "Missing data" }, { status: 400 });
       const row = await createEntity(entity, data);
       return NextResponse.json({ row });
+    }
+    if (action === "bulkCreate") {
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return NextResponse.json({ error: "Missing items" }, { status: 400 });
+      }
+      const rows = await bulkCreateEntity(entity, items);
+      return NextResponse.json({ rows });
     }
     if (action === "update") {
       if (!id || !data) return NextResponse.json({ error: "Missing id or data" }, { status: 400 });

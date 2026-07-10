@@ -6,17 +6,17 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Wallet, PiggyBank, BarChart3, Users, Home, CalendarDays, CheckSquare, Car, Plane, Shield,
   ShoppingBag, UtensilsCrossed, Lightbulb, LayoutGrid, Zap, CreditCard, ArrowRight, ArrowUpRight,
-  ArrowDownRight, ChevronDown, Plus, Landmark, Smartphone, Wifi, Receipt, User, Check, CheckCircle2,
+  ArrowDownRight, ChevronDown, Plus, Landmark, Receipt, User, Check, CheckCircle2,
   Pencil, Trash2, Search, TrendingUp, Target, GraduationCap, Gift, Clapperboard, HeartPulse,
-  BookOpen, IndianRupee, X,
+  BookOpen, IndianRupee, X, Upload, Loader2, FileText, AlertTriangle,
 } from "lucide-react";
-import { FaAmazon, FaSpotify } from "react-icons/fa";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell,
   LineChart, Line,
 } from "recharts";
 import { cn, inr } from "@/lib/utils";
 import { INVESTMENT_TYPES } from "@/lib/investment-types";
+import { Logo } from "@/components/logo";
 import type {
   FinanceData, FinanceEntity, FinAccount, FinTransaction, FinGoal, FinLoan, FinInvestment,
   FinBill, FinDue, FinBudget,
@@ -25,13 +25,6 @@ import type {
 /* ═══════════════════════════════════════════════════════════════════════════
    Brand icons
    ═══════════════════════════════════════════════════════════════════════════ */
-function NetflixIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M5.398 0v.006c3.028 8.556 5.37 15.175 8.348 23.596 2.344.058 4.85.398 4.854.398-2.8-7.924-5.923-16.747-8.487-24zm8.489 0v9.63L18.6 22.951c-.043-7.86-.004-15.913.002-22.95zM5.398 1.05V24c1.873-.225 2.81-.312 4.715-.398v-9.22z" />
-    </svg>
-  );
-}
 function HdfcIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 40 40" fill="none">
@@ -140,16 +133,29 @@ const INSTITUTIONS = [
   { value: "other", label: "Other Bank" },
 ];
 
-function billIconFor(name: string): { icon: React.ElementType; color: string } {
-  const n = name.toLowerCase();
-  if (n.includes("netflix")) return { icon: NetflixIcon, color: "#E50914" };
-  if (n.includes("amazon") || n.includes("prime")) return { icon: FaAmazon, color: "#FF9900" };
-  if (n.includes("spotify")) return { icon: FaSpotify, color: "#1DB954" };
-  if (n.includes("mobile") || n.includes("phone") || n.includes("postpaid") || n.includes("jio") || n.includes("airtel")) return { icon: Smartphone, color: "#3b82f6" };
-  if (n.includes("internet") || n.includes("wifi") || n.includes("broadband")) return { icon: Wifi, color: "#8b5cf6" };
-  if (n.includes("rent") || n.includes("house")) return { icon: Home, color: "#22c55e" };
-  if (n.includes("electric") || n.includes("power")) return { icon: Zap, color: "#f59e0b" };
-  return { icon: Receipt, color: "#64748b" };
+// Auto-guessed domain for common bills/subscriptions, so most entries get a
+// real company favicon (via the shared Logo component — Clearbit → Google
+// favicon → monogram) with zero setup. The bill form's "Logo Website" field
+// overrides this for anything not covered here.
+const BILL_DOMAIN_HINTS: { pattern: RegExp; domain: string }[] = [
+  { pattern: /netflix/i, domain: "netflix.com" },
+  { pattern: /amazon|prime ?video/i, domain: "amazon.in" },
+  { pattern: /spotify/i, domain: "spotify.com" },
+  { pattern: /hotstar|disney/i, domain: "hotstar.com" },
+  { pattern: /youtube/i, domain: "youtube.com" },
+  { pattern: /jio\b/i, domain: "jio.com" },
+  { pattern: /airtel/i, domain: "airtel.in" },
+  { pattern: /vodafone|\bvi\b/i, domain: "myvi.in" },
+  { pattern: /bsnl/i, domain: "bsnl.co.in" },
+  { pattern: /act fibernet/i, domain: "actcorp.in" },
+  { pattern: /google/i, domain: "google.com" },
+  { pattern: /apple|icloud/i, domain: "apple.com" },
+  { pattern: /gym|fitness|cult\.?fit/i, domain: "cult.fit" },
+  { pattern: /electric|power ?bill|bses|mahavitaran/i, domain: "bijlibachao.com" },
+];
+
+function guessBillDomain(name: string): string | undefined {
+  return BILL_DOMAIN_HINTS.find((h) => h.pattern.test(name))?.domain;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -379,6 +385,165 @@ function EntityForm({
   );
 }
 
+type ImportedTxn = {
+  date: string; description: string; amount: number;
+  direction: "debit" | "credit"; category: string; likelyTransfer: boolean; selected: boolean;
+};
+
+function ImportStatementModal({ open, onClose, onImport, busy }: {
+  open: boolean; onClose: () => void;
+  onImport: (items: Record<string, unknown>[]) => Promise<unknown>;
+  busy: boolean;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [parsing, setParsing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [rows, setRows] = useState<ImportedTxn[] | null>(null);
+
+  function reset() {
+    setFile(null); setParsing(false); setError(null); setRows(null);
+  }
+
+  async function handleParse() {
+    if (!file) return;
+    setParsing(true); setError(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/finance/import-statement", { method: "POST", body: form });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to parse statement");
+      if (json.error) { setError(json.error); setRows([]); return; }
+      const parsed: ImportedTxn[] = (json.transactions ?? []).map((t: Omit<ImportedTxn, "selected">) => ({ ...t, selected: !t.likelyTransfer }));
+      setRows(parsed);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to parse statement");
+    } finally {
+      setParsing(false);
+    }
+  }
+
+  async function handleImport() {
+    if (!rows) return;
+    const selected = rows.filter((r) => r.selected);
+    if (selected.length === 0) return;
+    const items = selected.map((r) => ({
+      type: r.direction === "credit" ? "income" : "expense",
+      category: r.category,
+      description: r.description,
+      amount: r.amount,
+      date: r.date,
+      mode: "UPI",
+      accountId: null,
+    }));
+    await onImport(items);
+    reset();
+    onClose();
+  }
+
+  const selectedCount = rows?.filter((r) => r.selected).length ?? 0;
+  const selectedExpenseTotal = rows?.filter((r) => r.selected && r.direction === "debit").reduce((s, r) => s + r.amount, 0) ?? 0;
+
+  return (
+    <Modal open={open} onClose={() => { reset(); onClose(); }} title="Import from Statement">
+      {!rows ? (
+        <div className="space-y-4">
+          <p className="text-sm text-muted">
+            Upload a PhonePe or bank PDF statement. Transactions get pulled out with a guessed category —
+            you pick which ones to actually add before anything is saved. Payments to personal names/accounts
+            start unchecked since those are usually transfers, not expenses.
+          </p>
+          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-surface-2/30 py-10 text-center hover:border-brand/40 hover:bg-brand-soft/10 transition-colors">
+            <Upload className="h-6 w-6 text-faint" />
+            <span className="text-sm font-medium text-ink">{file ? file.name : "Click to choose a PDF"}</span>
+            <span className="text-xs text-faint">PhonePe statement or bank statement (PDF)</span>
+            <input type="file" accept="application/pdf" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          </label>
+          {error && (
+            <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+          <button
+            onClick={handleParse}
+            disabled={!file || parsing}
+            className="w-full rounded-xl bg-emerald-500 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors disabled:opacity-50"
+          >
+            {parsing ? <span className="inline-flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Reading statement…</span> : "Parse Statement"}
+          </button>
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="space-y-3 py-6 text-center">
+          <FileText className="mx-auto h-8 w-8 text-faint" />
+          <p className="text-sm text-muted">No transactions were found in this file.</p>
+          <button onClick={reset} className="text-xs font-medium text-brand hover:underline">Try another file</button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between text-xs text-muted">
+            <span>{rows.length} transactions found</span>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setRows((r) => r!.map((x) => ({ ...x, selected: true })))} className="font-medium text-brand hover:underline">Select all</button>
+              <button onClick={() => setRows((r) => r!.map((x) => ({ ...x, selected: false })))} className="font-medium text-muted hover:underline">Deselect all</button>
+            </div>
+          </div>
+          <div className="max-h-[360px] space-y-1.5 overflow-y-auto pr-1">
+            {rows.map((r, i) => (
+              <div key={i} className={cn("flex items-start gap-2.5 rounded-lg border p-2.5 transition-opacity", r.selected ? "border-border bg-surface" : "border-border/50 bg-surface-2/30 opacity-60")}>
+                <input
+                  type="checkbox"
+                  checked={r.selected}
+                  onChange={(e) => setRows((rs) => rs!.map((x, xi) => (xi === i ? { ...x, selected: e.target.checked } : x)))}
+                  className="mt-1 h-4 w-4 shrink-0 rounded border-border accent-emerald-500"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-[13px] font-medium text-ink">{r.description}</p>
+                    <span className={cn("shrink-0 text-[13px] font-semibold", r.direction === "credit" ? "text-green-600" : "text-red-500")}>
+                      {r.direction === "credit" ? "+" : "-"}₹{r.amount.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-faint">
+                    <span>{new Date(r.date + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                    {r.direction === "debit" && (
+                      <select
+                        value={r.category}
+                        onChange={(e) => setRows((rs) => rs!.map((x, xi) => (xi === i ? { ...x, category: e.target.value } : x)))}
+                        className="rounded-md border border-border bg-surface-2 px-1.5 py-0.5 text-[11px] text-ink"
+                      >
+                        {EXPENSE_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                      </select>
+                    )}
+                    {r.likelyTransfer && (
+                      <span className="rounded-full bg-amber-50 px-1.5 py-0.5 font-medium text-amber-600">Looks like a personal transfer</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+            <div className="text-xs text-muted">
+              <span className="font-semibold text-ink">{selectedCount}</span> selected · <span className="font-semibold text-ink">₹{selectedExpenseTotal.toLocaleString("en-IN")}</span> in expenses
+            </div>
+            <div className="flex gap-2">
+              <button onClick={reset} className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-2">Start Over</button>
+              <button
+                onClick={handleImport}
+                disabled={selectedCount === 0 || busy}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 disabled:opacity-50"
+              >
+                {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} Add {selectedCount} Selected
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 function TxnForm({
   initial, submitLabel, onSubmit, busy, accounts,
 }: {
@@ -537,7 +702,7 @@ function computeHealth(income: number, expense: number, assets: number, liabilit
     { name: "Savings Rate", status: grade(srScore, 25), good: srScore >= 16, detail: income > 0 ? `Saving ${Math.round(sr * 100)}% of income` : "No income recorded" },
     { name: "Debt Management", status: grade(debtScore, 20), good: debtScore >= 13, detail: `Liabilities are ${Math.round(debtRatio * 100)}% of assets` },
     { name: "Investments", status: grade(investScore, 20), good: investScore >= 13, detail: `${Math.round(investRatio * 100)}% of net worth invested` },
-    { name: "Financial Discipline", status: grade(discScore, 15), good: discScore >= 10, detail: budgetRows.length ? `${withinBudget}/${budgetRows.length} budgets on track` : "No budgets set yet" },
+    { name: "Financial Discipline", status: grade(discScore, 15), good: discScore >= 10, detail: budgetRows.length ? (withinBudget > 0 ? "Within monthly budget" : "Over monthly budget") : "No budget set yet" },
   ];
   const label = score >= 80 ? "Excellent" : score >= 65 ? "Good" : score >= 50 ? "Fair" : "Needs Work";
   return { score, label, metrics };
@@ -567,6 +732,7 @@ type ModalState =
   | { kind: "goalMoney"; goal: FinGoal }
   | { kind: "loanPayment"; loan: FinLoan }
   | { kind: "healthReport" }
+  | { kind: "import" }
   | null;
 
 export function FinancesClient({ initial }: { initial: FinanceData }) {
@@ -592,7 +758,8 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
     const t = searchParams.get("tab");
     if (t && (TABS as readonly string[]).includes(t)) setTab(t as Tab);
     const qa = searchParams.get("quickAdd");
-    if (qa === "txn" || qa === "account" || qa === "goal" || qa === "loan" || qa === "bill" || qa === "due" || qa === "budget") {
+    if (qa === "budget") openBudgetModal();
+    else if (qa === "txn" || qa === "account" || qa === "goal" || qa === "loan" || qa === "bill" || qa === "due") {
       setModal({ kind: qa });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -612,7 +779,7 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
   }
 
   /* ── API plumbing ─────────────────────────────────────────────────────── */
-  async function apiMutate(entity: FinanceEntity, action: "create" | "update" | "delete", payload: { id?: string; data?: Record<string, unknown> }) {
+  async function apiMutate(entity: FinanceEntity, action: "create" | "bulkCreate" | "update" | "delete", payload: { id?: string; data?: Record<string, unknown>; items?: Record<string, unknown>[] }) {
     const res = await fetch("/api/finance", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -633,6 +800,21 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
       return row;
     } catch (err) {
       flash(err instanceof Error ? err.message : "Save failed");
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function bulkCreateRows(entity: FinanceEntity, items: Record<string, unknown>[], msg = "Imported") {
+    setBusy(true);
+    try {
+      const { rows } = await apiMutate(entity, "bulkCreate", { items });
+      setDb((p) => ({ ...p, [entity]: [...(p[entity] as unknown[]), ...rows] } as FinanceData));
+      flash(msg);
+      return rows;
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Import failed");
       return null;
     } finally {
       setBusy(false);
@@ -664,6 +846,14 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
     } catch (err) {
       flash(err instanceof Error ? err.message : "Delete failed");
     }
+  }
+
+  // There's only ever one overall monthly budget (not per-category) — this
+  // opens the modal pre-filled with it if it already exists, so the same
+  // button always behaves like an upsert instead of creating duplicates.
+  function openBudgetModal() {
+    const existing = db.budgets[0];
+    setModal({ kind: "budget", editing: existing as unknown as Record<string, unknown> | undefined });
   }
 
   /* ── Derived metrics ──────────────────────────────────────────────────── */
@@ -760,10 +950,11 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
       .sort(([, a], [, b]) => b - a)
       .map(([name, value]) => ({ name, value: Math.round(value), pct: expenseTotal ? Math.round((value / expenseTotal) * 1000) / 10 : 0, color: catColor(name) }));
 
-    const budgetRows = budgets.map((b) => {
-      const actual = Math.round(catMap.get(b.category) ?? 0);
-      return { ...b, actual, pctUsed: b.amount > 0 ? Math.round((actual / b.amount) * 100) : 0 };
-    });
+    // Single overall monthly budget (not per-category) — at most one row exists.
+    const budgetRow = budgets[0];
+    const overallBudget = budgetRow
+      ? { ...budgetRow, actual: Math.round(expenseTotal), pctUsed: budgetRow.amount > 0 ? Math.round((expenseTotal / budgetRow.amount) * 100) : 0 }
+      : null;
 
     const topSpending = expenseBreakdown.slice(0, 5);
     const recentTxns = [...transactions].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt)).slice(0, 5);
@@ -782,7 +973,7 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
       .sort((a, b) => a.days - b.days);
 
     const pendingDues = dues.filter((d) => d.status === "pending");
-    const health = computeHealth(sel.income, sel.expense, assets, liabilities, investCurrent, netWorth, budgetRows.map((b) => ({ budget: b.amount, actual: b.actual })));
+    const health = computeHealth(sel.income, sel.expense, assets, liabilities, investCurrent, netWorth, overallBudget ? [{ budget: overallBudget.amount, actual: overallBudget.actual }] : []);
 
     const investByType = INVESTMENT_TYPES.map((t) => ({
       name: t.value,
@@ -793,7 +984,7 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
     const monthOptions = Array.from(new Set(transactions.map((t) => t.date.slice(0, 7)))).sort().reverse();
 
     return {
-      selKey, sel, selSavings, kpis, cashFlowWeekly, expenseBreakdown, expenseTotal, budgetRows,
+      selKey, sel, selSavings, kpis, cashFlowWeekly, expenseBreakdown, expenseTotal, overallBudget,
       topSpending, recentTxns, upcomingBills, pendingDues, health, accountsTotal, assets, liabilities,
       netWorth, netWorthTrend, investInvested, investCurrent, investGainPct, loansOutstanding,
       loansPrincipal, investByType, monthOptions, nwDelta, vsLabel,
@@ -1062,30 +1253,22 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
 
   const budgetCard = (
     <Card>
-      <Head title="Budget vs Actual" right={<MonthSel value={overviewMonth} onChange={setOverviewMonth} />} />
-      {M.budgetRows.length === 0 ? (
-        <EmptyHint text="No budgets set yet." cta="Set a Budget" onClick={() => setModal({ kind: "budget" })} />
+      <Head title="Monthly Budget" right={<MonthSel value={overviewMonth} onChange={setOverviewMonth} />} />
+      {!M.overallBudget ? (
+        <EmptyHint text="No monthly budget set yet." cta="Set a Budget" onClick={openBudgetModal} />
       ) : (
-        <>
-          <div className="mb-2 grid grid-cols-[1fr_52px_52px_48px] gap-1 text-[10px] font-medium uppercase tracking-wide text-faint">
-            <span>Category</span><span className="text-right">Budget</span><span className="text-right">Actual</span><span className="text-right">Status</span>
+        <div>
+          <div className="flex items-baseline justify-between">
+            <span className="text-[20px] font-semibold text-ink">₹ {M.overallBudget.actual.toLocaleString("en-IN")}</span>
+            <span className="text-[12px] text-muted">of ₹ {M.overallBudget.amount.toLocaleString("en-IN")}</span>
           </div>
-          <div className="space-y-2">
-            {M.budgetRows.map((b) => (
-              <div key={b.id} className="grid grid-cols-[1fr_52px_52px_48px] items-center gap-1">
-                <span className="truncate text-[11px] font-medium text-ink">{b.category}</span>
-                <span className="text-right text-[10px] text-muted">₹ {b.amount.toLocaleString("en-IN")}</span>
-                <span className="text-right text-[10px] font-semibold text-ink">₹ {b.actual.toLocaleString("en-IN")}</span>
-                <div className="flex items-center justify-end gap-1">
-                  <div className="h-1.5 w-6 overflow-hidden rounded-full bg-surface-2">
-                    <div className={cn("h-full rounded-full", b.pctUsed > 100 ? "bg-gradient-to-r from-red-500 to-rose-400" : "bg-gradient-to-r from-green-500 to-emerald-400")} style={{ width: `${Math.min(100, b.pctUsed)}%` }} />
-                  </div>
-                  <span className="w-[26px] text-right text-[10px] font-medium text-muted">{b.pctUsed}%</span>
-                </div>
-              </div>
-            ))}
+          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-surface-2">
+            <div className={cn("h-full rounded-full", M.overallBudget.pctUsed > 100 ? "bg-gradient-to-r from-red-500 to-rose-400" : "bg-gradient-to-r from-green-500 to-emerald-400")} style={{ width: `${Math.min(100, M.overallBudget.pctUsed)}%` }} />
           </div>
-        </>
+          <p className={cn("mt-1.5 text-[11px] font-medium", M.overallBudget.pctUsed > 100 ? "text-red-500" : "text-green-600")}>
+            {M.overallBudget.pctUsed}% used{M.overallBudget.pctUsed > 100 ? " — over budget" : ""}
+          </p>
+        </div>
       )}
       <button onClick={() => switchTab("Expenses")} className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-brand hover:underline">
         View Full Budget Report <ArrowRight className="h-3 w-3" />
@@ -1129,13 +1312,9 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
       ) : (
         <div className="space-y-2">
           {M.upcomingBills.slice(0, 5).map((b) => {
-            const s = billIconFor(b.name);
-            const Icon = s.icon;
             return (
               <div key={b.id} className="group flex items-center gap-2.5 rounded-lg p-1.5 -mx-1.5 hover:bg-surface-2/50 transition-colors">
-                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px]" style={{ background: `linear-gradient(135deg, ${s.color}16, ${s.color}05)` }}>
-                  <Icon className="h-4 w-4" style={{ color: s.color }} />
-                </div>
+                <Logo domain={b.logoDomain || guessBillDomain(b.name)} label={b.name} size={32} rounded="rounded-[10px]" />
                 <p className="flex-1 truncate text-[12px] font-medium text-ink">{b.name}</p>
                 <div className="shrink-0 text-right">
                   <p className="text-[12px] font-semibold text-ink">₹ {b.amount.toLocaleString("en-IN")}</p>
@@ -1372,6 +1551,9 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
               <option>All</option>
               {M.monthOptions.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
             </select>
+            <button onClick={() => setModal({ kind: "import" })} className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-ink hover:bg-surface-2 transition-colors">
+              <Upload className="h-3.5 w-3.5" /> Import Statement
+            </button>
             <button onClick={() => setModal({ kind: "txn" })} className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 transition-colors">
               <Plus className="h-3.5 w-3.5" /> Add Transaction
             </button>
@@ -1431,33 +1613,32 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
 
       <div className="grid items-start gap-4 md:grid-cols-2">
         <Card>
-          <Head title="Monthly Budgets" right={
-            <button onClick={() => setModal({ kind: "budget" })} className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-muted hover:bg-surface-2 transition-colors">
-              <Plus className="h-3 w-3" /> Add Budget
+          <Head title="Monthly Budget" right={
+            <button onClick={openBudgetModal} className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-muted hover:bg-surface-2 transition-colors">
+              <Plus className="h-3 w-3" /> {M.overallBudget ? "Edit Budget" : "Set Budget"}
             </button>
           } />
-          {M.budgetRows.length === 0 ? (
-            <EmptyHint text="Set monthly budgets per category to track discipline." cta="Set a Budget" onClick={() => setModal({ kind: "budget" })} />
+          {!M.overallBudget ? (
+            <EmptyHint text="Set one overall monthly spending limit to track discipline." cta="Set a Budget" onClick={openBudgetModal} />
           ) : (
-            <div className="space-y-3">
-              {M.budgetRows.map((b) => (
-                <div key={b.id} className="group">
-                  <div className="flex items-center justify-between text-[12px]">
-                    <span className="font-medium text-ink">{b.category}</span>
-                    <span className="flex items-center gap-2">
-                      <span className="text-muted">₹ {b.actual.toLocaleString("en-IN")} / ₹ {b.amount.toLocaleString("en-IN")}</span>
-                      <span className={cn("font-semibold", b.pctUsed > 100 ? "text-red-500" : "text-green-600")}>{b.pctUsed}%</span>
-                      <RowActions
-                        onEdit={() => setModal({ kind: "budget", editing: b as unknown as Record<string, unknown> })}
-                        onDelete={() => deleteRow("budgets", b.id, `Remove budget for "${b.category}"?`)}
-                      />
-                    </span>
-                  </div>
-                  <div className="mt-1.5 h-2 w-full rounded-full bg-surface-2 overflow-hidden">
-                    <div className={cn("h-full rounded-full", b.pctUsed > 100 ? "bg-gradient-to-r from-red-500 to-rose-400" : "bg-gradient-to-r from-green-500 to-emerald-400")} style={{ width: `${Math.min(100, b.pctUsed)}%` }} />
-                  </div>
-                </div>
-              ))}
+            <div className="group">
+              <div className="flex items-center justify-between text-[12px]">
+                <span className="font-medium text-ink">This Month</span>
+                <span className="flex items-center gap-2">
+                  <span className="text-muted">₹ {M.overallBudget.actual.toLocaleString("en-IN")} / ₹ {M.overallBudget.amount.toLocaleString("en-IN")}</span>
+                  <span className={cn("font-semibold", M.overallBudget.pctUsed > 100 ? "text-red-500" : "text-green-600")}>{M.overallBudget.pctUsed}%</span>
+                  <RowActions
+                    onEdit={openBudgetModal}
+                    onDelete={() => deleteRow("budgets", M.overallBudget!.id, "Remove the monthly budget?")}
+                  />
+                </span>
+              </div>
+              <div className="mt-1.5 h-2 w-full rounded-full bg-surface-2 overflow-hidden">
+                <div className={cn("h-full rounded-full", M.overallBudget.pctUsed > 100 ? "bg-gradient-to-r from-red-500 to-rose-400" : "bg-gradient-to-r from-green-500 to-emerald-400")} style={{ width: `${Math.min(100, M.overallBudget.pctUsed)}%` }} />
+              </div>
+              {M.overallBudget.pctUsed > 100 && (
+                <p className="mt-1.5 text-[11px] font-medium text-red-500">Over budget by ₹ {(M.overallBudget.actual - M.overallBudget.amount).toLocaleString("en-IN")}</p>
+              )}
             </div>
           )}
         </Card>
@@ -1473,13 +1654,9 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
           ) : (
             <div className="space-y-1.5">
               {M.upcomingBills.map((b) => {
-                const s = billIconFor(b.name);
-                const Icon = s.icon;
                 return (
                   <div key={b.id} className="group flex items-center gap-2.5 rounded-lg p-1.5 -mx-1.5 hover:bg-surface-2/50 transition-colors">
-                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px]" style={{ background: `linear-gradient(135deg, ${s.color}16, ${s.color}05)` }}>
-                      <Icon className="h-4 w-4" style={{ color: s.color }} />
-                    </div>
+                    <Logo domain={b.logoDomain || guessBillDomain(b.name)} label={b.name} size={32} rounded="rounded-[10px]" />
                     <div className="min-w-0 flex-1">
                       <p className="text-[12px] font-medium text-ink">{b.name}</p>
                       <p className="text-[10px] text-muted">Every month on day {b.dueDay}</p>
@@ -1645,6 +1822,13 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
 
   const modals = (
     <>
+      <ImportStatementModal
+        open={modal?.kind === "import"}
+        onClose={() => setModal(null)}
+        busy={busy}
+        onImport={(items) => bulkCreateRows("transactions", items, `${items.length} transaction${items.length === 1 ? "" : "s"} imported`)}
+      />
+
       <Modal open={modal?.kind === "txn"} onClose={() => setModal(null)} title={editing ? "Edit Transaction" : "Add Transaction"}>
         <TxnForm
           key={String((editing as { id?: string })?.id ?? "new")}
@@ -1782,12 +1966,15 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
             { name: "name", label: "Name", placeholder: "e.g. Netflix Subscription" },
             { name: "amount", label: "Amount (₹)", type: "number", placeholder: "0", half: true },
             { name: "dueDay", label: "Due Day of Month (1-31)", type: "number", placeholder: "5", half: true },
+            { name: "logoDomain", label: "Logo Website (optional)", placeholder: "e.g. netflix.com — auto-detected for common services", required: false },
           ]}
-          initial={editing ? { name: String(editing.name), amount: String(editing.amount), dueDay: String(editing.dueDay) } : undefined}
+          initial={editing ? { name: String(editing.name), amount: String(editing.amount), dueDay: String(editing.dueDay), logoDomain: String(editing.logoDomain ?? "") } : undefined}
           submitLabel={editing ? "Save Changes" : "Add Bill"}
           busy={busy}
           onSubmit={(d) => {
-            const data = { name: d.name, amount: Number(d.amount) || 0, dueDay: Math.min(31, Math.max(1, Number(d.dueDay) || 1)) };
+            const data: Record<string, unknown> = { name: d.name, amount: Number(d.amount) || 0, dueDay: Math.min(31, Math.max(1, Number(d.dueDay) || 1)) };
+            const domain = (d.logoDomain || "").trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+            data.logoDomain = domain || guessBillDomain(d.name) || null;
             if (editing) updateRow("bills", String((editing as { id: string }).id), data, "Bill updated");
             else createRow("bills", data, "Bill added");
           }}
@@ -1814,18 +2001,17 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
         />
       </Modal>
 
-      <Modal open={modal?.kind === "budget"} onClose={() => setModal(null)} title={editing ? "Edit Budget" : "Set Monthly Budget"}>
+      <Modal open={modal?.kind === "budget"} onClose={() => setModal(null)} title={editing ? "Edit Monthly Budget" : "Set Monthly Budget"}>
         <EntityForm
           key={String((editing as { id?: string })?.id ?? "new")}
           fields={[
-            { name: "category", label: "Category", type: "select", options: EXPENSE_CATEGORIES.map((c) => ({ value: c, label: c })) },
-            { name: "amount", label: "Monthly Budget (₹)", type: "number", placeholder: "0" },
+            { name: "amount", label: "Monthly Budget (₹)", placeholder: "e.g. 50000", type: "number" },
           ]}
-          initial={editing ? { category: String(editing.category), amount: String(editing.amount) } : undefined}
+          initial={editing ? { amount: String(editing.amount) } : undefined}
           submitLabel={editing ? "Save Changes" : "Set Budget"}
           busy={busy}
           onSubmit={(d) => {
-            const data = { category: d.category, amount: Number(d.amount) || 0 };
+            const data = { category: "Overall", amount: Number(d.amount) || 0 };
             if (editing) updateRow("budgets", String((editing as { id: string }).id), data, "Budget updated");
             else createRow("budgets", data, "Budget set");
           }}
@@ -1915,7 +2101,7 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
               {QUICK_ADDS.map((q) => (
                 <button
                   key={q.label}
-                  onClick={() => { setQuickOpen(false); setModal({ kind: q.kind } as ModalState); }}
+                  onClick={() => { setQuickOpen(false); if (q.kind === "budget") openBudgetModal(); else setModal({ kind: q.kind } as ModalState); }}
                   className="block w-full rounded-lg px-3 py-2 text-left text-[13px] text-muted hover:bg-surface-2 hover:text-ink"
                 >
                   {q.label}

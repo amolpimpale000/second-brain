@@ -51,7 +51,7 @@ export type FinInvestment = {
   lastSipCreditedMonth?: string; priceUpdatedAt?: string;
 };
 export type FinBill = {
-  id: string; name: string; amount: number; dueDay: number; createdAt: string;
+  id: string; name: string; amount: number; dueDay: number; logoDomain?: string; createdAt: string;
 };
 export type FinDue = {
   id: string; person: string; amount: number; direction: "to" | "from";
@@ -108,7 +108,7 @@ const ENTITY_CONFIG = {
   },
   bills: {
     table: "finance_bills",
-    fields: { name: "name", amount: "amount", dueDay: "due_day" },
+    fields: { name: "name", amount: "amount", dueDay: "due_day", logoDomain: "logo_domain" },
     order: [{ col: "due_day", asc: true }],
   },
   dues: {
@@ -160,6 +160,17 @@ export async function listEntity(entity: FinanceEntity): Promise<Record<string, 
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []).map((r) => fromRow(entity, r));
+}
+
+/** Inserts many rows in a single round-trip — used by the statement-import "Add Selected" action. */
+export async function bulkCreateEntity(entity: FinanceEntity, items: Record<string, unknown>[]): Promise<Record<string, unknown>[]> {
+  if (items.length === 0) return [];
+  const sb = admin();
+  const cfg = ENTITY_CONFIG[entity];
+  const rows = items.map((data) => ({ id: uid(), ...toRow(entity, data) }));
+  const { data: created, error } = await sb.from(cfg.table).insert(rows).select();
+  if (error) throw error;
+  return (created ?? []).map((r) => fromRow(entity, r));
 }
 
 export async function createEntity(entity: FinanceEntity, data: Record<string, unknown>): Promise<Record<string, unknown>> {
