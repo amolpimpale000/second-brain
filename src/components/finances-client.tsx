@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell,
-  LineChart, Line,
+  LineChart, Line, AreaChart, Area,
 } from "recharts";
 import { cn, inr } from "@/lib/utils";
 import { INVESTMENT_TYPES } from "@/lib/investment-types";
@@ -165,6 +165,9 @@ const todayISO = () => {
   const n = NOW();
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
 };
+const isoDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const dayMonthLabel = (day: number, key: string) => `${day} ${monthShort(key)}`;
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Shared primitives
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -213,6 +216,18 @@ function yFmt(v: number) {
   if (Math.abs(v) < 100000) return `₹${Math.round(v / 1000)}K`;
   const l = v / 100000;
   return `₹${Number.isInteger(l) ? l : l.toFixed(1)}L`;
+}
+
+// Signed variant (minus sign before the ₹, e.g. "-₹40L") — used on the Net
+// Worth Trend axis, which regularly dips negative.
+function yFmtSigned(v: number) {
+  if (v === 0) return "₹0";
+  const sign = v < 0 ? "-" : "";
+  const av = Math.abs(v);
+  if (av < 1000) return `${sign}₹${Math.round(av)}`;
+  if (av < 100000) return `${sign}₹${Math.round(av / 1000)}K`;
+  const l = av / 100000;
+  return `${sign}₹${Number.isInteger(l) ? l : l.toFixed(1)}L`;
 }
 
 const fmtMoney2 = (v: number) => v.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1013,6 +1028,32 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
       ? Math.round(((netWorth - netWorthTrend[netWorthTrend.length - 2]) / Math.abs(netWorthTrend[netWorthTrend.length - 2])) * 1000) / 10
       : 0;
 
+    // Day-by-day Net Worth Trend for the selected month, walked back from
+    // today's real netWorth using each day's actual transaction flow. Days
+    // after today simply have no data yet (same as real account balances) —
+    // there's nothing to fabricate for the future.
+    const dayFlow = new Map<string, number>();
+    for (const t of transactions) {
+      dayFlow.set(t.date, (dayFlow.get(t.date) ?? 0) + (t.type === "income" ? t.amount : -t.amount));
+    }
+    const [nwy, nwm] = selKey.split("-").map(Number);
+    const daysInSelMonth2 = new Date(nwy, nwm, 0).getDate();
+    const nwWalkStart = new Date(nwy, nwm - 1, 1);
+    let runningNw = netWorth;
+    const dayNwDesc: { iso: string; value: number }[] = [];
+    for (const d = NOW(); d >= nwWalkStart; d.setDate(d.getDate() - 1)) {
+      const iso = isoDate(d);
+      dayNwDesc.push({ iso, value: Math.round(runningNw) });
+      runningNw -= dayFlow.get(iso) ?? 0;
+    }
+    const netWorthDailyTrend = dayNwDesc
+      .filter((d) => d.iso.slice(0, 7) === selKey)
+      .reverse()
+      .map((d) => ({ day: Number(d.iso.slice(8, 10)), value: d.value }));
+    const nwTicksAll = [1, 8, 15, 22, daysInSelMonth2];
+    const nwLastDay = netWorthDailyTrend.length ? netWorthDailyTrend[netWorthDailyTrend.length - 1].day : 0;
+    const nwTicks = Array.from(new Set(nwTicksAll.filter((d) => d <= nwLastDay)));
+
     const vsLabel = `vs ${monthLabel(prevKey)}`;
     const kpis = [
       { label: "Total Income", value: sel.income, delta: delta(sel.income, prev.income), vs: vsLabel, color: "#22c55e", spark: incomeSpark },
@@ -1089,7 +1130,7 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
     return {
       selKey, sel, selSavings, kpis, cashFlowWeekly, expenseBreakdown, expenseTotal, overallBudget,
       topSpending, recentTxns, upcomingBills, pendingDues, health, accountsTotal, assets, liabilities,
-      netWorth, netWorthTrend, investInvested, investCurrent, investGainPct, loansOutstanding,
+      netWorth, netWorthTrend, netWorthDailyTrend, nwTicks, investInvested, investCurrent, investGainPct, loansOutstanding,
       loansPrincipal, investByType, monthOptions, nwDelta, vsLabel,
     };
   }, [db, overviewMonth]);
@@ -1150,7 +1191,7 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
   );
 
   const netWorthCard = (
-    <Card>
+    <Card className="flex h-full flex-col">
       <div className="flex items-center justify-between">
         <span className="text-[15px] font-semibold tracking-tight text-ink">Net Worth Overview</span>
         <MonthSel value={overviewMonth} onChange={setOverviewMonth} />
@@ -1169,6 +1210,41 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
         <div className="rounded-xl border border-border/60 bg-surface-2/40 p-3">
           <p className="flex items-center gap-1.5 text-xs text-muted"><Landmark className="h-3.5 w-3.5 text-red-400" /> Total Liabilities</p>
           <p className="mt-1 text-base font-semibold text-ink">₹ {fmtMoney2(M.liabilities)}</p>
+        </div>
+      </div>
+      <div className="mt-4 flex-1">
+        <p className="text-xs font-medium text-muted">Net Worth Trend</p>
+        <div className="mt-1 h-[160px]">
+          {M.netWorthDailyTrend.length < 2 ? (
+            <div className="flex h-full items-center justify-center text-[11px] text-faint">Not enough data yet this month.</div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%" debounce={200}>
+              <AreaChart data={M.netWorthDailyTrend} margin={{ top: 4, right: 4, left: -14, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="nwFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#22c55e" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#22c55e" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis
+                  dataKey="day" type="number" domain={["dataMin", "dataMax"]} ticks={M.nwTicks}
+                  tickFormatter={(d) => dayMonthLabel(Number(d), M.selKey)}
+                  tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={false} tickLine={false}
+                />
+                <YAxis tickFormatter={yFmtSigned} tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={false} tickLine={false} width={54} />
+                <Tooltip cursor={{ stroke: "var(--border)" }} content={({ active, payload, label }) =>
+                  active && payload?.length ? (
+                    <Tip>
+                      <p className="font-medium text-ink">{dayMonthLabel(Number(label), M.selKey)}</p>
+                      <p className="text-muted">₹ {Number(payload[0].value).toLocaleString("en-IN")}</p>
+                    </Tip>
+                  ) : null
+                } />
+                <Area type="monotone" dataKey="value" stroke="#22c55e" strokeWidth={2} fill="url(#nwFill)" isAnimationActive={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     </Card>
@@ -1574,30 +1650,31 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
 
   /* ═════════════════════════════ Tab bodies ═════════════════════════════ */
 
-  // Two independent vertical stacks (not a row-synced grid) so cards of very
-  // different heights don't leave blank space under the shorter ones in a
-  // shared row — each column just packs tightly on its own.
   const overviewTab = (
     <div className="space-y-4">
       {kpiCards}
-      <div className="grid items-start gap-4 xl:grid-cols-[1.7fr_1fr]">
+      <div className="grid items-start gap-4 xl:grid-cols-[1.25fr_1.25fr_0.95fr]">
+        {netWorthCard}
         <div className="space-y-4">
-          {netWorthCard}
-          {savingsGoalsCard}
           {cashFlowCard}
           {expenseBreakdownCard}
-          {recentTxnsCard}
-          {budgetCard}
-          {topSpendingCard}
-          {loansCard}
-          {investmentsCard}
-          {duesCard}
         </div>
         <div className="space-y-4">
           {accountsCard}
-          {billsCard}
-          {healthCard}
+          {savingsGoalsCard}
         </div>
+      </div>
+      <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {recentTxnsCard}
+        {budgetCard}
+        {topSpendingCard}
+        {billsCard}
+      </div>
+      <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {loansCard}
+        {investmentsCard}
+        {duesCard}
+        {healthCard}
       </div>
     </div>
   );
