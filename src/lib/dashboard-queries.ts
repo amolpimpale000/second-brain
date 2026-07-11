@@ -1,10 +1,12 @@
 // Aggregates real data for the landing dashboard (/) from the app's actual
 // data sources — no fabricated numbers. Falls back to null/empty per-section
 // so one failing source never blanks the whole page.
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { getFinanceData, type FinanceData } from "./finance-store";
-import { getTasks, getNotes, getVault } from "./queries";
-import { tasks as sampleTasks, notes as sampleNotes, vaultAccounts as sampleVaultAccounts, type Task, type Note, type VaultAccount } from "./data";
+import { getTasks, getVault } from "./queries";
+import { tasks as sampleTasks, vaultAccounts as sampleVaultAccounts, type Task, type VaultAccount } from "./data";
 import { getJournalDashboardData } from "./journal-dashboard";
+import { readManifest, type StoredDoc } from "./documents-store";
 
 export type BusinessSummary = {
   revenue: number; revenueDelta: number; revenueSpark: number[];
@@ -13,14 +15,36 @@ export type BusinessSummary = {
   clients: number; clientsSpark: number[];
 };
 
+// The real Notes page reads/writes the richer `user_notes` table directly
+// (client-side) — this is a separate, minimal read-only mirror of that same
+// table for the dashboard preview, not the old `notes` table getNotes() uses.
+export type QuickNote = { id: string; title: string; time: string };
+
+let _notesAdmin: SupabaseClient | null = null;
+async function getQuickNotes(limit = 3): Promise<QuickNote[] | null> {
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  if (!_notesAdmin) _notesAdmin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data, error } = await _notesAdmin
+    .from("user_notes")
+    .select("id,title,time")
+    .eq("trashed", false)
+    .order("sort", { ascending: true })
+    .limit(limit);
+  if (error || !data) return null;
+  return data.map((r) => ({ id: r.id as string, title: r.title as string, time: r.time as string }));
+}
+
 export type DashboardData = {
   finance: FinanceData;
   // null means the underlying table is empty (no real rows entered yet) —
   // distinguished from [] so the UI can show an honest empty state instead
   // of the sample-data fallback these queries use elsewhere.
   tasks: Task[] | null;
-  notes: Note[] | null;
+  notes: QuickNote[] | null;
   vault: VaultAccount[] | null;
+  documents: StoredDoc[];
   business: BusinessSummary | null;
 };
 
@@ -31,17 +55,18 @@ function monthKey(d: Date) {
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
-  const [finance, tasksRaw, notesRaw, vaultRaw, journal] = await Promise.all([
+  const [finance, tasksRaw, notes, vaultRaw, documentsRaw, journal] = await Promise.all([
     getFinanceData().catch((err) => { console.error("Dashboard finance fetch failed:", err); return EMPTY_FINANCE; }),
     getTasks().catch(() => sampleTasks),
-    getNotes().catch(() => sampleNotes),
+    getQuickNotes().catch((err) => { console.error("Dashboard notes fetch failed:", err); return null; }),
     getVault().catch(() => sampleVaultAccounts),
+    readManifest().catch((err) => { console.error("Dashboard documents fetch failed:", err); return []; }),
     getJournalDashboardData().catch((err) => { console.error("Dashboard journal fetch failed:", err); return null; }),
   ]);
 
   const tasks = tasksRaw === sampleTasks ? null : tasksRaw;
-  const notes = notesRaw === sampleNotes ? null : notesRaw;
   const vault = vaultRaw === sampleVaultAccounts ? null : vaultRaw;
+  const documents = documentsRaw.filter((d) => !d.trashed).slice(0, 8);
 
   let business: BusinessSummary | null = null;
   if (journal) {
@@ -89,5 +114,5 @@ export async function getDashboardData(): Promise<DashboardData> {
     };
   }
 
-  return { finance, tasks, notes, vault, business };
+  return { finance, tasks, notes, vault, documents, business };
 }

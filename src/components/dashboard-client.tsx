@@ -8,7 +8,6 @@ import {
   TrendingUp,
   TrendingDown,
   BarChart3,
-  Landmark,
   ChevronDown,
   CheckCircle2,
   Circle,
@@ -22,9 +21,6 @@ import {
   Briefcase,
   ShoppingBag,
   Zap,
-  Lock,
-  Mail,
-  Instagram,
   CalendarPlus,
   PlusCircle,
   ArrowRightLeft,
@@ -32,6 +28,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Plus,
+  FileText,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -52,7 +49,9 @@ import {
 import { cn, inr } from "@/lib/utils";
 import { INVESTMENT_TYPES } from "@/lib/investment-types";
 import type { DashboardData } from "@/lib/dashboard-queries";
+import type { StoredDoc } from "@/lib/documents-store";
 import { ConsolidatedPnL } from "@/components/consolidated-pnl";
+import { BrandLogo } from "@/components/vault-ui";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Shared primitives
@@ -193,12 +192,6 @@ const txnIcon: Record<string, React.ElementType> = {
   briefcase: Briefcase,
 };
 
-const pwdIcon: Record<string, React.ElementType> = {
-  lock: Lock,
-  mail: Mail,
-  instagram: Instagram,
-};
-
 const actionIcon: Record<string, React.ElementType> = {
   calendarPlus: CalendarPlus,
   plusCircle: PlusCircle,
@@ -207,14 +200,6 @@ const actionIcon: Record<string, React.ElementType> = {
 };
 
 /* ── Presentation palettes (derived data → color, not fabricated values) ──── */
-const ACCOUNT_META: Record<string, { color: string; bg: string }> = {
-  hdfc: { color: "#ef4444", bg: "#fee2e2" },
-  sbi: { color: "#3b82f6", bg: "#dbeafe" },
-  icici: { color: "#f97316", bg: "#fed7aa" },
-  cash: { color: "#22c55e", bg: "#dcfce7" },
-  other: { color: "#64748b", bg: "#f1f5f9" },
-};
-
 const CAT_COLOR: Record<string, string> = {
   Housing: "#22c55e", "Food & Dining": "#f59e0b", Transport: "#3b82f6", Shopping: "#ec4899",
   Utilities: "#8b5cf6", Entertainment: "#ef4444", Health: "#14b8a6", Education: "#6366f1",
@@ -235,9 +220,34 @@ const PRIORITY_META: Record<string, { color: string; bg: string }> = {
   low: { color: "#3b82f6", bg: "#dbeafe" },
 };
 
-const VAULT_ICON: Record<string, string> = {
-  Banking: "lock", Email: "mail", "Social Media": "instagram", Shopping: "lock", Business: "lock", Entertainment: "lock",
-};
+// Real logo domain guessing for vault entries — same auto-detect-then-let-
+// the-user-override pattern used for bank accounts and bills in /finances.
+const VAULT_DOMAIN_HINTS: { pattern: RegExp; domain: string }[] = [
+  { pattern: /hdfc/i, domain: "hdfcbank.com" },
+  { pattern: /\bsbi\b|state bank/i, domain: "sbi.co.in" },
+  { pattern: /icici/i, domain: "icicibank.com" },
+  { pattern: /kotak/i, domain: "kotak.com" },
+  { pattern: /axis/i, domain: "axisbank.com" },
+  { pattern: /gmail|google/i, domain: "google.com" },
+  { pattern: /instagram/i, domain: "instagram.com" },
+  { pattern: /facebook/i, domain: "facebook.com" },
+  { pattern: /twitter|\bx\.com\b/i, domain: "x.com" },
+  { pattern: /linkedin/i, domain: "linkedin.com" },
+  { pattern: /netflix/i, domain: "netflix.com" },
+  { pattern: /amazon/i, domain: "amazon.in" },
+  { pattern: /apple|icloud/i, domain: "apple.com" },
+  { pattern: /microsoft|outlook/i, domain: "microsoft.com" },
+  { pattern: /paypal/i, domain: "paypal.com" },
+  { pattern: /github/i, domain: "github.com" },
+  { pattern: /dropbox/i, domain: "dropbox.com" },
+  { pattern: /crossref/i, domain: "crossref.org" },
+  { pattern: /ijsrt/i, domain: "ijsrtjournal.com" },
+  { pattern: /ijps\b/i, domain: "ijpsjournal.com" },
+  { pattern: /ijes\b/i, domain: "ijesjournal.com" },
+];
+function guessVaultDomain(name: string): string | undefined {
+  return VAULT_DOMAIN_HINTS.find((h) => h.pattern.test(name))?.domain;
+}
 
 function txnIconKeyFor(category: string): string {
   const c = category.toLowerCase();
@@ -293,40 +303,38 @@ function KpiCards({ cards }: { cards: KpiCard[] }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Accounts Overview
+   Documents Preview
    ═══════════════════════════════════════════════════════════════════════════ */
-type AccountVM = { id: string; bank: string; type: string; balance: number; accountNumber: string; color: string; bg: string };
-
-function AccountsOverviewCard({ accounts, onAdd }: { accounts: AccountVM[]; onAdd: () => void }) {
+function DocumentsPreviewCard({ documents, onAdd }: { documents: StoredDoc[]; onAdd: () => void }) {
   return (
     <Card className="xl:col-span-1">
-      <Head title="Accounts Overview" right={<ViewAll href="/finances" />} />
-      {accounts.length === 0 ? (
-        <EmptyState text="No accounts added yet." cta="Add your first account" onClick={onAdd} />
+      <Head title="Documents" right={<ViewAll href="/documents" />} />
+      {documents.length === 0 ? (
+        <EmptyState text="No documents uploaded yet." cta="Upload a document" onClick={onAdd} />
       ) : (
-        <div className="space-y-3">
-          {accounts.map((a) => (
-            <div
-              key={a.id}
-              className="flex items-center gap-3 rounded-xl border border-border bg-surface-2/40 p-3"
+        <div className="grid grid-cols-4 gap-2">
+          {documents.map((d) => (
+            <button
+              key={d.id}
+              onClick={() => window.open(d.url, "_blank")}
+              title={d.name}
+              className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-surface-2/40 hover:border-brand/40 transition-colors"
             >
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl" style={{ background: a.bg }}>
-                <Landmark className="h-5 w-5" style={{ color: a.color }} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-ink">{a.bank}</p>
-                <p className="text-xs text-muted">{a.type}</p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className="text-sm font-bold text-ink">₹ {Math.round(a.balance).toLocaleString("en-IN")}</p>
-                <p className="text-[10px] text-faint">**** {a.accountNumber}</p>
-              </div>
-            </div>
+              {d.kind === "image" ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={d.url} alt={d.name} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-1">
+                  <FileText className="h-4 w-4 text-muted" />
+                  <span className="truncate px-0.5 text-[8px] font-semibold text-faint">{d.ext}</span>
+                </div>
+              )}
+            </button>
           ))}
         </div>
       )}
       <button onClick={onAdd} className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border py-2.5 text-xs font-medium text-muted hover:bg-surface-2 transition-colors">
-        <Plus className="h-3.5 w-3.5" /> Add New Account
+        <Plus className="h-3.5 w-3.5" /> Upload Document
       </button>
     </Card>
   );
@@ -632,6 +640,7 @@ function LoansOverviewCard({ loans, onAdd }: { loans: LoanVM[]; onAdd: () => voi
 type NoteVM = { id: string; text: string; time: string };
 
 function QuickNotesCard({ notes, available, onAdd }: { notes: NoteVM[]; available: boolean; onAdd: () => void }) {
+  const router = useRouter();
   return (
     <Card className="xl:col-span-1">
       <Head
@@ -647,10 +656,14 @@ function QuickNotesCard({ notes, available, onAdd }: { notes: NoteVM[]; availabl
       ) : (
         <div className="space-y-2">
           {notes.map((n) => (
-            <div key={n.id} className="rounded-xl border border-border bg-surface-2/40 p-3">
+            <button
+              key={n.id}
+              onClick={() => router.push("/notes")}
+              className="block w-full rounded-xl border border-border bg-surface-2/40 p-3 text-left hover:border-brand/40 transition-colors"
+            >
               <p className="text-sm font-medium text-ink">{n.text}</p>
               <p className="mt-1 text-[10px] text-faint">{n.time}</p>
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -734,7 +747,7 @@ function RecentTransactionsCard({ transactions, onAdd }: { transactions: TxnVM[]
 /* ═══════════════════════════════════════════════════════════════════════════
    Passwords Manager
    ═══════════════════════════════════════════════════════════════════════════ */
-type VaultVM = { id: string; name: string; username: string; color: string; bg: string; icon: string };
+type VaultVM = { id: string; name: string; username: string; color: string; domain?: string };
 
 function PasswordsManagerCard({ accounts, available }: { accounts: VaultVM[]; available: boolean }) {
   const router = useRouter();
@@ -745,23 +758,18 @@ function PasswordsManagerCard({ accounts, available }: { accounts: VaultVM[]; av
         <EmptyState text="No saved passwords yet." cta="Add one in the Vault" onClick={() => router.push("/vault")} />
       ) : (
         <div className="space-y-1">
-          {accounts.map((p) => {
-            const Icon = pwdIcon[p.icon] ?? Lock;
-            return (
-              <div key={p.id} className="flex items-center gap-3 rounded-xl px-1 py-2">
-                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ background: p.bg }}>
-                  <Icon className="h-4 w-4" style={{ color: p.color }} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-ink">{p.name}</p>
-                  <p className="text-[11px] text-muted truncate">{p.username}</p>
-                </div>
-                <button onClick={() => router.push("/vault")} className="text-faint hover:text-ink transition-colors shrink-0">
-                  <MoreHorizontal className="h-4 w-4" />
-                </button>
+          {accounts.map((p) => (
+            <div key={p.id} className="flex items-center gap-3 rounded-xl px-1 py-2">
+              <BrandLogo domain={p.domain} initial={(p.name.trim()[0] || "?").toUpperCase()} color={p.color} size={36} />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-ink">{p.name}</p>
+                <p className="text-[11px] text-muted truncate">{p.username}</p>
               </div>
-            );
-          })}
+              <button onClick={() => router.push("/vault")} className="text-faint hover:text-ink transition-colors shrink-0">
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </Card>
@@ -803,7 +811,7 @@ function QuickActionsCard({ actions }: { actions: ActionVM[] }) {
    ═══════════════════════════════════════════════════════════════════════════ */
 export function DashboardClient({ data }: { data: DashboardData }) {
   const router = useRouter();
-  const { finance, notes, vault, business } = data;
+  const { finance, notes, vault, documents, business } = data;
   const [tasks, setTasks] = useState(data.tasks);
 
   async function toggleTask(id: string) {
@@ -873,14 +881,6 @@ export function DashboardClient({ data }: { data: DashboardData }) {
       { label: "Total Investments", value: totalCurrent, delta: investDelta, deltaLabel: "overall return", color: "#3b82f6", bg: "#dbeafe", icon: "investment", spark: investSpark.length ? investSpark : [0, 0] },
     ];
 
-    const accountsOverview: AccountVM[] = [...finance.accounts]
-      .sort((a, b) => b.balance - a.balance)
-      .slice(0, 4)
-      .map((a) => {
-        const meta = ACCOUNT_META[a.institution?.toLowerCase()] ?? ACCOUNT_META.other;
-        return { id: a.id, bank: a.name, type: a.type, balance: a.balance, accountNumber: a.last4, color: meta.color, bg: meta.bg };
-      });
-
     const catMap = new Map<string, number>();
     for (const t of txnsThisMonth.filter((t) => t.type === "expense")) catMap.set(t.category, (catMap.get(t.category) ?? 0) + t.amount);
     const totalCat = Array.from(catMap.values()).reduce((s, v) => s + v, 0);
@@ -915,7 +915,7 @@ export function DashboardClient({ data }: { data: DashboardData }) {
       return { id: l.id, name: l.name, balance: l.outstanding, rate: l.rate, color: meta.color, bg: meta.bg, icon: meta.icon, progress: l.principal > 0 ? Math.round(((l.principal - l.outstanding) / l.principal) * 100) : 0 };
     });
 
-    const quickNotes: NoteVM[] = (notes ?? []).slice(0, 3).map((n) => ({ id: n.id, text: n.title, time: n.updated }));
+    const quickNotes: NoteVM[] = (notes ?? []).map((n) => ({ id: n.id, text: n.title, time: n.time }));
 
     const businessMetrics: BizMetric[] | null = business ? [
       { label: "Revenue", value: business.revenue, delta: business.revenueDelta, color: "#8b5cf6", bg: "#ede9fe" },
@@ -935,7 +935,7 @@ export function DashboardClient({ data }: { data: DashboardData }) {
       }));
 
     const passwordsManager: VaultVM[] = (vault ?? []).slice(0, 4).map((v) => ({
-      id: v.id, name: v.name, username: v.username, color: v.color, bg: `${v.color}20`, icon: VAULT_ICON[v.category] ?? "lock",
+      id: v.id, name: v.name, username: v.username, color: v.color, domain: v.domain || guessVaultDomain(v.name),
     }));
 
     const quickActions: ActionVM[] = [
@@ -946,7 +946,7 @@ export function DashboardClient({ data }: { data: DashboardData }) {
     ];
 
     return {
-      kpiCards, accountsOverview, cashFlowMonthly, expenseCategories, upcomingTasks, savingsGoals,
+      kpiCards, cashFlowMonthly, expenseCategories, upcomingTasks, savingsGoals,
       investmentsPortfolio, loansOverview, quickNotes, businessMetrics, businessSparklines, recentTransactions,
       passwordsManager, quickActions,
     };
@@ -956,7 +956,7 @@ export function DashboardClient({ data }: { data: DashboardData }) {
     <div className="animate-fade-up grid grid-cols-1 gap-4 xl:grid-cols-4">
       {/* Row 1 */}
       <KpiCards cards={vm.kpiCards} />
-      <AccountsOverviewCard accounts={vm.accountsOverview} onAdd={() => router.push("/finances?quickAdd=account")} />
+      <DocumentsPreviewCard documents={documents} onAdd={() => router.push("/documents")} />
 
       {/* Consolidated journal P&L — full width, with month toggle */}
       <ConsolidatedPnL className="xl:col-span-4" />

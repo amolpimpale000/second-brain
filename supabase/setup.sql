@@ -163,8 +163,12 @@ create table vault (
   identifier  text,
   secret      text,
   updated     text,
-  strength    text
+  strength    text,
+  domain      text
 );
+-- If vault already exists with real data, do NOT re-run this file (the
+-- DROP above would wipe it) — instead just run:
+-- alter table vault add column if not exists domain text;
 insert into vault (id, position, name, category, identifier, secret, updated, strength) values
   ('v1', 1, 'HDFC Net Banking',     'Bank',       'amol.p',                    'REPLACE_ME', '12 Jun', 'strong'),
   ('v2', 2, 'ICICI Business',       'Bank',       'ijsrt.corp',                'REPLACE_ME', '02 Jul', 'strong'),
