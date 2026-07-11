@@ -48,14 +48,14 @@ function makeEndDot(color: string, lastIndex: number) {
   return EndDot;
 }
 
-function Sparkline({ data, color, gradientId }: { data: { value: number }[]; color: string; gradientId: string }) {
+function Sparkline({ data, color, gradientId, height = "100%" }: { data: { value: number }[]; color: string; gradientId: string; height?: number | string }) {
   if (data.length < 2) return <div className="h-full w-full" />;
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={data} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+            <stop offset="0%" stopColor={color} stopOpacity={0.18} />
             <stop offset="100%" stopColor={color} stopOpacity={0} />
           </linearGradient>
         </defs>
@@ -223,9 +223,9 @@ export function ConsolidatedPnL({ className }: { className?: string }) {
               delta={deltas.income}
               monthLabel={prev?.label ?? "—"}
               icon={<TrendingUp className="h-5 w-5" />}
-              iconBg="bg-emerald-500"
+              color="#22c55e"
+              bg="#dcfce7"
               sparkData={incomeSpark}
-              sparkColor="#10b981"
               gradientId="pnl-grad-income"
             />
             <StatTile
@@ -235,9 +235,9 @@ export function ConsolidatedPnL({ className }: { className?: string }) {
               deltaInvert
               monthLabel={prev?.label ?? "—"}
               icon={<TrendingDown className="h-5 w-5" />}
-              iconBg="bg-rose-500"
+              color="#ef4444"
+              bg="#fee2e2"
               sparkData={expensesSpark}
-              sparkColor="#f43f5e"
               gradientId="pnl-grad-expenses"
             />
             <StatTile
@@ -246,9 +246,9 @@ export function ConsolidatedPnL({ className }: { className?: string }) {
               delta={deltas.profit}
               monthLabel={prev?.label ?? "—"}
               icon={<Wallet className="h-5 w-5" />}
-              iconBg={cur.profit >= 0 ? "bg-indigo-500" : "bg-rose-500"}
+              color={cur.profit >= 0 ? "#6366f1" : "#ef4444"}
+              bg={cur.profit >= 0 ? "#ede9fe" : "#fee2e2"}
               sparkData={profitSpark}
-              sparkColor={cur.profit >= 0 ? "#6366f1" : "#f43f5e"}
               gradientId="pnl-grad-profit"
               badge={
                 <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", cur.profit >= 0 ? "bg-indigo-100 text-indigo-700" : "bg-rose-100 text-rose-600")}>
@@ -329,28 +329,26 @@ export function ConsolidatedPnL({ className }: { className?: string }) {
 }
 
 function StatTile({
-  label, value, delta, deltaInvert, monthLabel, icon, iconBg, sparkData, sparkColor, gradientId, badge,
+  label, value, delta, deltaInvert, monthLabel, icon, color, bg, sparkData, gradientId, badge,
 }: {
   label: string; value: number; delta: number; deltaInvert?: boolean; monthLabel: string;
-  icon: React.ReactNode; iconBg: string; sparkData: { value: number }[]; sparkColor: string; gradientId: string;
+  icon: React.ReactNode; color: string; bg: string; sparkData: { value: number }[]; gradientId: string;
   badge?: React.ReactNode;
 }) {
   return (
-    <div className="flex h-[168px] items-stretch overflow-hidden rounded-2xl border border-border bg-card shadow-card">
-      <div className="flex min-w-0 flex-1 flex-col justify-center p-4">
-        <div className="flex items-center gap-2.5">
-          <div className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-xl text-white", iconBg)}>{icon}</div>
-          <p className="text-sm font-medium text-muted">{label}</p>
-        </div>
-        <p className="mt-3 truncate text-[28px] font-bold leading-none tracking-tight text-ink">{inr(value)}</p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Delta v={delta} invert={deltaInvert} />
-          <span className="text-xs text-faint">vs {monthLabel}</span>
-        </div>
-        {badge && <div className="mt-1.5">{badge}</div>}
+    <div className="flex flex-col rounded-2xl border border-border bg-card p-4 shadow-card">
+      <div className="flex items-center gap-2.5">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: bg, color }}>{icon}</div>
+        <p className="text-sm font-medium text-muted">{label}</p>
       </div>
-      <div className="h-full w-[42%] shrink-0">
-        <Sparkline data={sparkData} color={sparkColor} gradientId={gradientId} />
+      <p className="mt-3 truncate text-[28px] font-bold leading-none tracking-tight text-ink">{inr(value)}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <Delta v={delta} invert={deltaInvert} />
+        <span className="text-xs text-faint">vs {monthLabel}</span>
+      </div>
+      {badge && <div className="mt-1.5">{badge}</div>}
+      <div className="-mx-1 mt-3">
+        <Sparkline data={sparkData} color={color} gradientId={gradientId} height={44} />
       </div>
     </div>
   );
