@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell,
-  LineChart, Line,
+  LineChart, Line, AreaChart, Area,
 } from "recharts";
 import { cn, inr } from "@/lib/utils";
 import { INVESTMENT_TYPES } from "@/lib/investment-types";
@@ -23,54 +23,34 @@ import type {
 } from "@/lib/finance-store";
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Brand icons
+   Bank logo domain guessing — real company favicons via the shared Logo
+   component (Clearbit → Google favicon → monogram), same pattern as bills.
+   Guessed from the account NAME first (users often rename "Kotak Bank" while
+   leaving institution set to something else), falling back to institution.
    ═══════════════════════════════════════════════════════════════════════════ */
-function HdfcIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 40 40" fill="none">
-      <rect width="40" height="40" rx="8" fill="#ED232A" />
-      <text x="20" y="25" textAnchor="middle" fill="white" fontSize="11" fontWeight="700" fontFamily="Arial, sans-serif">HDFC</text>
-    </svg>
-  );
-}
-function SbiIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 40 40" fill="none">
-      <circle cx="20" cy="20" r="20" fill="#0052CC" />
-      <circle cx="20" cy="15" r="4.5" stroke="white" strokeWidth="2" />
-      <path d="M20 19.5V29M15 25H25" stroke="white" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
-function IciciIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 40 40" fill="none">
-      <rect width="40" height="40" rx="8" fill="#EF4123" />
-      <path d="M20 8L32 32H8L20 8Z" fill="white" />
-    </svg>
-  );
-}
-function CashIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 40 40" fill="none">
-      <rect width="40" height="40" rx="8" fill="#0F172A" />
-      <rect x="8" y="13" width="24" height="14" rx="2.5" stroke="white" strokeWidth="2" />
-      <circle cx="20" cy="20" r="3.5" stroke="white" strokeWidth="2" />
-    </svg>
-  );
-}
-function BankIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 40 40" fill="none">
-      <rect width="40" height="40" rx="8" fill="#6366F1" />
-      <path d="M20 9l12 6H8l12-6zM11 18v10M16.5 18v10M23.5 18v10M29 18v10M8 30h24" stroke="white" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
+const BANK_DOMAIN_HINTS: { pattern: RegExp; domain: string }[] = [
+  { pattern: /hdfc/i, domain: "hdfcbank.com" },
+  { pattern: /\bsbi\b|state bank/i, domain: "sbi.co.in" },
+  { pattern: /icici/i, domain: "icicibank.com" },
+  { pattern: /kotak/i, domain: "kotak.com" },
+  { pattern: /axis/i, domain: "axisbank.com" },
+  { pattern: /\bpnb\b|punjab national/i, domain: "pnbindia.in" },
+  { pattern: /yes bank/i, domain: "yesbank.in" },
+  { pattern: /idfc/i, domain: "idfcfirstbank.com" },
+  { pattern: /indusind/i, domain: "indusind.com" },
+  { pattern: /\bbob\b|bank of baroda/i, domain: "bankofbaroda.in" },
+  { pattern: /canara/i, domain: "canarabank.com" },
+  { pattern: /union bank/i, domain: "unionbankofindia.co.in" },
+  { pattern: /paytm/i, domain: "paytmbank.com" },
+  { pattern: /idbi/i, domain: "idbibank.in" },
+  { pattern: /federal bank/i, domain: "federalbank.co.in" },
+  { pattern: /rbl/i, domain: "rblbank.com" },
+];
+const INSTITUTION_DOMAIN: Record<string, string> = { hdfc: "hdfcbank.com", sbi: "sbi.co.in", icici: "icicibank.com" };
 
-const bankLogo: Record<string, React.ElementType> = {
-  hdfc: HdfcIcon, sbi: SbiIcon, icici: IciciIcon, cash: CashIcon, other: BankIcon,
-};
+function guessBankDomain(name: string, institution: string): string | undefined {
+  return BANK_DOMAIN_HINTS.find((h) => h.pattern.test(name))?.domain ?? INSTITUTION_DOMAIN[institution];
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Category / entity constants
@@ -185,6 +165,8 @@ const todayISO = () => {
   const n = NOW();
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
 };
+const isoDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const dayMonthLabel = (day: number, key: string) => `${day} ${monthShort(key)}`;
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Shared primitives
@@ -235,6 +217,20 @@ function yFmt(v: number) {
   const l = v / 100000;
   return `₹${Number.isInteger(l) ? l : l.toFixed(1)}L`;
 }
+
+// Signed variant (minus sign before the ₹, e.g. "-₹40L") — used on the Net
+// Worth Trend axis, which regularly dips negative.
+function yFmtSigned(v: number) {
+  if (v === 0) return "₹0";
+  const sign = v < 0 ? "-" : "";
+  const av = Math.abs(v);
+  if (av < 1000) return `${sign}₹${Math.round(av)}`;
+  if (av < 100000) return `${sign}₹${Math.round(av / 1000)}K`;
+  const l = av / 100000;
+  return `${sign}₹${Number.isInteger(l) ? l : l.toFixed(1)}L`;
+}
+
+const fmtMoney2 = (v: number) => v.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 function AddButton({ label, onClick }: { label: string; onClick?: () => void }) {
   return (
@@ -333,6 +329,7 @@ const inputCls = "w-full rounded-xl border border-border bg-surface-2 px-3 py-2 
 type FieldDef = {
   name: string; label: string; type?: "text" | "number" | "date" | "select";
   options?: { value: string; label: string }[]; placeholder?: string; required?: boolean; half?: boolean;
+  datalist?: string[]; // free-text input with autocomplete suggestions (e.g. known account/SIP names)
 };
 
 function EntityForm({
@@ -362,15 +359,23 @@ function EntityForm({
               {f.options?.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           ) : (
-            <input
-              type={f.type || "text"}
-              step={f.type === "number" ? "0.01" : undefined}
-              placeholder={f.placeholder}
-              required={f.required !== false}
-              value={data[f.name]}
-              onChange={(e) => setData((p) => ({ ...p, [f.name]: e.target.value }))}
-              className={inputCls}
-            />
+            <>
+              <input
+                type={f.type || "text"}
+                step={f.type === "number" ? "0.01" : undefined}
+                placeholder={f.placeholder}
+                required={f.required !== false}
+                value={data[f.name]}
+                onChange={(e) => setData((p) => ({ ...p, [f.name]: e.target.value }))}
+                className={inputCls}
+                list={f.datalist ? `${f.name}-datalist` : undefined}
+              />
+              {f.datalist && (
+                <datalist id={`${f.name}-datalist`}>
+                  {f.datalist.map((opt) => <option key={opt} value={opt} />)}
+                </datalist>
+              )}
+            </>
           )}
         </div>
       ))}
@@ -629,6 +634,119 @@ function TxnForm({
         </div>
       )}
       <button type="submit" disabled={busy} className="w-full rounded-xl bg-emerald-500 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors disabled:opacity-60">
+        {busy ? "Saving…" : submitLabel}
+      </button>
+    </form>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Loan form — EMI auto-calculates from principal + rate + tenure (standard
+   amortization formula) but stays a normal editable field, so a bank-quoted
+   EMI that doesn't match the formula exactly can just be typed over it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+function calcEmi(principal: number, annualRatePct: number, tenureMonths: number): number {
+  if (!principal || !tenureMonths) return 0;
+  const r = annualRatePct / 12 / 100;
+  if (r === 0) return Math.round(principal / tenureMonths);
+  const factor = Math.pow(1 + r, tenureMonths);
+  return Math.round((principal * r * factor) / (factor - 1));
+}
+
+function LoanForm({
+  initial, submitLabel, onSubmit, busy,
+}: {
+  initial?: Partial<FinLoan>;
+  submitLabel: string;
+  onSubmit: (data: Record<string, unknown>) => void;
+  busy: boolean;
+}) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [kind, setKind] = useState(initial?.kind ?? "personal");
+  const [lender, setLender] = useState(initial?.lender ?? "");
+  const [principal, setPrincipal] = useState(initial?.principal != null ? String(initial.principal) : "");
+  const [outstanding, setOutstanding] = useState(initial?.outstanding != null ? String(initial.outstanding) : "");
+  const [rate, setRate] = useState(initial?.rate != null ? String(initial.rate) : "");
+  const [tenureMonths, setTenureMonths] = useState(initial?.tenureMonths != null ? String(initial.tenureMonths) : "");
+  const [emi, setEmi] = useState(initial?.emi != null ? String(initial.emi) : "");
+  // Editing an existing loan keeps its saved EMI untouched by default — only
+  // a brand-new loan (or an explicit "Auto-calculate" click) live-follows
+  // principal/rate/tenure changes.
+  const [emiAuto, setEmiAuto] = useState(!initial);
+
+  useEffect(() => {
+    if (!emiAuto) return;
+    const p = Number(principal) || 0;
+    const r = Number(rate) || 0;
+    const n = Number(tenureMonths) || 0;
+    if (p > 0 && n > 0) setEmi(String(calcEmi(p, r, n)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [principal, rate, tenureMonths, emiAuto]);
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit({
+          name, kind, lender,
+          principal: Number(principal) || 0,
+          outstanding: Number(outstanding) || 0,
+          rate: Number(rate) || 0,
+          tenureMonths: tenureMonths.trim() ? Number(tenureMonths) : null,
+          emi: Number(emi) || 0,
+        });
+      }}
+      className="grid grid-cols-2 gap-3"
+    >
+      <div className="col-span-2">
+        <label className="mb-1 block text-xs font-medium text-muted">Loan Name</label>
+        <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Home Loan" className={inputCls} />
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-muted">Loan Type</label>
+        <select value={kind} onChange={(e) => setKind(e.target.value)} className={inputCls}>
+          {LOAN_KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-muted">Lender</label>
+        <input value={lender} onChange={(e) => setLender(e.target.value)} placeholder="e.g. HDFC" className={inputCls} />
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-muted">Principal (₹)</label>
+        <input required type="number" step="0.01" value={principal} onChange={(e) => setPrincipal(e.target.value)} placeholder="0" className={inputCls} />
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-muted">Outstanding (₹)</label>
+        <input required type="number" step="0.01" value={outstanding} onChange={(e) => setOutstanding(e.target.value)} placeholder="0" className={inputCls} />
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-muted">Interest Rate (% p.a.)</label>
+        <input type="number" step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="8.5" className={inputCls} />
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-muted">Tenure (months)</label>
+        <input type="number" value={tenureMonths} onChange={(e) => setTenureMonths(e.target.value)} placeholder="e.g. 240" className={inputCls} />
+      </div>
+      <div className="col-span-2">
+        <div className="mb-1 flex items-center justify-between">
+          <label className="block text-xs font-medium text-muted">Monthly EMI (₹)</label>
+          {!emiAuto && Number(principal) > 0 && Number(tenureMonths) > 0 && (
+            <button type="button" onClick={() => setEmiAuto(true)} className="text-[10px] font-medium text-brand hover:underline">
+              Auto-calculate
+            </button>
+          )}
+        </div>
+        <input
+          type="number" step="0.01" value={emi}
+          onChange={(e) => { setEmiAuto(false); setEmi(e.target.value); }}
+          placeholder="0" className={inputCls}
+        />
+        <p className="mt-1 text-[10px] text-faint">
+          {emiAuto ? "Auto-calculated from principal, rate & tenure." : "Edited manually — click \"Auto-calculate\" to recompute from the formula."}
+        </p>
+      </div>
+      <button type="submit" disabled={busy} className="col-span-2 mt-1 rounded-xl bg-emerald-500 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors disabled:opacity-60">
         {busy ? "Saving…" : submitLabel}
       </button>
     </form>
@@ -910,6 +1028,32 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
       ? Math.round(((netWorth - netWorthTrend[netWorthTrend.length - 2]) / Math.abs(netWorthTrend[netWorthTrend.length - 2])) * 1000) / 10
       : 0;
 
+    // Day-by-day Net Worth Trend for the selected month, walked back from
+    // today's real netWorth using each day's actual transaction flow. Days
+    // after today simply have no data yet (same as real account balances) —
+    // there's nothing to fabricate for the future.
+    const dayFlow = new Map<string, number>();
+    for (const t of transactions) {
+      dayFlow.set(t.date, (dayFlow.get(t.date) ?? 0) + (t.type === "income" ? t.amount : -t.amount));
+    }
+    const [nwy, nwm] = selKey.split("-").map(Number);
+    const daysInSelMonth2 = new Date(nwy, nwm, 0).getDate();
+    const nwWalkStart = new Date(nwy, nwm - 1, 1);
+    let runningNw = netWorth;
+    const dayNwDesc: { iso: string; value: number }[] = [];
+    for (const d = NOW(); d >= nwWalkStart; d.setDate(d.getDate() - 1)) {
+      const iso = isoDate(d);
+      dayNwDesc.push({ iso, value: Math.round(runningNw) });
+      runningNw -= dayFlow.get(iso) ?? 0;
+    }
+    const netWorthDailyTrend = dayNwDesc
+      .filter((d) => d.iso.slice(0, 7) === selKey)
+      .reverse()
+      .map((d) => ({ day: Number(d.iso.slice(8, 10)), value: d.value }));
+    const nwTicksAll = [1, 8, 15, 22, daysInSelMonth2];
+    const nwLastDay = netWorthDailyTrend.length ? netWorthDailyTrend[netWorthDailyTrend.length - 1].day : 0;
+    const nwTicks = Array.from(new Set(nwTicksAll.filter((d) => d <= nwLastDay)));
+
     const vsLabel = `vs ${monthLabel(prevKey)}`;
     const kpis = [
       { label: "Total Income", value: sel.income, delta: delta(sel.income, prev.income), vs: vsLabel, color: "#22c55e", spark: incomeSpark },
@@ -986,7 +1130,7 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
     return {
       selKey, sel, selSavings, kpis, cashFlowWeekly, expenseBreakdown, expenseTotal, overallBudget,
       topSpending, recentTxns, upcomingBills, pendingDues, health, accountsTotal, assets, liabilities,
-      netWorth, netWorthTrend, investInvested, investCurrent, investGainPct, loansOutstanding,
+      netWorth, netWorthTrend, netWorthDailyTrend, nwTicks, investInvested, investCurrent, investGainPct, loansOutstanding,
       loansPrincipal, investByType, monthOptions, nwDelta, vsLabel,
     };
   }, [db, overviewMonth]);
@@ -1048,33 +1192,59 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
 
   const netWorthCard = (
     <Card className="flex h-full flex-col">
-      <div className="flex items-center gap-2">
-        <div className="grid h-9 w-9 place-items-center rounded-xl bg-brand-soft">
-          <Home className="h-5 w-5 text-brand-ink" />
-        </div>
-        <span className="text-sm font-medium text-muted">Net Worth Overview</span>
+      <div className="flex items-center justify-between">
+        <span className="text-[15px] font-semibold tracking-tight text-ink">Net Worth Overview</span>
+        <MonthSel value={overviewMonth} onChange={setOverviewMonth} />
       </div>
-      <p className="mt-3 text-[32px] font-semibold tracking-tight text-ink">₹ {M.netWorth.toLocaleString("en-IN")}</p>
-      <div className="mt-2 flex items-center gap-2 text-sm">
-        <span className={cn("inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-medium", M.nwDelta >= 0 ? "bg-emerald-50 text-green-600" : "bg-red-50 text-red-500")}>
-          {M.nwDelta >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />} {Math.abs(M.nwDelta)}%
-        </span>
+      <p className="mt-3 text-[28px] font-semibold tracking-tight text-ink">₹ {fmtMoney2(M.netWorth)}</p>
+      <div className="mt-1.5 flex items-center gap-1.5 text-xs">
+        {M.nwDelta >= 0 ? <ArrowUpRight className="h-3.5 w-3.5 text-green-500" /> : <ArrowDownRight className="h-3.5 w-3.5 text-red-500" />}
+        <span className={cn("font-semibold", M.nwDelta >= 0 ? "text-green-600" : "text-red-500")}>{Math.abs(M.nwDelta)}%</span>
         <span className="text-muted">{M.vsLabel}</span>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3">
         <div className="rounded-xl border border-border/60 bg-surface-2/40 p-3">
           <p className="flex items-center gap-1.5 text-xs text-muted"><Wallet className="h-3.5 w-3.5 text-emerald-500" /> Total Assets</p>
-          <p className="mt-1 text-base font-semibold text-ink">₹ {M.assets.toLocaleString("en-IN")}</p>
+          <p className="mt-1 text-base font-semibold text-ink">₹ {fmtMoney2(M.assets)}</p>
         </div>
         <div className="rounded-xl border border-border/60 bg-surface-2/40 p-3">
           <p className="flex items-center gap-1.5 text-xs text-muted"><Landmark className="h-3.5 w-3.5 text-red-400" /> Total Liabilities</p>
-          <p className="mt-1 text-base font-semibold text-ink">₹ {M.liabilities.toLocaleString("en-IN")}</p>
+          <p className="mt-1 text-base font-semibold text-ink">₹ {fmtMoney2(M.liabilities)}</p>
         </div>
       </div>
-      <div className="mt-4 flex-1 rounded-xl border border-border/60 bg-surface-2/30 p-3">
+      <div className="mt-4 flex-1">
         <p className="text-xs font-medium text-muted">Net Worth Trend</p>
-        <div className="mt-1 h-[140px]">
-          <Spark data={M.netWorthTrend} color="#22c55e" height={140} />
+        <div className="mt-1 h-[160px]">
+          {M.netWorthDailyTrend.length < 2 ? (
+            <div className="flex h-full items-center justify-center text-[11px] text-faint">Not enough data yet this month.</div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%" debounce={200}>
+              <AreaChart data={M.netWorthDailyTrend} margin={{ top: 4, right: 4, left: -14, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="nwFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#22c55e" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#22c55e" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis
+                  dataKey="day" type="number" domain={["dataMin", "dataMax"]} ticks={M.nwTicks}
+                  tickFormatter={(d) => dayMonthLabel(Number(d), M.selKey)}
+                  tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={false} tickLine={false}
+                />
+                <YAxis tickFormatter={yFmtSigned} tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={false} tickLine={false} width={54} />
+                <Tooltip cursor={{ stroke: "var(--border)" }} content={({ active, payload, label }) =>
+                  active && payload?.length ? (
+                    <Tip>
+                      <p className="font-medium text-ink">{dayMonthLabel(Number(label), M.selKey)}</p>
+                      <p className="text-muted">₹ {Number(payload[0].value).toLocaleString("en-IN")}</p>
+                    </Tip>
+                  ) : null
+                } />
+                <Area type="monotone" dataKey="value" stroke="#22c55e" strokeWidth={2} fill="url(#nwFill)" isAnimationActive={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     </Card>
@@ -1162,12 +1332,9 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
       <div className="flex-1 space-y-1">
         {db.accounts.length === 0 && <EmptyHint text="No accounts added yet." />}
         {db.accounts.map((a) => {
-          const Icon = bankLogo[a.institution] ?? BankIcon;
           return (
             <div key={a.id} className="group flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-surface-2/60">
-              <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl">
-                <Icon className="h-full w-full" />
-              </div>
+              <Logo domain={a.logoDomain || guessBankDomain(a.name, a.institution)} label={a.name} size={40} rounded="rounded-xl" />
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] font-semibold text-ink">{a.name}</p>
                 <p className="text-[11px] text-muted">{a.type}{a.last4 && <> • ****{a.last4}</>}</p>
@@ -1195,16 +1362,22 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
           const GI = meta.icon;
           const pct = g.target > 0 ? Math.min(100, Math.round((g.saved / g.target) * 100)) : 0;
           return (
-            <div key={g.id} className="flex items-start gap-3">
+            <div key={g.id} className="group flex items-start gap-3">
               <div className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px]" style={{ background: `linear-gradient(135deg, ${g.color}20, ${g.color}08)` }}>
                 <GI className="h-3.5 w-3.5" style={{ color: g.color }} />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
                   <p className="text-[12px] font-medium text-ink">{g.name}</p>
-                  <span className="text-[11px] font-semibold text-ink">{pct}%</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-semibold text-ink">{pct}%</span>
+                    <RowActions
+                      onEdit={() => setModal({ kind: "goal", editing: g as unknown as Record<string, unknown> })}
+                      onDelete={() => deleteRow("goals", g.id, `Delete goal "${g.name}"?`)}
+                    />
+                  </span>
                 </div>
-                <p className="mt-0.5 text-[10px] text-muted">₹ {g.saved.toLocaleString("en-IN")} of ₹ {g.target.toLocaleString("en-IN")}</p>
+                <p className="mt-0.5 text-[10px] text-muted">₹ {g.saved.toLocaleString("en-IN")} of ₹ {g.target.toLocaleString("en-IN")}{g.savedAt ? ` · saved in ${g.savedAt}` : ""}</p>
                 <div className="mt-1.5 h-1.5 w-full rounded-full bg-surface-2 overflow-hidden">
                   <div className="h-full rounded-full" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${g.color}, ${g.color}cc)` }} />
                 </div>
@@ -1705,7 +1878,7 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
                   </div>
                   <div>
                     <p className="text-[14px] font-semibold text-ink">{l.name}</p>
-                    <p className="text-[11px] text-muted">{meta.label}{l.lender && ` · ${l.lender}`}</p>
+                    <p className="text-[11px] text-muted">{meta.label}{l.lender && ` · ${l.lender}`}{l.tenureMonths ? ` · ${l.tenureMonths}mo tenure` : ""}</p>
                   </div>
                 </div>
                 <RowActions
@@ -1773,6 +1946,9 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
                 <div>
                   <p className="text-[14px] font-semibold text-ink">{g.name}</p>
                   <p className="text-[11px] text-muted">{meta.label}</p>
+                  {g.savedAt && (
+                    <p className="mt-0.5 flex items-center gap-1 text-[10px] text-faint"><Landmark className="h-3 w-3" /> Saved in {g.savedAt}</p>
+                  )}
                 </div>
               </div>
               <RowActions
@@ -1852,12 +2028,14 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
             { name: "type", label: "Account Type", type: "select", options: ["Savings", "Salary", "Current", "FD", "Cash"].map((v) => ({ value: v, label: v })), half: true },
             { name: "last4", label: "Last 4 Digits", placeholder: "5678", required: false, half: true },
             { name: "balance", label: "Current Balance (₹)", type: "number", placeholder: "0" },
+            { name: "logoDomain", label: "Logo Website (optional)", placeholder: "e.g. hdfcbank.com — auto-detected for common banks", required: false },
           ]}
-          initial={editing ? { name: String(editing.name), institution: String(editing.institution), type: String(editing.type), last4: String(editing.last4 ?? ""), balance: String(editing.balance) } : undefined}
+          initial={editing ? { name: String(editing.name), institution: String(editing.institution), type: String(editing.type), last4: String(editing.last4 ?? ""), balance: String(editing.balance), logoDomain: String(editing.logoDomain ?? "") } : undefined}
           submitLabel={editing ? "Save Changes" : "Add Account"}
           busy={busy}
           onSubmit={(d) => {
-            const data = { name: d.name, institution: d.institution, type: d.type, last4: d.last4, balance: Number(d.balance) || 0 };
+            const domain = (d.logoDomain || "").trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+            const data = { name: d.name, institution: d.institution, type: d.type, last4: d.last4, balance: Number(d.balance) || 0, logoDomain: domain || guessBankDomain(d.name, d.institution) || null };
             if (editing) updateRow("accounts", String((editing as { id: string }).id), data, "Account updated");
             else createRow("accounts", data, "Account added");
           }}
@@ -1872,13 +2050,18 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
             { name: "icon", label: "Type", type: "select", options: GOAL_ICONS.map((g) => ({ value: g.value, label: g.label })) },
             { name: "target", label: "Target Amount (₹)", type: "number", placeholder: "0", half: true },
             { name: "saved", label: "Saved So Far (₹)", type: "number", placeholder: "0", required: false, half: true },
+            {
+              name: "savedAt", label: "Where is it saved? (optional)", required: false,
+              placeholder: "e.g. HDFC Savings, a SIP, or anything else",
+              datalist: [...db.accounts.map((a) => a.name), ...db.investments.map((i) => i.name)],
+            },
           ]}
-          initial={editing ? { name: String(editing.name), icon: String(editing.icon), target: String(editing.target), saved: String(editing.saved) } : undefined}
+          initial={editing ? { name: String(editing.name), icon: String(editing.icon), target: String(editing.target), saved: String(editing.saved), savedAt: String(editing.savedAt ?? "") } : undefined}
           submitLabel={editing ? "Save Changes" : "Save Goal"}
           busy={busy}
           onSubmit={(d) => {
             const meta = goalMeta(d.icon);
-            const data = { name: d.name, icon: d.icon, color: meta.color, target: Number(d.target) || 0, saved: Number(d.saved) || 0 };
+            const data = { name: d.name, icon: d.icon, color: meta.color, target: Number(d.target) || 0, saved: Number(d.saved) || 0, savedAt: d.savedAt?.trim() || null };
             if (editing) updateRow("goals", String((editing as { id: string }).id), data, "Goal updated");
             else createRow("goals", data, "Goal added");
           }}
@@ -1901,22 +2084,12 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
       )}
 
       <Modal open={modal?.kind === "loan"} onClose={() => setModal(null)} title={editing ? "Edit Loan" : "Add Loan"}>
-        <EntityForm
+        <LoanForm
           key={String((editing as { id?: string })?.id ?? "new")}
-          fields={[
-            { name: "name", label: "Loan Name", placeholder: "e.g. Home Loan" },
-            { name: "kind", label: "Loan Type", type: "select", options: LOAN_KINDS.map((k) => ({ value: k.value, label: k.label })), half: true },
-            { name: "lender", label: "Lender", placeholder: "e.g. HDFC", required: false, half: true },
-            { name: "principal", label: "Principal (₹)", type: "number", placeholder: "0", half: true },
-            { name: "outstanding", label: "Outstanding (₹)", type: "number", placeholder: "0", half: true },
-            { name: "rate", label: "Interest Rate (%)", type: "number", placeholder: "8.5", required: false, half: true },
-            { name: "emi", label: "Monthly EMI (₹)", type: "number", placeholder: "0", required: false, half: true },
-          ]}
-          initial={editing ? { name: String(editing.name), kind: String(editing.kind), lender: String(editing.lender ?? ""), principal: String(editing.principal), outstanding: String(editing.outstanding), rate: String(editing.rate), emi: String(editing.emi) } : undefined}
+          initial={editing as Partial<FinLoan> | undefined}
           submitLabel={editing ? "Save Changes" : "Add Loan"}
           busy={busy}
-          onSubmit={(d) => {
-            const data = { name: d.name, kind: d.kind, lender: d.lender, principal: Number(d.principal) || 0, outstanding: Number(d.outstanding) || 0, rate: Number(d.rate) || 0, emi: Number(d.emi) || 0 };
+          onSubmit={(data) => {
             if (editing) updateRow("loans", String((editing as { id: string }).id), data, "Loan updated");
             else createRow("loans", data, "Loan added");
           }}

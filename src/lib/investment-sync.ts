@@ -14,7 +14,7 @@ function monthKey(d: Date): string {
 
 /**
  * Refreshes current_value for every live-priced holding (Stocks, US Stocks,
- * ETFs, Mutual Funds, Gold) that has a quantity set, and — once per calendar
+ * ETFs, Mutual Funds, Physical Gold) that has a quantity set, and — once per calendar
  * month, on or after each holding's sip_day — buys new units with that
  * month's SIP amount at the live price, exactly like a real SIP would.
  *
@@ -35,7 +35,7 @@ export async function runInvestmentPriceSync(): Promise<SyncLogEntry[]> {
       log.push({ id: inv.id, name: inv.name, action: "skipped", detail: "no quantity set" });
       continue;
     }
-    if (inv.type !== "Gold" && !inv.symbol) {
+    if (inv.type !== "Physical Gold" && !inv.symbol) {
       log.push({ id: inv.id, name: inv.name, action: "skipped", detail: "no symbol set" });
       continue;
     }

@@ -96,7 +96,7 @@ export async function searchMutualFunds(query: string): Promise<MfSearchResult[]
  */
 export async function getLiveValueInr(type: string, quantity: number, symbol: string | undefined): Promise<number | null> {
   if (!quantity || quantity <= 0) return null;
-  if (type === "Gold") {
+  if (type === "Physical Gold") {
     const perGram = await getGoldPricePerGram();
     return perGram != null ? Math.round(perGram * quantity) : null;
   }
@@ -117,7 +117,7 @@ export async function getLiveValueInr(type: string, quantity: number, symbol: st
 
 /** Live per-unit price (not multiplied by quantity) — used when buying new SIP units. */
 export async function getLivePricePerUnitInr(type: string, symbol: string | undefined): Promise<number | null> {
-  if (type === "Gold") return getGoldPricePerGram();
+  if (type === "Physical Gold") return getGoldPricePerGram();
   if (!symbol) return null;
   if (type === "Mutual Funds") return getMutualFundNav(symbol);
   if (type === "Stocks" || type === "US Stocks" || type === "ETFs") {
@@ -130,4 +130,4 @@ export async function getLivePricePerUnitInr(type: string, symbol: string | unde
   return null;
 }
 
-export const LIVE_PRICED_TYPES = ["Stocks", "US Stocks", "ETFs", "Mutual Funds", "Gold"];
+export const LIVE_PRICED_TYPES = ["Stocks", "US Stocks", "ETFs", "Mutual Funds", "Physical Gold"];

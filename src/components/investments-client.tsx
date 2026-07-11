@@ -21,7 +21,7 @@ import { Logo } from "@/components/logo";
    ═══════════════════════════════════════════════════════════════════════════ */
 const TYPE_ICON: Record<string, React.ElementType> = {
   Stocks: LineChartIcon, "US Stocks": Globe2, "Mutual Funds": Landmark, ETFs: Layers,
-  Gold: Coins, Bonds: ScrollText, REITs: Building2, NPS: ShieldCheck, PPF: Banknote,
+  "Physical Gold": Coins, "Gold Scheme": Coins, Bonds: ScrollText, REITs: Building2, NPS: ShieldCheck, PPF: Banknote,
   FD: Wallet, Crypto: Bitcoin, Other: LayoutGrid,
 };
 
@@ -36,7 +36,7 @@ const SUB_TABS: { label: string; types?: string[]; sipOnly?: boolean }[] = [
   { label: "NPS", types: ["NPS"] },
   { label: "ETFs", types: ["ETFs"] },
   { label: "REITs", types: ["REITs"] },
-  { label: "Gold", types: ["Gold"] },
+  { label: "Gold", types: ["Physical Gold", "Gold Scheme"] },
 ];
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -101,7 +101,7 @@ type InvInput = {
   quantity?: number; symbol?: string; sipDay?: number;
 };
 
-const LIVE_PRICED_TYPES = ["Stocks", "US Stocks", "ETFs", "Mutual Funds", "Gold"];
+const LIVE_PRICED_TYPES = ["Stocks", "US Stocks", "ETFs", "Mutual Funds", "Physical Gold"];
 
 function MfSymbolInput({ value, onChange }: { value: string; onChange: (schemeCode: string, schemeName: string) => void }) {
   const [query, setQuery] = useState(value);
@@ -176,7 +176,7 @@ function InvestmentForm({ initial, submitLabel, onSubmit, busy }: {
   const [sipDay, setSipDay] = useState(initial?.sipDay != null ? String(initial.sipDay) : "");
 
   const isLivePriced = LIVE_PRICED_TYPES.includes(type);
-  const isGold = type === "Gold";
+  const isGold = type === "Physical Gold";
   const isMf = type === "Mutual Funds";
 
   return (

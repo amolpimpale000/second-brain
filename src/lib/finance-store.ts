@@ -31,18 +31,19 @@ export function uid() {
 
 export type FinAccount = {
   id: string; name: string; institution: string; type: string; last4: string;
-  balance: number; createdAt: string;
+  balance: number; logoDomain?: string; createdAt: string;
 };
 export type FinTransaction = {
   id: string; type: "income" | "expense"; category: string; description: string;
   amount: number; date: string; mode: string; accountId: string | null; createdAt: string;
 };
 export type FinGoal = {
-  id: string; name: string; icon: string; color: string; target: number; saved: number; createdAt: string;
+  id: string; name: string; icon: string; color: string; target: number; saved: number;
+  savedAt?: string; createdAt: string;
 };
 export type FinLoan = {
   id: string; name: string; kind: string; lender: string; principal: number;
-  outstanding: number; rate: number; emi: number; createdAt: string;
+  outstanding: number; rate: number; emi: number; tenureMonths?: number; createdAt: string;
 };
 export type FinInvestment = {
   id: string; name: string; type: string; invested: number; currentValue: number;
@@ -78,7 +79,7 @@ export type FinanceData = {
 const ENTITY_CONFIG = {
   accounts: {
     table: "finance_accounts",
-    fields: { name: "name", institution: "institution", type: "type", last4: "last4", balance: "balance" },
+    fields: { name: "name", institution: "institution", type: "type", last4: "last4", balance: "balance", logoDomain: "logo_domain" },
     order: [{ col: "created_at", asc: true }],
   },
   transactions: {
@@ -88,12 +89,12 @@ const ENTITY_CONFIG = {
   },
   goals: {
     table: "finance_goals",
-    fields: { name: "name", icon: "icon", color: "color", target: "target", saved: "saved" },
+    fields: { name: "name", icon: "icon", color: "color", target: "target", saved: "saved", savedAt: "saved_at" },
     order: [{ col: "created_at", asc: true }],
   },
   loans: {
     table: "finance_loans",
-    fields: { name: "name", kind: "kind", lender: "lender", principal: "principal", outstanding: "outstanding", rate: "rate", emi: "emi" },
+    fields: { name: "name", kind: "kind", lender: "lender", principal: "principal", outstanding: "outstanding", rate: "rate", emi: "emi", tenureMonths: "tenure_months" },
     order: [{ col: "created_at", asc: true }],
   },
   investments: {
@@ -144,7 +145,7 @@ function fromRow(entity: FinanceEntity, row: Record<string, unknown>): Record<st
   for (const [camel, snake] of Object.entries(cfg.fields)) {
     let v = row[snake];
     // numeric columns come back as strings from Postgres — coerce
-    if (["amount", "balance", "target", "saved", "principal", "outstanding", "rate", "emi", "invested", "currentValue", "dueDay", "sipAmount", "quantity", "sipDay"].includes(camel) || snake === "current_value" || snake === "due_day" || snake === "sip_amount" || snake === "quantity" || snake === "sip_day") {
+    if (["amount", "balance", "target", "saved", "principal", "outstanding", "rate", "emi", "tenureMonths", "invested", "currentValue", "dueDay", "sipAmount", "quantity", "sipDay"].includes(camel) || snake === "current_value" || snake === "due_day" || snake === "sip_amount" || snake === "quantity" || snake === "sip_day" || snake === "tenure_months") {
       v = v == null ? v : Number(v);
     }
     out[camel] = v ?? (camel === "accountId" || camel === "dueDate" ? null : v);

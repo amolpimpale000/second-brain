@@ -8,8 +8,11 @@ create table finance_accounts (
   type text not null default 'Savings',
   last4 text not null default '',
   balance numeric not null default 0,
+  logo_domain text,    -- company favicon/logo, e.g. "hdfcbank.com" — same Logo component as SIPs/Bills
   created_at timestamptz not null default now()
 );
+-- If finance_accounts already existed, run once instead:
+-- alter table finance_accounts add column if not exists logo_domain text;
 
 create table finance_transactions (
   id text primary key,
@@ -30,8 +33,11 @@ create table finance_goals (
   color text not null default '#8b5cf6',
   target numeric not null,
   saved numeric not null default 0,
+  saved_at text,  -- where the money actually sits — a bank account name, a SIP/investment name, or free text
   created_at timestamptz not null default now()
 );
+-- If finance_goals already existed, run once instead:
+-- alter table finance_goals add column if not exists saved_at text;
 
 create table finance_loans (
   id text primary key,
@@ -42,8 +48,11 @@ create table finance_loans (
   outstanding numeric not null,
   rate numeric not null default 0,
   emi numeric not null default 0,
+  tenure_months integer,  -- loan tenure — lets EMI be auto-calculated from principal + rate + tenure
   created_at timestamptz not null default now()
 );
+-- If finance_loans already existed, run once instead:
+-- alter table finance_loans add column if not exists tenure_months integer;
 
 create table finance_investments (
   id text primary key,
