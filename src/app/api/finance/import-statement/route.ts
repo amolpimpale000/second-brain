@@ -1,8 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFParse } from "pdf-parse";
+import path from "path";
+import { pathToFileURL } from "url";
 import { parseStatementText } from "@/lib/statement-parser";
 
 export const dynamic = "force-dynamic";
+
+// pdf-parse (pdfjs-dist under the hood) resolves its worker script relative
+// to its own bundled module by default, which breaks once Next.js bundles
+// this route into a single output file elsewhere. Point it at the real
+// worker file on disk — Hostinger runs traditional Node hosting with a full
+// node_modules present at runtime, so this path is reliable there.
+let workerConfigured = false;
+function ensureWorkerConfigured() {
+  if (workerConfigured) return;
+  const workerPath = path.join(process.cwd(), "node_modules/pdf-parse/dist/pdf-parse/esm/pdf.worker.mjs");
+  PDFParse.setWorker(pathToFileURL(workerPath).href);
+  workerConfigured = true;
+}
 
 // POST /api/finance/import-statement (multipart/form-data, field "file")
 // Extracts text from an uploaded PDF (PhonePe / bank statement) and returns
@@ -20,6 +35,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Only PDF files are supported" }, { status: 400 });
     }
 
+    ensureWorkerConfigured();
     const buffer = Buffer.from(await file.arrayBuffer());
     const parser = new PDFParse({ data: buffer });
     const result = await parser.getText();
