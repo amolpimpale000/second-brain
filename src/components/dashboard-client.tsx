@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -445,7 +445,7 @@ function ExpenseCategoriesCard({ categories }: { categories: ExpenseCat[] }) {
    ═══════════════════════════════════════════════════════════════════════════ */
 type TaskVM = { id: string; title: string; category: string; completed: boolean; due: string; categoryColor: string; categoryBg: string };
 
-function UpcomingTasksCard({ tasks, available }: { tasks: TaskVM[]; available: boolean }) {
+function UpcomingTasksCard({ tasks, available, onToggle }: { tasks: TaskVM[]; available: boolean; onToggle: (id: string) => void }) {
   return (
     <Card className="xl:col-span-1">
       <Head title="Upcoming Tasks" right={<ViewAll href="/tasks" />} />
@@ -455,13 +455,13 @@ function UpcomingTasksCard({ tasks, available }: { tasks: TaskVM[]; available: b
         <div className="space-y-3">
           {tasks.map((t) => (
             <div key={t.id} className="flex items-start gap-3">
-              <div className="mt-0.5 shrink-0">
+              <button onClick={() => onToggle(t.id)} className="mt-0.5 shrink-0">
                 {t.completed ? (
                   <CheckCircle2 className="h-5 w-5 text-green-500" />
                 ) : (
-                  <Circle className="h-5 w-5 text-faint" />
+                  <Circle className="h-5 w-5 text-faint hover:text-brand-ink" />
                 )}
-              </div>
+              </button>
               <div className="min-w-0 flex-1">
                 <p className={cn("text-sm font-medium leading-tight", t.completed ? "text-muted line-through" : "text-ink")}>
                   {t.title}
@@ -803,7 +803,26 @@ function QuickActionsCard({ actions }: { actions: ActionVM[] }) {
    ═══════════════════════════════════════════════════════════════════════════ */
 export function DashboardClient({ data }: { data: DashboardData }) {
   const router = useRouter();
-  const { finance, tasks, notes, vault, business } = data;
+  const { finance, notes, vault, business } = data;
+  const [tasks, setTasks] = useState(data.tasks);
+
+  async function toggleTask(id: string) {
+    if (!tasks) return;
+    const t = tasks.find((x) => x.id === id);
+    if (!t) return;
+    const nextDone = !t.done;
+    setTasks((prev) => prev && prev.map((x) => (x.id === id ? { ...x, done: nextDone } : x)));
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update", id, data: { done: nextDone } }),
+      });
+      if (!res.ok) throw new Error("Failed");
+    } catch {
+      setTasks((prev) => prev && prev.map((x) => (x.id === id ? { ...x, done: !nextDone } : x)));
+    }
+  }
 
   const vm = useMemo(() => {
     const now = new Date();
@@ -945,7 +964,7 @@ export function DashboardClient({ data }: { data: DashboardData }) {
       {/* Row 2 */}
       <CashFlowOverview data={vm.cashFlowMonthly} />
       <ExpenseCategoriesCard categories={vm.expenseCategories} />
-      <UpcomingTasksCard tasks={vm.upcomingTasks} available={tasks !== null} />
+      <UpcomingTasksCard tasks={vm.upcomingTasks} available={tasks !== null} onToggle={toggleTask} />
 
       {/* Row 3 */}
       <SavingsGoalsCard goals={vm.savingsGoals} onAdd={() => router.push("/finances?quickAdd=goal")} />
