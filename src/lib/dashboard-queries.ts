@@ -66,7 +66,7 @@ export async function getDashboardData(): Promise<DashboardData> {
 
   const tasks = tasksRaw === sampleTasks ? null : tasksRaw;
   const vault = vaultRaw === sampleVaultAccounts ? null : vaultRaw;
-  const documents = documentsRaw.filter((d) => !d.trashed).slice(0, 8);
+  const documents = documentsRaw.filter((d) => !d.trashed).slice(0, 4);
 
   let business: BusinessSummary | null = null;
   if (journal) {
