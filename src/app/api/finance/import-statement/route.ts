@@ -1,21 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFParse } from "pdf-parse";
-import path from "path";
-import { pathToFileURL } from "url";
+import { getData as getWorkerDataUrl } from "pdf-parse/worker";
 import { parseStatementText } from "@/lib/statement-parser";
 
 export const dynamic = "force-dynamic";
 
 // pdf-parse (pdfjs-dist under the hood) resolves its worker script relative
 // to its own bundled module by default, which breaks once Next.js bundles
-// this route into a single output file elsewhere. Point it at the real
-// worker file on disk — Hostinger runs traditional Node hosting with a full
-// node_modules present at runtime, so this path is reliable there.
+// this route into a single output file elsewhere — a filesystem path into
+// node_modules is also unreliable across environments. pdf-parse/worker's
+// getData() sidesteps both by returning the worker script as a self-
+// contained base64 data: URL, so nothing needs to be resolved on disk.
 let workerConfigured = false;
 function ensureWorkerConfigured() {
   if (workerConfigured) return;
-  const workerPath = path.join(process.cwd(), "node_modules/pdf-parse/dist/pdf-parse/esm/pdf.worker.mjs");
-  PDFParse.setWorker(pathToFileURL(workerPath).href);
+  PDFParse.setWorker(getWorkerDataUrl());
   workerConfigured = true;
 }
 
