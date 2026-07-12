@@ -8,7 +8,6 @@ import {
   TrendingUp,
   TrendingDown,
   BarChart3,
-  ChevronDown,
   CheckCircle2,
   Circle,
   Car,
@@ -83,11 +82,13 @@ function ViewAll({ href }: { href: string }) {
   );
 }
 
-function MonthBtn() {
+// Static period label — these dashboard cards always show a fixed window, so
+// this is a plain label, not a dropdown pretending to be interactive.
+function PeriodLabel({ label = "This Month" }: { label?: string }) {
   return (
-    <button className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-muted hover:bg-surface-2 transition-colors">
-      This Month <ChevronDown className="h-3 w-3" />
-    </button>
+    <span className="inline-flex items-center rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-muted">
+      {label}
+    </span>
   );
 }
 
@@ -348,7 +349,7 @@ type CashFlowPoint = { month: string; income: number; expenses: number; savings:
 function CashFlowOverview({ data }: { data: CashFlowPoint[] }) {
   return (
     <Card className="xl:col-span-2">
-      <Head title="Cash Flow Overview" right={<MonthBtn />} />
+      <Head title="Cash Flow Overview" right={<PeriodLabel label="Last 12 months" />} />
       <div className="mb-3 flex gap-5 text-xs">
         {[{ n: "Income", c: "#22c55e" }, { n: "Expenses", c: "#ef4444" }, { n: "Savings", c: "#3b82f6" }].map((s) => (
           <span key={s.n} className="flex items-center gap-1.5 text-muted">
@@ -396,7 +397,7 @@ function ExpenseCategoriesCard({ categories }: { categories: ExpenseCat[] }) {
   const total = categories.reduce((s, c) => s + c.value, 0);
   return (
     <Card className="xl:col-span-1">
-      <Head title="Expense Categories" right={<MonthBtn />} />
+      <Head title="Expense Categories" right={<PeriodLabel />} />
       {categories.length === 0 ? (
         <p className="py-10 text-center text-xs text-faint">No expenses recorded this month.</p>
       ) : (
@@ -679,7 +680,7 @@ type BizMetric = { label: string; value: number; delta: number; color: string; b
 function BusinessOverviewCard({ metrics, sparklines }: { metrics: BizMetric[] | null; sparklines: number[][] }) {
   return (
     <Card className="xl:col-span-1">
-      <Head title="Business Overview" right={<MonthBtn />} />
+      <Head title="Business Overview" right={<PeriodLabel />} />
       {!metrics ? (
         <p className="py-8 text-center text-xs text-faint">Journal business data is temporarily unavailable.</p>
       ) : (

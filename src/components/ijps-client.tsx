@@ -1053,7 +1053,7 @@ export function IjpsClient({
             <button
               onClick={submitExpense}
               disabled={saving}
-              className="w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors disabled:opacity-60"
+              className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-60"
             >
               {saving ? "Saving…" : "Add Expense"}
             </button>
@@ -1297,7 +1297,7 @@ export function IjpsClient({
           </div>
           <div className="mt-5 flex justify-end gap-2">
             <button onClick={() => setEditingExpense(null)} className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted hover:bg-surface-2">Cancel</button>
-            <button onClick={saveEditedExpense} disabled={saving} className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-60">
+            <button onClick={saveEditedExpense} disabled={saving} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
               {saving ? "Saving…" : "Save Changes"}
             </button>
           </div>

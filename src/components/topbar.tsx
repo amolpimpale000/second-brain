@@ -3,6 +3,7 @@
 import { Search, Bell, Plus, ChevronDown } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { owner } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
@@ -15,7 +16,9 @@ const quickLinks = [
 ];
 
 export function Topbar() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -26,13 +29,24 @@ export function Topbar() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
+  function submitSearch() {
+    const q = query.trim();
+    if (!q) return;
+    // Transactions are the highest-volume searchable data in the app — land
+    // there with the query prefilled (finances reads ?q= into its search box).
+    router.push(`/finances?tab=Expenses&q=${encodeURIComponent(q)}`);
+  }
+
   return (
     <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-bg/80 px-4 py-3 backdrop-blur-md sm:px-6 lg:px-8">
       {/* Search */}
       <div className="relative hidden max-w-md flex-1 sm:block">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
         <input
-          placeholder="Search anything — transactions, notes, journals…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") submitSearch(); }}
+          placeholder="Search transactions… (press Enter)"
           className="w-full rounded-xl border border-border bg-surface py-2.5 pl-10 pr-4 text-sm text-ink placeholder:text-faint focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
         />
       </div>
@@ -57,10 +71,13 @@ export function Topbar() {
             </div>
           )}
         </div>
-        <button className="relative grid h-10 w-10 place-items-center rounded-xl border border-border bg-surface text-muted transition-colors hover:text-ink">
+        <Link
+          href="/journal-management"
+          title="Journal alerts"
+          className="relative grid h-10 w-10 place-items-center rounded-xl border border-border bg-surface text-muted transition-colors hover:text-ink"
+        >
           <Bell className="h-[18px] w-[18px]" />
-          <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-brand ring-2 ring-surface" />
-        </button>
+        </Link>
         <div className="ml-1 flex items-center gap-2.5 rounded-xl border border-border bg-surface py-1.5 pl-1.5 pr-3">
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-soft text-sm font-semibold text-brand-ink">
             AP

@@ -279,7 +279,7 @@ function InvestmentForm({ initial, submitLabel, onSubmit, busy }: {
           On/after day {sipDay || "…"} each month, ₹{sipAmount || 0} will automatically buy units at that day&apos;s live price and add to this holding.
         </p>
       )}
-      <button type="submit" disabled={busy} className="w-full rounded-xl bg-emerald-500 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors disabled:opacity-60">
+      <button type="submit" disabled={busy} className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-60">
         {busy ? "Saving…" : submitLabel}
       </button>
     </form>
@@ -396,7 +396,7 @@ export function InvestmentsClient({ initial }: { initial: FinInvestment[] }) {
       return (
         <div className="flex flex-col items-center gap-3 py-12 text-center">
           <p className="text-sm text-faint">No holdings here yet.</p>
-          <button onClick={() => setModal({ kind: "add" })} className="inline-flex items-center gap-1 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors">
+          <button onClick={() => setModal({ kind: "add" })} className="inline-flex items-center gap-1 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors">
             <Plus className="h-4 w-4" /> Add Investment
           </button>
         </div>
@@ -680,9 +680,9 @@ export function InvestmentsClient({ initial }: { initial: FinInvestment[] }) {
   );
 
   const promoCard = (
-    <Card className="!bg-gradient-to-br !from-emerald-50 !to-teal-50/40 !border-emerald-100">
+    <Card className="!bg-gradient-to-br !from-blue-50 !to-sky-50/40 !border-blue-100">
       <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-500/15"><Sparkles className="h-5 w-5 text-emerald-600" /></div>
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-600/15"><Sparkles className="h-5 w-5 text-blue-600" /></div>
         <div>
           <p className="text-[14px] font-semibold text-ink">Stay diversified, stay ahead</p>
           <p className="mt-0.5 text-[11px] text-muted">
@@ -690,7 +690,7 @@ export function InvestmentsClient({ initial }: { initial: FinInvestment[] }) {
           </p>
         </div>
       </div>
-      <button onClick={() => setSubTab("Holdings")} className="mt-3 w-full rounded-xl bg-emerald-500 py-2 text-[13px] font-semibold text-white hover:bg-emerald-600 transition-colors">Review Portfolio</button>
+      <button onClick={() => setSubTab("Holdings")} className="mt-3 w-full rounded-xl bg-blue-600 py-2 text-[13px] font-semibold text-white hover:bg-blue-700 transition-colors">Review Portfolio</button>
     </Card>
   );
 
@@ -742,7 +742,7 @@ export function InvestmentsClient({ initial }: { initial: FinInvestment[] }) {
       <Card>
         <div className="mb-1 flex items-center justify-between">
           <h3 className="text-[15px] font-semibold tracking-tight text-ink">{subTab === "SIPs" ? "Active SIPs" : subTab}</h3>
-          <button onClick={() => setModal({ kind: "add" })} className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 transition-colors"><Plus className="h-3.5 w-3.5" /> Add</button>
+          <button onClick={() => setModal({ kind: "add" })} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition-colors"><Plus className="h-3.5 w-3.5" /> Add</button>
         </div>
         {activeTab.sipOnly ? (
           visibleItems.length === 0 ? (
@@ -790,7 +790,7 @@ export function InvestmentsClient({ initial }: { initial: FinInvestment[] }) {
         <div className="flex items-center gap-2">
           <span className="hidden rounded-xl border border-border px-3 py-2 text-xs font-medium text-muted sm:inline">As of {today}</span>
           <button onClick={exportCsv} className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-[13px] font-medium text-muted hover:bg-surface-2 hover:text-ink transition-colors"><Download className="h-4 w-4" /> Export</button>
-          <button onClick={() => setModal({ kind: "add" })} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2 text-[13px] font-semibold text-white hover:bg-emerald-600 transition-colors"><Plus className="h-4 w-4" /> Add Investment</button>
+          <button onClick={() => setModal({ kind: "add" })} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-blue-700 transition-colors"><Plus className="h-4 w-4" /> Add Investment</button>
         </div>
       </div>
 
@@ -802,11 +802,11 @@ export function InvestmentsClient({ initial }: { initial: FinInvestment[] }) {
             onClick={() => setSubTab(t.label)}
             className={cn(
               "relative whitespace-nowrap px-3.5 py-2.5 text-[13px] font-medium transition-colors",
-              subTab === t.label ? "text-emerald-600" : "text-muted hover:text-ink"
+              subTab === t.label ? "text-blue-600" : "text-muted hover:text-ink"
             )}
           >
             {t.label}
-            {subTab === t.label && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-emerald-500" />}
+            {subTab === t.label && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-blue-600" />}
           </button>
         ))}
       </div>
@@ -834,7 +834,7 @@ export function InvestmentsClient({ initial }: { initial: FinInvestment[] }) {
               <label className="mb-1 block text-xs font-medium text-muted">Current Value (₹)</label>
               <input name="cv" required type="number" step="0.01" defaultValue={modal.investment.currentValue} className={inputCls} />
             </div>
-            <button type="submit" disabled={busy} className="w-full rounded-xl bg-emerald-500 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors disabled:opacity-60">{busy ? "Saving…" : "Update Value"}</button>
+            <button type="submit" disabled={busy} className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-60">{busy ? "Saving…" : "Update Value"}</button>
           </form>
         </Modal>
       )}

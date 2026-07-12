@@ -73,7 +73,7 @@ function NewTaskForm({ busy, onSubmit }: { busy: boolean; onSubmit: (d: { title:
           <option value="low">Low</option>
         </select>
       </div>
-      <button type="submit" disabled={busy} className="w-full rounded-xl bg-emerald-500 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors disabled:opacity-60">
+      <button type="submit" disabled={busy} className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-60">
         {busy ? "Adding…" : "Add Task"}
       </button>
     </form>

@@ -367,7 +367,7 @@ function EntityForm({
       <button
         type="submit"
         disabled={busy}
-        className="col-span-2 mt-1 rounded-xl bg-emerald-500 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors disabled:opacity-60"
+        className="col-span-2 mt-1 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-60"
       >
         {busy ? "Saving…" : submitLabel}
       </button>
@@ -458,7 +458,7 @@ function ImportStatementModal({ open, onClose, onImport, busy }: {
           <button
             onClick={handleParse}
             disabled={!file || parsing}
-            className="w-full rounded-xl bg-emerald-500 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors disabled:opacity-50"
+            className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
             {parsing ? <span className="inline-flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Reading statement…</span> : "Parse Statement"}
           </button>
@@ -485,7 +485,7 @@ function ImportStatementModal({ open, onClose, onImport, busy }: {
                   type="checkbox"
                   checked={r.selected}
                   onChange={(e) => setRows((rs) => rs!.map((x, xi) => (xi === i ? { ...x, selected: e.target.checked } : x)))}
-                  className="mt-1 h-4 w-4 shrink-0 rounded border-border accent-emerald-500"
+                  className="mt-1 h-4 w-4 shrink-0 rounded border-border accent-blue-600"
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
@@ -522,7 +522,7 @@ function ImportStatementModal({ open, onClose, onImport, busy }: {
               <button
                 onClick={handleImport}
                 disabled={selectedCount === 0 || busy}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} Add {selectedCount} Selected
               </button>
@@ -618,7 +618,7 @@ function TxnForm({
           </select>
         </div>
       )}
-      <button type="submit" disabled={busy} className="w-full rounded-xl bg-emerald-500 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors disabled:opacity-60">
+      <button type="submit" disabled={busy} className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-60">
         {busy ? "Saving…" : submitLabel}
       </button>
     </form>
@@ -731,7 +731,7 @@ function LoanForm({
           {emiAuto ? "Auto-calculated from principal, rate & tenure." : "Edited manually — click \"Auto-calculate\" to recompute from the formula."}
         </p>
       </div>
-      <button type="submit" disabled={busy} className="col-span-2 mt-1 rounded-xl bg-emerald-500 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors disabled:opacity-60">
+      <button type="submit" disabled={busy} className="col-span-2 mt-1 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-60">
         {busy ? "Saving…" : submitLabel}
       </button>
     </form>
@@ -867,6 +867,16 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Topbar global search lands here with ?q= — applied whenever the URL
+  // changes (not just on mount) so searching while already on this page works.
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q) {
+      setTab("Expenses");
+      setTxnSearch(q);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -1651,7 +1661,7 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
             <button onClick={() => setModal({ kind: "import" })} className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-ink hover:bg-surface-2 transition-colors">
               <Upload className="h-3.5 w-3.5" /> Import Statement
             </button>
-            <button onClick={() => setModal({ kind: "txn" })} className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 transition-colors">
+            <button onClick={() => setModal({ kind: "txn" })} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition-colors">
               <Plus className="h-3.5 w-3.5" /> Add Transaction
             </button>
           </div>
@@ -2178,7 +2188,7 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
                 onClick={() => switchTab(t)}
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-medium transition-all",
-                  tab === t ? "border border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm" : "text-muted hover:bg-surface-2 hover:text-ink"
+                  tab === t ? "border border-blue-200 bg-blue-50 text-blue-700 shadow-sm" : "text-muted hover:bg-surface-2 hover:text-ink"
                 )}
               >
                 <Icon className="h-4 w-4" /> {t}
@@ -2189,7 +2199,7 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
         <div className="relative" ref={quickRef}>
           <button
             onClick={() => setQuickOpen(!quickOpen)}
-            className="mr-1 inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2 text-[13px] font-semibold text-white hover:bg-emerald-600 transition-colors"
+            className="mr-1 inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-blue-700 transition-colors"
           >
             <Plus className="h-4 w-4" /> Quick Add <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", quickOpen && "rotate-180")} />
           </button>

@@ -371,8 +371,8 @@ export function VaultClient({ accounts: initial }: { accounts: VaultAccount[] })
             <Dropdown label={strengthFilter} options={["All Types", "Strong", "Medium", "Weak"]} onSelect={setStrengthFilter} />
             <Dropdown label={`Sort: ${sort}`} options={["Recent", "Name", "Category"]} onSelect={setSort} />
             <div className="ml-auto flex items-center gap-1 rounded-xl border border-border bg-surface p-0.5">
-              <button onClick={() => setView("list")} className={cn("grid h-8 w-8 place-items-center rounded-lg", view === "list" ? "bg-green-50 text-green-600" : "text-faint")}><List className="h-4 w-4" /></button>
-              <button onClick={() => setView("grid")} className={cn("grid h-8 w-8 place-items-center rounded-lg", view === "grid" ? "bg-green-50 text-green-600" : "text-faint")}><LayoutGrid className="h-4 w-4" /></button>
+              <button onClick={() => setView("list")} className={cn("grid h-8 w-8 place-items-center rounded-lg", view === "list" ? "bg-blue-50 text-blue-600" : "text-faint")}><List className="h-4 w-4" /></button>
+              <button onClick={() => setView("grid")} className={cn("grid h-8 w-8 place-items-center rounded-lg", view === "grid" ? "bg-blue-50 text-blue-600" : "text-faint")}><LayoutGrid className="h-4 w-4" /></button>
             </div>
           </div>
 
@@ -401,7 +401,7 @@ export function VaultClient({ accounts: initial }: { accounts: VaultAccount[] })
             <div className="min-w-0">
               {shown.length === 0 ? (
                 <div className="rounded-2xl border border-border bg-card p-12 text-center shadow-card">
-                  <p className="text-sm text-muted">No accounts match. <button onClick={() => setModal({ type: "account" })} className="font-medium text-green-600 hover:underline">Add one</button></p>
+                  <p className="text-sm text-muted">No accounts match. <button onClick={() => setModal({ type: "account" })} className="font-medium text-blue-600 hover:underline">Add one</button></p>
                 </div>
               ) : view === "list" ? (
                 <div className="rounded-2xl border border-border bg-card shadow-card">
@@ -516,7 +516,7 @@ export function VaultClient({ accounts: initial }: { accounts: VaultAccount[] })
           <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-ink">Security Score</h3>
-              <button onClick={() => setModal({ type: "security" })} className="text-xs font-medium text-green-600 hover:underline">View Details</button>
+              <button onClick={() => setModal({ type: "security" })} className="text-xs font-medium text-blue-600 hover:underline">View Details</button>
             </div>
             <div className="my-4"><ScoreRing value={score} /></div>
             <div className="space-y-3">
@@ -551,7 +551,7 @@ export function VaultClient({ accounts: initial }: { accounts: VaultAccount[] })
           <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="font-semibold text-ink">ATM &amp; Card Pins <span className="text-xs font-normal text-faint">({cards.length})</span></h3>
-              <button onClick={() => setModal({ type: "cards" })} className="text-xs font-medium text-green-600 hover:underline">Manage all</button>
+              <button onClick={() => setModal({ type: "cards" })} className="text-xs font-medium text-blue-600 hover:underline">Manage all</button>
             </div>
             <div className="grid grid-cols-3 gap-2.5">
               {cards.slice(0, 3).map((c) => (

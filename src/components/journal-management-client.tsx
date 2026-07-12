@@ -296,7 +296,7 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
   const addExpenseForm = (
     <div className="space-y-4">
       <label className="flex items-center gap-2.5 rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm">
-        <input type="checkbox" checked={expShared} onChange={(e) => setExpShared(e.target.checked)} className="h-4 w-4 rounded border-border accent-emerald-500" />
+        <input type="checkbox" checked={expShared} onChange={(e) => setExpShared(e.target.checked)} className="h-4 w-4 rounded border-border accent-blue-600" />
         <span className="font-medium text-ink">Shared cost — split equally across all 5 journals</span>
       </label>
 
@@ -387,7 +387,7 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
       </div>
       <button
         onClick={submitExpense} disabled={saving}
-        className="w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors disabled:opacity-60"
+        className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-60"
       >
         {saving ? "Saving…" : "Add Expense"}
       </button>
@@ -469,7 +469,7 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           <AlertsBell />
           <button
             onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
           >
             <Plus className="h-4 w-4" /> Quick Add Expense
           </button>
@@ -716,7 +716,7 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
             <button onClick={exportExpensesCsv} className="text-xs font-medium text-indigo-600 hover:underline">Export CSV</button>
             <button
               onClick={() => setShowAddModal(true)}
-              className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 transition-colors"
+              className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition-colors"
             >
               <Plus className="h-3.5 w-3.5" /> Add Expense
             </button>
@@ -1128,7 +1128,7 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
             </div>
             <button
               onClick={saveEditedExpense} disabled={saving}
-              className="w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors disabled:opacity-60"
+              className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-60"
             >
               {saving ? "Saving…" : "Save Changes"}
             </button>

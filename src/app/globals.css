@@ -13,10 +13,10 @@
   --muted: #6b7772;
   --faint: #9aa4a0;
 
-  /* Lime / green premium accent (from reference) */
-  --brand: #a3e635;
-  --brand-soft: #ecfccb;
-  --brand-ink: #3f6212;
+  /* Blue premium accent (matches the Second Brain logo) */
+  --brand: #2563eb;
+  --brand-soft: #dbeafe;
+  --brand-ink: #1d4ed8;
 
   --font-sans: "Inter", system-ui, sans-serif;
 
@@ -48,7 +48,7 @@ body {
 
 ::selection {
   background: var(--brand);
-  color: #1a2e05;
+  color: #ffffff;
 }
 
 /* Scrollbar */
