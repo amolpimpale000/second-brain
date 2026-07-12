@@ -11,7 +11,6 @@ import {
   CheckSquare,
   KeyRound,
   Settings,
-  Sparkles,
   ChevronsLeft,
   FolderOpen,
   BookOpen,
@@ -85,9 +84,8 @@ export function Sidebar() {
     >
       {/* Brand */}
       <div className="flex items-center gap-2.5 px-2 pb-6">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-ink text-brand">
-          <Sparkles className="h-5 w-5" />
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-icon.png" alt="Second Brain" className="h-9 w-9 shrink-0 rounded-xl" />
         {!collapsed && (
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-ink">Second Brain</p>
