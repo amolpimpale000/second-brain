@@ -164,11 +164,38 @@ create table vault (
   secret      text,
   updated     text,
   strength    text,
-  domain      text
+  domain      text,
+  color       text,
+  initial     text,
+  favorite    boolean not null default false,
+  two_factor  boolean not null default false,
+  trashed     boolean not null default false
 );
 -- If vault already exists with real data, do NOT re-run this file (the
 -- DROP above would wipe it) — instead just run:
 -- alter table vault add column if not exists domain text;
+-- alter table vault add column if not exists color text;
+-- alter table vault add column if not exists initial text;
+-- alter table vault add column if not exists favorite boolean not null default false;
+-- alter table vault add column if not exists two_factor boolean not null default false;
+-- alter table vault add column if not exists trashed boolean not null default false;
+
+create table vault_cards (
+  id       text primary key,
+  position int,
+  bank     text not null default '',
+  label    text not null default '',
+  type     text not null default 'Debit', -- Debit | Credit
+  network  text not null default 'VISA',  -- VISA | Mastercard | RuPay | Amex
+  number   text not null default '',
+  holder   text not null default '',
+  expiry   text not null default '',
+  cvv      text not null default '',
+  pin      text not null default '',
+  theme    text not null default 'blue'
+);
+-- If vault_cards doesn't exist yet on an already-deployed DB, run just the
+-- create table statement above (skip the drop/insert below).
 insert into vault (id, position, name, category, identifier, secret, updated, strength) values
   ('v1', 1, 'HDFC Net Banking',     'Bank',       'amol.p',                    'REPLACE_ME', '12 Jun', 'strong'),
   ('v2', 2, 'ICICI Business',       'Bank',       'ijsrt.corp',                'REPLACE_ME', '02 Jul', 'strong'),
@@ -189,6 +216,7 @@ alter table businesses   enable row level security;
 alter table tasks        enable row level security;
 alter table notes        enable row level security;
 alter table vault        enable row level security;
+alter table vault_cards  enable row level security;
 
 -- Public (anon) read for non-sensitive tables.
 create policy "public read" on transactions for select using (true);
@@ -199,4 +227,6 @@ create policy "public read" on businesses   for select using (true);
 create policy "public read" on tasks        for select using (true);
 create policy "public read" on notes        for select using (true);
 
--- NOTE: `vault` intentionally has NO policy → the publishable key cannot read it.
+-- NOTE: `vault` and `vault_cards` intentionally have NO policy → the
+-- publishable (anon) key can't read them; only the service-role key
+-- (server-side only) can, same as every other write path in this app.

@@ -69,24 +69,6 @@ function uid() {
   return Math.random().toString(36).slice(2, 9);
 }
 
-/* persist to localStorage, hydrating after mount (no SSR mismatch) */
-function usePersist<T>(key: string, seed: T) {
-  const [val, setVal] = useState<T>(seed);
-  const ready = useRef(false);
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(key);
-      if (raw) setVal(JSON.parse(raw));
-    } catch {}
-    ready.current = true;
-  }, [key]);
-  useEffect(() => {
-    if (ready.current) {
-      try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
-    }
-  }, [key, val]);
-  return [val, setVal] as const;
-}
 
 /* --------------------------------------------------------------- score ring */
 function ScoreRing({ value }: { value: number }) {
@@ -183,10 +165,11 @@ function FullCard({ card, onEdit, onDelete }: { card: VaultCard; onEdit: () => v
 const PAGE_SIZE = 6;
 
 /* =========================================================================== */
-export function VaultClient({ accounts: initial }: { accounts: VaultAccount[] }) {
-  const [accounts, setAccounts] = usePersist<VaultAccount[]>("sb.vault.accounts", initial);
-  const [cards, setCards] = usePersist<VaultCard[]>("sb.vault.cards", seedCards);
-  const [trash, setTrash] = usePersist<VaultAccount[]>("sb.vault.trash", []);
+export function VaultClient({ accounts: initialAccounts, cards: initialCards }: { accounts: VaultAccount[]; cards: VaultCard[] }) {
+  const [accounts, setAccounts] = useState<VaultAccount[]>(initialAccounts.filter((a) => !a.trashed));
+  const [trash, setTrash] = useState<VaultAccount[]>(initialAccounts.filter((a) => a.trashed));
+  const [cards, setCards] = useState<VaultCard[]>(initialCards);
+  const [busy, setBusy] = useState(false);
 
   const [activeCat, setActiveCat] = useState("All Passwords");
   const [query, setQuery] = useState("");
@@ -268,26 +251,131 @@ export function VaultClient({ accounts: initial }: { accounts: VaultAccount[] })
   const shown = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
   useEffect(() => { setPage(1); }, [activeCat, query, strengthFilter, sort]);
 
-  /* mutations */
-  const saveAccount = (a: VaultAccount) =>
-    setAccounts((prev) => prev.some((x) => x.id === a.id) ? prev.map((x) => (x.id === a.id ? a : x)) : [a, ...prev]);
-  const deleteAccount = (id: string) => {
-    const acc = accounts.find((a) => a.id === id);
-    if (acc) setTrash((t) => [acc, ...t]);
-    setAccounts((prev) => prev.filter((a) => a.id !== id));
-    flash("Moved to Trash");
-  };
-  const restore = (id: string) => {
-    const acc = trash.find((a) => a.id === id);
-    if (acc) setAccounts((p) => [acc, ...p]);
-    setTrash((t) => t.filter((a) => a.id !== id));
-  };
-  const purge = (id: string) => setTrash((t) => t.filter((a) => a.id !== id));
-  const toggleFav = (id: string) => setAccounts((prev) => prev.map((a) => (a.id === id ? { ...a, favorite: !a.favorite } : a)));
+  /* ── persistence ──────────────────────────────────────────────────────── */
+  async function apiMutate(entity: "account" | "card", action: "create" | "update" | "delete", payload: { id?: string; data?: Record<string, unknown> }) {
+    const res = await fetch("/api/vault", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entity, action, ...payload }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || "Save failed");
+    return json;
+  }
 
-  const saveCard = (c: VaultCard) =>
-    setCards((prev) => prev.some((x) => x.id === c.id) ? prev.map((x) => (x.id === c.id ? c : x)) : [...prev, c]);
-  const deleteCard = (id: string) => { setCards((prev) => prev.filter((c) => c.id !== id)); flash("Card deleted"); };
+  function accountToData(a: VaultAccount) {
+    return { name: a.name, username: a.username, category: a.category, domain: a.domain, secret: a.secret, strength: a.strength, color: a.color, initial: a.initial, favorite: a.favorite, twoFactor: a.twoFactor };
+  }
+
+  /* mutations */
+  async function saveAccount(a: VaultAccount, isNew: boolean) {
+    setBusy(true);
+    try {
+      if (isNew) {
+        const { row } = await apiMutate("account", "create", { data: accountToData(a) });
+        setAccounts((prev) => [row, ...prev]);
+        flash("Account added");
+      } else {
+        const { row } = await apiMutate("account", "update", { id: a.id, data: accountToData(a) });
+        setAccounts((prev) => prev.map((x) => (x.id === a.id ? row : x)));
+        flash("Account updated");
+      }
+      setModal(null);
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Failed to save account");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function deleteAccount(id: string) {
+    const acc = accounts.find((a) => a.id === id);
+    if (!acc) return;
+    setAccounts((prev) => prev.filter((a) => a.id !== id));
+    setTrash((t) => [{ ...acc, trashed: true }, ...t]);
+    flash("Moved to Trash");
+    try {
+      await apiMutate("account", "update", { id, data: { trashed: true } });
+    } catch (err) {
+      setAccounts((prev) => [acc, ...prev]);
+      setTrash((t) => t.filter((a) => a.id !== id));
+      flash(err instanceof Error ? err.message : "Failed to delete account");
+    }
+  }
+  async function restore(id: string) {
+    const acc = trash.find((a) => a.id === id);
+    if (!acc) return;
+    setTrash((t) => t.filter((a) => a.id !== id));
+    setAccounts((p) => [{ ...acc, trashed: false }, ...p]);
+    try {
+      await apiMutate("account", "update", { id, data: { trashed: false } });
+    } catch (err) {
+      setAccounts((p) => p.filter((a) => a.id !== id));
+      setTrash((t) => [acc, ...t]);
+      flash(err instanceof Error ? err.message : "Failed to restore account");
+    }
+  }
+  async function purge(id: string) {
+    const prevTrash = trash;
+    setTrash((t) => t.filter((a) => a.id !== id));
+    try {
+      await apiMutate("account", "delete", { id });
+    } catch (err) {
+      setTrash(prevTrash);
+      flash(err instanceof Error ? err.message : "Failed to delete account");
+    }
+  }
+  async function emptyTrash() {
+    const prevTrash = trash;
+    setTrash([]);
+    try {
+      await Promise.all(prevTrash.map((a) => apiMutate("account", "delete", { id: a.id })));
+      flash("Trash emptied");
+    } catch (err) {
+      setTrash(prevTrash);
+      flash(err instanceof Error ? err.message : "Failed to empty trash");
+    }
+  }
+  async function toggleFav(id: string) {
+    const acc = accounts.find((a) => a.id === id);
+    if (!acc) return;
+    const nextFav = !acc.favorite;
+    setAccounts((prev) => prev.map((a) => (a.id === id ? { ...a, favorite: nextFav } : a)));
+    try {
+      await apiMutate("account", "update", { id, data: { favorite: nextFav } });
+    } catch {
+      setAccounts((prev) => prev.map((a) => (a.id === id ? { ...a, favorite: !nextFav } : a)));
+    }
+  }
+
+  async function saveCard(c: VaultCard, isNew: boolean) {
+    setBusy(true);
+    try {
+      const data = { bank: c.bank, label: c.label, type: c.type, network: c.network, number: c.number, holder: c.holder, expiry: c.expiry, cvv: c.cvv, pin: c.pin, theme: c.theme };
+      if (isNew) {
+        const { row } = await apiMutate("card", "create", { data });
+        setCards((prev) => [...prev, row]);
+      } else {
+        const { row } = await apiMutate("card", "update", { id: c.id, data });
+        setCards((prev) => prev.map((x) => (x.id === c.id ? row : x)));
+      }
+      flash("Card saved");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Failed to save card");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function deleteCard(id: string) {
+    const prevCards = cards;
+    setCards((prev) => prev.filter((c) => c.id !== id));
+    try {
+      await apiMutate("card", "delete", { id });
+      flash("Card deleted");
+    } catch (err) {
+      setCards(prevCards);
+      flash(err instanceof Error ? err.message : "Failed to delete card");
+    }
+  }
 
   const exportVault = () => {
     const blob = new Blob([JSON.stringify({ accounts, cards }, null, 2)], { type: "application/json" });
@@ -297,17 +385,35 @@ export function VaultClient({ accounts: initial }: { accounts: VaultAccount[] })
     URL.revokeObjectURL(url);
     flash("Vault exported");
   };
-  const importVault = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const data = JSON.parse(String(reader.result));
-        if (Array.isArray(data.accounts)) setAccounts((prev) => [...data.accounts.map((a: VaultAccount) => ({ ...a, id: a.id || uid() })), ...prev]);
-        if (Array.isArray(data.cards)) setCards((prev) => [...prev, ...data.cards.map((c: VaultCard) => ({ ...c, id: c.id || uid() }))]);
-        flash("Vault imported");
-      } catch { flash("Invalid file"); }
-    };
-    reader.readAsText(file);
+  const importVault = async (file: File) => {
+    const text = await file.text();
+    let data: { accounts?: VaultAccount[]; cards?: VaultCard[] };
+    try {
+      data = JSON.parse(text);
+    } catch {
+      flash("Invalid file");
+      return;
+    }
+    setBusy(true);
+    try {
+      if (Array.isArray(data.accounts)) {
+        for (const a of data.accounts) {
+          const { row } = await apiMutate("account", "create", { data: accountToData(a) });
+          setAccounts((prev) => [row, ...prev]);
+        }
+      }
+      if (Array.isArray(data.cards)) {
+        for (const c of data.cards) {
+          const { row } = await apiMutate("card", "create", { data: { bank: c.bank, label: c.label, type: c.type, network: c.network, number: c.number, holder: c.holder, expiry: c.expiry, cvv: c.cvv, pin: c.pin, theme: c.theme } });
+          setCards((prev) => [...prev, row]);
+        }
+      }
+      flash("Vault imported");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Import failed");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -584,13 +690,13 @@ export function VaultClient({ accounts: initial }: { accounts: VaultAccount[] })
 
       {/* MODALS */}
       {modal?.type === "account" && (
-        <AccountModal editing={modal.editing} onClose={() => setModal(null)} onSave={(a) => { saveAccount(a); setModal(null); flash(modal.editing ? "Account updated" : "Account added"); }} onGenerate={() => genPassword()} />
+        <AccountModal editing={modal.editing} busy={busy} onClose={() => setModal(null)} onSave={(a) => saveAccount(a, !modal.editing)} onGenerate={() => genPassword()} />
       )}
       {modal?.type === "card" && (
-        <CardModal editing={undefined} onClose={() => setModal(null)} onSave={(c) => { saveCard(c); setModal(null); flash("Card saved"); }} />
+        <CardModal editing={undefined} busy={busy} onClose={() => setModal(null)} onSave={(c) => saveCard(c, true).then(() => setModal(null))} />
       )}
       {modal?.type === "cards" && (
-        <CardsManagerModal cards={cards} onClose={() => setModal(null)} onSave={saveCard} onDelete={deleteCard} />
+        <CardsManagerModal cards={cards} busy={busy} onClose={() => setModal(null)} onSave={saveCard} onDelete={deleteCard} />
       )}
       {modal?.type === "gen" && <GeneratorModal onClose={() => setModal(null)} onCopy={(pw) => copy(pw, "Password copied")} />}
       {modal?.type === "trash" && (
@@ -607,7 +713,7 @@ export function VaultClient({ accounts: initial }: { accounts: VaultAccount[] })
                   <button onClick={() => purge(a.id)} className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-red-50 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
                 </div>
               ))}
-              <button onClick={() => { setTrash([]); flash("Trash emptied"); }} className="mt-2 w-full rounded-xl border border-border py-2 text-sm font-medium text-red-500 hover:bg-red-50">Empty Trash</button>
+              <button onClick={emptyTrash} className="mt-2 w-full rounded-xl border border-border py-2 text-sm font-medium text-red-500 hover:bg-red-50">Empty Trash</button>
             </div>
           )}
         </Modal>
@@ -663,8 +769,8 @@ function PageBtn({ children, active, disabled, onClick }: { children: React.Reac
 }
 
 /* ------------------------------------------------------------- account modal */
-function AccountModal({ editing, onClose, onSave, onGenerate }: {
-  editing?: VaultAccount; onClose: () => void; onSave: (a: VaultAccount) => void; onGenerate: () => string;
+function AccountModal({ editing, busy, onClose, onSave, onGenerate }: {
+  editing?: VaultAccount; busy: boolean; onClose: () => void; onSave: (a: VaultAccount) => void; onGenerate: () => string;
 }) {
   const [f, setF] = useState<VaultAccount>(
     editing ?? { id: uid(), name: "", username: "", category: "Banking", lastUsed: "Just now", favorite: false, color: "#334155", initial: "?", domain: "", secret: "", strength: "weak", twoFactor: false }
@@ -709,14 +815,14 @@ function AccountModal({ editing, onClose, onSave, onGenerate }: {
       </div>
       <div className="mt-5 flex justify-end gap-2">
         <button onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted hover:bg-surface-2">Cancel</button>
-        <button onClick={submit} className="rounded-xl bg-green-500 px-4 py-2 text-sm font-semibold text-white hover:bg-green-600">{editing ? "Save changes" : "Add account"}</button>
+        <button onClick={submit} disabled={busy} className="rounded-xl bg-green-500 px-4 py-2 text-sm font-semibold text-white hover:bg-green-600 disabled:opacity-60">{busy ? "Saving…" : editing ? "Save changes" : "Add account"}</button>
       </div>
     </Modal>
   );
 }
 
 /* ---------------------------------------------------------------- card modal */
-function CardModal({ editing, onClose, onSave }: { editing?: VaultCard; onClose: () => void; onSave: (c: VaultCard) => void }) {
+function CardModal({ editing, busy, onClose, onSave }: { editing?: VaultCard; busy: boolean; onClose: () => void; onSave: (c: VaultCard) => void }) {
   const [f, setF] = useState<VaultCard>(
     editing ?? { id: uid(), bank: "", label: "", type: "Debit", network: "VISA", number: "", holder: "", expiry: "", cvv: "", pin: "", theme: "blue" }
   );
@@ -751,15 +857,15 @@ function CardModal({ editing, onClose, onSave }: { editing?: VaultCard; onClose:
       </div>
       <div className="mt-5 flex justify-end gap-2">
         <button onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted hover:bg-surface-2">Cancel</button>
-        <button onClick={() => f.label.trim() && onSave(f)} className="rounded-xl bg-green-500 px-4 py-2 text-sm font-semibold text-white hover:bg-green-600">{editing ? "Save changes" : "Add card"}</button>
+        <button onClick={() => f.label.trim() && onSave(f)} disabled={busy} className="rounded-xl bg-green-500 px-4 py-2 text-sm font-semibold text-white hover:bg-green-600 disabled:opacity-60">{busy ? "Saving…" : editing ? "Save changes" : "Add card"}</button>
       </div>
     </Modal>
   );
 }
 
 /* ------------------------------------------------------- cards manager modal */
-function CardsManagerModal({ cards, onClose, onSave, onDelete }: {
-  cards: VaultCard[]; onClose: () => void; onSave: (c: VaultCard) => void; onDelete: (id: string) => void;
+function CardsManagerModal({ cards, busy, onClose, onSave, onDelete }: {
+  cards: VaultCard[]; busy: boolean; onClose: () => void; onSave: (c: VaultCard, isNew: boolean) => void; onDelete: (id: string) => void;
 }) {
   const [editing, setEditing] = useState<VaultCard | "new" | null>(null);
   return (
@@ -777,8 +883,9 @@ function CardsManagerModal({ cards, onClose, onSave, onDelete }: {
       {editing && (
         <CardModal
           editing={editing === "new" ? undefined : editing}
+          busy={busy}
           onClose={() => setEditing(null)}
-          onSave={(c) => { onSave(c); setEditing(null); }}
+          onSave={(c) => { onSave(c, editing === "new"); setEditing(null); }}
         />
       )}
     </>

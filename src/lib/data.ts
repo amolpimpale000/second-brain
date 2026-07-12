@@ -248,6 +248,7 @@ export type VaultAccount = {
   secret: string;
   strength: "strong" | "medium" | "weak";
   twoFactor: boolean;
+  trashed?: boolean;
 };
 
 export const vaultAccounts: VaultAccount[] = [

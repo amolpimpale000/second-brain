@@ -11,7 +11,7 @@
 // ============================================================================
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import * as sample from "./data";
-import type { Txn, Holding, Business, Task, Note, VaultAccount } from "./data";
+import type { Txn, Holding, Business, Task, Note, VaultAccount, VaultCard } from "./data";
 
 let _client: SupabaseClient | null = null;
 
@@ -134,15 +134,40 @@ export async function getVault(): Promise<VaultAccount[]> {
       username: r.identifier,
       category: r.category,
       lastUsed: r.updated,
-      favorite: false,
-      color: "#64748b",
-      initial: (r.name?.[0] ?? "?").toUpperCase(),
+      favorite: Boolean(r.favorite),
+      color: r.color || "#64748b",
+      initial: r.initial || (r.name?.[0] ?? "?").toUpperCase(),
       domain: r.domain ?? "",
       secret: r.secret,
       strength: r.strength,
-      twoFactor: false,
+      twoFactor: Boolean(r.two_factor),
+      trashed: Boolean(r.trashed),
     }));
   } catch {
     return sample.vaultAccounts;
+  }
+}
+
+export async function getVaultCards(): Promise<VaultCard[]> {
+  try {
+    const supabase = db();
+    if (!supabase) return sample.vaultCards;
+    const { data, error } = await supabase.from("vault_cards").select("*").order("position");
+    if (error || !data?.length) return sample.vaultCards;
+    return data.map((r) => ({
+      id: r.id,
+      bank: r.bank ?? "",
+      label: r.label ?? "",
+      type: r.type ?? "Debit",
+      network: r.network ?? "VISA",
+      number: r.number ?? "",
+      holder: r.holder ?? "",
+      expiry: r.expiry ?? "",
+      cvv: r.cvv ?? "",
+      pin: r.pin ?? "",
+      theme: r.theme ?? "blue",
+    }));
+  } catch {
+    return sample.vaultCards;
   }
 }

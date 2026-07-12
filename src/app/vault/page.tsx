@@ -1,9 +1,9 @@
 import { VaultClient } from "@/components/vault-client";
-import { getVault } from "@/lib/queries";
+import { getVault, getVaultCards } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
 export default async function VaultPage() {
-  const accounts = await getVault();
-  return <VaultClient accounts={accounts} />;
+  const [accounts, cards] = await Promise.all([getVault(), getVaultCards()]);
+  return <VaultClient accounts={accounts} cards={cards} />;
 }
