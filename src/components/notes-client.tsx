@@ -258,7 +258,13 @@ export function NotesClient() {
   const recent = notes.slice(0, 5);
 
   return (
-    <div className="animate-fade-up">
+    <div className="animate-fade-up space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-ink">Notes</h1>
+          <p className="mt-1 text-sm text-muted">Capture ideas, pin what matters, and keep reminders in one place</p>
+        </div>
+      </div>
       <div className="grid gap-5 xl:grid-cols-[220px_minmax(0,1fr)_300px]">
         {/* Stats span first two cols */}
         <div className="xl:col-span-2">

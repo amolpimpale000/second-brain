@@ -955,6 +955,14 @@ export function DashboardClient({ data }: { data: DashboardData }) {
 
   return (
     <div className="animate-fade-up grid grid-cols-1 gap-4 xl:grid-cols-4">
+      {/* Header */}
+      <div className="flex flex-wrap items-start justify-between gap-3 xl:col-span-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-ink">Dashboard</h1>
+          <p className="mt-1 text-sm text-muted">Your finances, tasks and business at a glance</p>
+        </div>
+      </div>
+
       {/* Row 1 */}
       <KpiCards cards={vm.kpiCards} />
       <DocumentsPreviewCard documents={documents} onAdd={() => router.push("/documents")} />

@@ -2164,6 +2164,14 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
         </div>
       )}
 
+      {/* Header */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-ink">Personal Finances</h1>
+          <p className="mt-1 text-sm text-muted">Track accounts, expenses, loans and savings goals in one place</p>
+        </div>
+      </div>
+
       {/* Tab bar + Quick Add */}
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-card p-1.5 shadow-[0_2px_8px_rgba(16,24,40,0.04)]">
         <div className="flex flex-wrap items-center gap-1">
