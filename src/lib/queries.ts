@@ -127,7 +127,8 @@ export async function getVault(): Promise<VaultAccount[]> {
     const supabase = db();
     if (!supabase) return sample.vaultAccounts;
     const { data, error } = await supabase.from("vault").select("*").order("position");
-    if (error || !data?.length) return sample.vaultAccounts;
+    if (error) return sample.vaultAccounts;
+    if (!data?.length) return [];
     return data.map((r) => ({
       id: r.id,
       name: r.name,
@@ -153,7 +154,8 @@ export async function getVaultCards(): Promise<VaultCard[]> {
     const supabase = db();
     if (!supabase) return sample.vaultCards;
     const { data, error } = await supabase.from("vault_cards").select("*").order("position");
-    if (error || !data?.length) return sample.vaultCards;
+    if (error) return sample.vaultCards;
+    if (!data?.length) return [];
     return data.map((r) => ({
       id: r.id,
       bank: r.bank ?? "",
