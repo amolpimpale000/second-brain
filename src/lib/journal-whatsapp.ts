@@ -63,7 +63,7 @@ async function fireTemplate(
 
   const result = await sendWhatsAppTemplate(OWNER_PHONE, OWNER_COUNTRY_CODE, template, bodyValues);
   if (result.ok) {
-    await recordWhatsAppSent(alertKey, template, journalCode, OWNER_PHONE);
+    await recordWhatsAppSent(alertKey, template, journalCode, OWNER_PHONE, result.messageId);
   }
   return { alertKey, template, journal: journalCode, ok: result.ok, httpStatus: result.httpStatus, detail: result.body };
 }

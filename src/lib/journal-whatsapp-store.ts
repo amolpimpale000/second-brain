@@ -47,14 +47,36 @@ export async function recordWhatsAppSent(
   alertKey: string,
   template: string,
   journalCode: string,
-  phone: string
+  phone: string,
+  messageId?: string
 ): Promise<void> {
   const sb = admin();
   const { error } = await sb
     .from(TABLE)
     .upsert(
-      { alert_key: alertKey, template, journal_code: journalCode, phone, last_sent_at: new Date().toISOString() },
+      {
+        alert_key: alertKey,
+        template,
+        journal_code: journalCode,
+        phone,
+        last_sent_at: new Date().toISOString(),
+        message_id: messageId ?? null,
+        delivery_status: null,
+        delivery_updated_at: null,
+      },
       { onConflict: "alert_key" }
     );
   if (error) throw error;
+}
+
+/** Called by the Interakt webhook when a message's delivery status changes. */
+export async function updateDeliveryStatus(messageId: string, status: string): Promise<boolean> {
+  const sb = admin();
+  const { data, error } = await sb
+    .from(TABLE)
+    .update({ delivery_status: status, delivery_updated_at: new Date().toISOString() })
+    .eq("message_id", messageId)
+    .select();
+  if (error) throw error;
+  return (data?.length ?? 0) > 0;
 }

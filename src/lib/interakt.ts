@@ -12,6 +12,7 @@ export type InteraktSendResult = {
   ok: boolean;
   httpStatus: number;
   body: string;
+  messageId?: string;
 };
 
 /** Sends a pre-approved WhatsApp template message via Interakt's public API. */
@@ -46,7 +47,13 @@ export async function sendWhatsAppTemplate(
       }),
     });
     const text = await res.text();
-    return { ok: res.ok, httpStatus: res.status, body: text.slice(0, 1000) };
+    let messageId: string | undefined;
+    try {
+      messageId = JSON.parse(text)?.id;
+    } catch {
+      // non-JSON response — leave messageId undefined
+    }
+    return { ok: res.ok, httpStatus: res.status, body: text.slice(0, 1000), messageId };
   } catch (err) {
     return { ok: false, httpStatus: 0, body: err instanceof Error ? err.message : "Request failed" };
   }

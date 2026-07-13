@@ -1,14 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/utils/supabase/middleware";
 
-// Hit directly by Hostinger cron jobs with their own ?secret= query param —
-// a cron job can't complete an HTTP Basic Auth challenge, so these stay
-// outside the site-wide gate below (they're still protected, just by a
-// different mechanism suited to machine callers).
+// Hit directly by Hostinger cron jobs (their own ?secret= query param) or by
+// Interakt's webhook caller — neither can complete an HTTP Basic Auth
+// challenge, so these stay outside the site-wide gate below (they're still
+// protected, just by a different mechanism suited to machine callers).
 const CRON_PATHS = [
   "/api/investments/sync-prices",
   "/api/journals/whatsapp-alerts/check",
   "/api/journals/whatsapp-alerts/trial",
+  "/api/journals/whatsapp-alerts/webhook",
 ];
 
 function unauthorized() {
