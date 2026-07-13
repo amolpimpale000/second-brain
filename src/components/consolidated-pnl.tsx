@@ -298,7 +298,7 @@ export function ConsolidatedPnL({ className }: { className?: string }) {
                 const color = JOURNAL_COLOR[j.code] ?? "#64748b";
                 const pct = (j.income / maxJournalIncome) * 100;
                 return (
-                  <div key={j.code} className="grid grid-cols-[76px_1fr_96px_88px_60px] items-center gap-3 sm:grid-cols-[92px_1fr_110px_100px_64px]">
+                  <div key={j.code} className="grid grid-cols-[52px_1fr_64px_40px] items-center gap-2 sm:grid-cols-[92px_1fr_110px_100px_64px] sm:gap-3">
                     <div className="flex min-w-0 items-center gap-2">
                       <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white" style={{ background: color }}>
                         <Icon className="h-4 w-4" />
