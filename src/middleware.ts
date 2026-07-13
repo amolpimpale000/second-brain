@@ -2,8 +2,8 @@ import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/utils/supabase/middleware";
 
 // Hit directly by Hostinger cron jobs (their own ?secret= query param) or by
-// Interakt's webhook caller — neither can complete an HTTP Basic Auth
-// challenge, so these stay outside the site-wide gate below (they're still
+// Interakt's webhook caller — neither can complete a browser-based access
+// check, so these stay outside the site-wide gate below (they're still
 // protected, just by a different mechanism suited to machine callers).
 const CRON_PATHS = [
   "/api/investments/sync-prices",
@@ -12,31 +12,33 @@ const CRON_PATHS = [
   "/api/journals/whatsapp-alerts/webhook",
 ];
 
-function unauthorized() {
-  return new NextResponse("Authentication required", {
-    status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="Second Brain"' },
-  });
+// The unlock link itself must stay reachable without the cookie it grants —
+// it's what sets that cookie in the first place. See /api/auth/unlock.
+const PUBLIC_PATHS = ["/api/auth/unlock"];
+
+const ACCESS_COOKIE = "sb_trusted";
+
+function denied() {
+  return new NextResponse("This device isn't authorized to view this site.", { status: 403 });
 }
 
-// Whole-site login gate. Off (site stays open) until AUTH_USERNAME/
-// AUTH_PASSWORD are set as env vars — see Settings page for the reminder.
+// Whole-site access gate: silent — no visible login prompt. A device is
+// trusted once it's visited the private unlock link (/api/auth/unlock),
+// which sets a long-lived cookie; every other device gets a plain "not
+// authorized" response. Off (site stays open) until SITE_ACCESS_TOKEN is
+// set as an env var — see Settings page for the reminder.
 function isAuthorized(request: NextRequest): boolean {
-  const user = process.env.AUTH_USERNAME;
-  const pass = process.env.AUTH_PASSWORD;
-  if (!user || !pass) return true;
-  const header = request.headers.get("authorization");
-  if (!header?.startsWith("Basic ")) return false;
-  const decoded = atob(header.slice(6));
-  const sep = decoded.indexOf(":");
-  if (sep === -1) return false;
-  return decoded.slice(0, sep) === user && decoded.slice(sep + 1) === pass;
+  const token = process.env.SITE_ACCESS_TOKEN;
+  if (!token) return true;
+  return request.cookies.get(ACCESS_COOKIE)?.value === token;
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (!CRON_PATHS.some((p) => pathname.startsWith(p)) && !isAuthorized(request)) {
-    return unauthorized();
+  const bypassed =
+    CRON_PATHS.some((p) => pathname.startsWith(p)) || PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+  if (!bypassed && !isAuthorized(request)) {
+    return denied();
   }
 
   const response = await updateSession(request);

@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Bell, Plus, ChevronDown } from "lucide-react";
+import { Search, Bell, Plus, ChevronDown, Menu } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,7 +15,7 @@ const quickLinks = [
   { label: "Goal", href: "/finances?quickAdd=goal" },
 ];
 
-export function Topbar() {
+export function Topbar({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -39,6 +39,13 @@ export function Topbar() {
 
   return (
     <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-bg/80 px-4 py-3 backdrop-blur-md sm:px-6 lg:px-8">
+      <button
+        onClick={onOpenMobileNav}
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-border bg-surface text-muted hover:text-ink lg:hidden"
+        aria-label="Open menu"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
       {/* Search */}
       <div className="relative hidden max-w-md flex-1 sm:block">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />

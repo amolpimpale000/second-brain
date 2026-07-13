@@ -5,15 +5,15 @@ import { owner } from "@/lib/data";
 export const dynamic = "force-dynamic";
 
 export default function SettingsPage() {
-  const authEnabled = Boolean(process.env.AUTH_USERNAME && process.env.AUTH_PASSWORD);
+  const authEnabled = Boolean(process.env.SITE_ACCESS_TOKEN);
 
   const rows = [
     { icon: <User className="h-5 w-5" />, title: "Profile", desc: "Name, email, and role", value: owner.email },
     { icon: <Database className="h-5 w-5" />, title: "Data Source", desc: "Finance, tasks, notes, documents & vault storage", value: "Supabase · Connected" },
     { icon: <Bell className="h-5 w-5" />, title: "Notifications", desc: "Journal alerts + WhatsApp triggers (hourly cron)", value: "On" },
     {
-      icon: <Shield className="h-5 w-5" />, title: "Site Login",
-      desc: authEnabled ? "HTTP Basic Auth gate is active on every page and API route" : "No login required — anyone with the URL can see everything",
+      icon: <Shield className="h-5 w-5" />, title: "Site Access",
+      desc: authEnabled ? "Only devices that visited the private unlock link can view this site — no login prompt" : "No access gate — anyone with the URL can see everything",
       value: authEnabled ? "Protected" : "Unprotected",
     },
     { icon: <Palette className="h-5 w-5" />, title: "Appearance", desc: "Theme and accent", value: "Light · Blue" },
@@ -28,10 +28,9 @@ export default function SettingsPage() {
           <div className="flex items-start gap-3">
             <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-600"><AlertTriangle className="h-5 w-5" /></div>
             <div>
-              <p className="text-sm font-semibold text-ink">This site has no login</p>
+              <p className="text-sm font-semibold text-ink">This site has no access gate</p>
               <p className="mt-1 text-sm text-muted">
-                Anyone with the URL can see your finances, journal revenue, and vault. Set <code className="rounded bg-white px-1.5 py-0.5 text-amber-700">AUTH_USERNAME</code> and{" "}
-                <code className="rounded bg-white px-1.5 py-0.5 text-amber-700">AUTH_PASSWORD</code> as environment variables in Hostinger to turn on a login prompt for the whole site.
+                Anyone with the URL can see your finances, journal revenue, and vault. Set <code className="rounded bg-white px-1.5 py-0.5 text-amber-700">SITE_ACCESS_TOKEN</code> as an environment variable in Hostinger, then visit <code className="rounded bg-white px-1.5 py-0.5 text-amber-700">/api/auth/unlock?token=...</code> once per device to grant it silent access.
               </p>
             </div>
           </div>
