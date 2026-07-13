@@ -430,7 +430,7 @@ export function VaultClient({ accounts: initialAccounts, cards: initialCards }: 
           </button>
           <Menu
             trigger={
-              <span className="inline-flex items-center gap-2 rounded-xl bg-green-500 py-2.5 pl-4 pr-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-green-600">
+              <span className="inline-flex items-center gap-2 rounded-xl bg-blue-600 py-2.5 pl-4 pr-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">
                 <Plus className="h-4 w-4" /> Add New
                 <span className="ml-1 border-l border-white/30 pl-2"><ChevronDown className="h-4 w-4" /></span>
               </span>
@@ -471,7 +471,7 @@ export function VaultClient({ accounts: initialAccounts, cards: initialCards }: 
             <div className="relative min-w-[180px] flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search accounts..."
-                className="w-full rounded-xl border border-border bg-surface-2 py-2 pl-9 pr-3 text-sm text-ink placeholder:text-faint focus:border-green-400 focus:outline-none" />
+                className="w-full rounded-xl border border-border bg-surface-2 py-2 pl-9 pr-3 text-sm text-ink placeholder:text-faint focus:border-brand focus:outline-none" />
             </div>
             <Dropdown label={activeCat === "All Passwords" ? "All Categories" : activeCat} options={["All Passwords", ...CATEGORIES]} onSelect={setActiveCat} />
             <Dropdown label={strengthFilter} options={["All Types", "Strong", "Medium", "Weak"]} onSelect={setStrengthFilter} />
@@ -493,10 +493,10 @@ export function VaultClient({ accounts: initialAccounts, cards: initialCards }: 
                   const count = c.name === "All Passwords" ? accounts.length : catCounts[c.name] ?? 0;
                   return (
                     <button key={c.name} onClick={() => setActiveCat(c.name)}
-                      className={cn("flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition-colors", active ? "bg-green-50 font-medium text-green-700" : "text-muted hover:bg-surface-2")}>
+                      className={cn("flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition-colors", active ? "bg-brand-soft font-medium text-brand-ink" : "text-muted hover:bg-surface-2")}>
                       <Icon className="h-4 w-4 shrink-0" style={{ color: c.color }} />
                       <span className="truncate">{c.name}</span>
-                      <span className={cn("ml-auto rounded-full px-1.5 py-0.5 text-[11px] font-medium", active ? "bg-green-100 text-green-700" : "bg-surface-2 text-faint")}>{count}</span>
+                      <span className={cn("ml-auto rounded-full px-1.5 py-0.5 text-[11px] font-medium", active ? "bg-brand-soft text-brand-ink" : "bg-surface-2 text-faint")}>{count}</span>
                     </button>
                   );
                 })}
@@ -762,7 +762,7 @@ function PageBtn({ children, active, disabled, onClick }: { children: React.Reac
   return (
     <button onClick={onClick} disabled={disabled}
       className={cn("grid h-8 min-w-8 place-items-center rounded-lg px-2 text-sm transition-colors",
-        active ? "bg-green-500 font-semibold text-white" : "text-muted hover:bg-surface-2", disabled && "opacity-40")}>
+        active ? "bg-blue-600 font-semibold text-white" : "text-muted hover:bg-surface-2", disabled && "opacity-40")}>
       {children}
     </button>
   );
@@ -806,16 +806,16 @@ function AccountModal({ editing, busy, onClose, onSave, onGenerate }: {
             </select>
           </Field>
           <Field label="Two-factor">
-            <button type="button" onClick={() => set({ twoFactor: !f.twoFactor })} className={cn("flex h-[38px] w-full items-center justify-between rounded-xl border px-3 text-sm", f.twoFactor ? "border-green-300 bg-green-50 text-green-700" : "border-border bg-surface-2 text-muted")}>
+            <button type="button" onClick={() => set({ twoFactor: !f.twoFactor })} className={cn("flex h-[38px] w-full items-center justify-between rounded-xl border px-3 text-sm", f.twoFactor ? "border-blue-300 bg-blue-50 text-blue-700" : "border-border bg-surface-2 text-muted")}>
               {f.twoFactor ? "Enabled" : "Disabled"}
-              <span className={cn("relative h-5 w-9 rounded-full transition-colors", f.twoFactor ? "bg-green-500" : "bg-slate-300")}><span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all", f.twoFactor ? "left-[18px]" : "left-0.5")} /></span>
+              <span className={cn("relative h-5 w-9 rounded-full transition-colors", f.twoFactor ? "bg-blue-600" : "bg-slate-300")}><span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all", f.twoFactor ? "left-[18px]" : "left-0.5")} /></span>
             </button>
           </Field>
         </div>
       </div>
       <div className="mt-5 flex justify-end gap-2">
         <button onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted hover:bg-surface-2">Cancel</button>
-        <button onClick={submit} disabled={busy} className="rounded-xl bg-green-500 px-4 py-2 text-sm font-semibold text-white hover:bg-green-600 disabled:opacity-60">{busy ? "Saving…" : editing ? "Save changes" : "Add account"}</button>
+        <button onClick={submit} disabled={busy} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">{busy ? "Saving…" : editing ? "Save changes" : "Add account"}</button>
       </div>
     </Modal>
   );
@@ -850,14 +850,14 @@ function CardModal({ editing, busy, onClose, onSave }: { editing?: VaultCard; bu
         <Field label="Card colour">
           <div className="flex gap-2">
             {CARD_THEMES.map((t) => (
-              <button key={t} type="button" onClick={() => set({ theme: t })} className={cn("h-8 w-8 rounded-lg bg-gradient-to-br ring-offset-2", cardGrad[t], f.theme === t ? "ring-2 ring-green-500" : "")} />
+              <button key={t} type="button" onClick={() => set({ theme: t })} className={cn("h-8 w-8 rounded-lg bg-gradient-to-br ring-offset-2", cardGrad[t], f.theme === t ? "ring-2 ring-blue-600" : "")} />
             ))}
           </div>
         </Field>
       </div>
       <div className="mt-5 flex justify-end gap-2">
         <button onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted hover:bg-surface-2">Cancel</button>
-        <button onClick={() => f.label.trim() && onSave(f)} disabled={busy} className="rounded-xl bg-green-500 px-4 py-2 text-sm font-semibold text-white hover:bg-green-600 disabled:opacity-60">{busy ? "Saving…" : editing ? "Save changes" : "Add card"}</button>
+        <button onClick={() => f.label.trim() && onSave(f)} disabled={busy} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">{busy ? "Saving…" : editing ? "Save changes" : "Add card"}</button>
       </div>
     </Modal>
   );
@@ -917,7 +917,7 @@ function GeneratorModal({ onClose, onCopy }: { onClose: () => void; onCopy: (pw:
       <div className="mt-4 space-y-3">
         <div>
           <div className="mb-1 flex justify-between text-xs text-muted"><span>Length</span><span className="font-medium text-ink">{len}</span></div>
-          <input type="range" min={8} max={32} value={len} onChange={(e) => setLen(+e.target.value)} className="w-full accent-green-500" />
+          <input type="range" min={8} max={32} value={len} onChange={(e) => setLen(+e.target.value)} className="w-full accent-blue-600" />
         </div>
         {[
           { label: "Uppercase (A-Z)", v: upper, set: setUpper },
@@ -926,13 +926,13 @@ function GeneratorModal({ onClose, onCopy }: { onClose: () => void; onCopy: (pw:
         ].map((o) => (
           <label key={o.label} className="flex items-center justify-between text-sm">
             <span className="text-muted">{o.label}</span>
-            <button onClick={() => o.set(!o.v)} className={cn("relative h-5 w-9 rounded-full transition-colors", o.v ? "bg-green-500" : "bg-slate-300")}>
+            <button onClick={() => o.set(!o.v)} className={cn("relative h-5 w-9 rounded-full transition-colors", o.v ? "bg-blue-600" : "bg-slate-300")}>
               <span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all", o.v ? "left-[18px]" : "left-0.5")} />
             </button>
           </label>
         ))}
       </div>
-      <button onClick={() => onCopy(pw)} className="mt-5 w-full rounded-xl bg-green-500 py-2.5 text-sm font-semibold text-white hover:bg-green-600">Copy password</button>
+      <button onClick={() => onCopy(pw)} className="mt-5 w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">Copy password</button>
     </Modal>
   );
 }

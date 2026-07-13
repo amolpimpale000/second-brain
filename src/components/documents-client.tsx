@@ -393,11 +393,11 @@ export function DocumentsClient() {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => docInputRef.current?.click()} disabled={uploading}
-            className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 disabled:opacity-60">
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60">
             <FileUp className="h-4 w-4" /> Upload Documents
           </button>
           <button onClick={() => photoInputRef.current?.click()} disabled={uploading}
-            className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-60">
+            className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-60">
             <ImagePlus className="h-4 w-4" /> Upload Photos
           </button>
         </div>
@@ -424,7 +424,7 @@ export function DocumentsClient() {
           <div>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="font-semibold text-ink">Browse by Category</h2>
-              <button onClick={() => setActiveCat(null)} className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-600 hover:bg-violet-100">View All</button>
+              <button onClick={() => setActiveCat(null)} className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-100">View All</button>
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {categoryList.map((c) => {
@@ -433,7 +433,7 @@ export function DocumentsClient() {
                 const protectedCat = PROTECTED_CATEGORIES.includes(c.name);
                 return (
                   <div key={c.name}
-                    className={cn("group relative flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-card transition-colors hover:border-violet-200", active ? "border-violet-300 ring-1 ring-violet-200" : "border-border")}>
+                    className={cn("group relative flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-card transition-colors hover:border-blue-200", active ? "border-blue-300 ring-1 ring-blue-200" : "border-border")}>
                     <button onClick={() => { if (c.name === PHOTO_CATEGORY) { setTab("photos"); setActiveCat(null); } else { setTab("all"); setActiveCat(active ? null : c.name); } }}
                       className="flex min-w-0 flex-1 items-center gap-3 text-left">
                       <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: `${c.color}1a`, color: c.color }}>
@@ -456,7 +456,7 @@ export function DocumentsClient() {
                   </div>
                 );
               })}
-              <button onClick={() => setModal("category")} className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border p-3 text-sm font-medium text-violet-600 hover:bg-violet-50">
+              <button onClick={() => setModal("category")} className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border p-3 text-sm font-medium text-blue-600 hover:bg-blue-50">
                 <Plus className="h-4 w-4" /> Add Category
               </button>
             </div>
@@ -468,11 +468,11 @@ export function DocumentsClient() {
               <div className="flex gap-5">
                 {([["all", "All Documents"], ["photos", "Photos"], ["folders", "Folders"], ["trash", "Trash"]] as const).map(([k, label]) => (
                   <button key={k} onClick={() => setTab(k)}
-                    className={cn("relative pb-3 text-sm font-medium transition-colors", tab === k ? "text-violet-600" : "text-muted hover:text-ink")}>
+                    className={cn("relative pb-3 text-sm font-medium transition-colors", tab === k ? "text-blue-600" : "text-muted hover:text-ink")}>
                     {label}
                     {k === "photos" && photos.length > 0 ? ` (${photos.length})` : ""}
                     {k === "trash" && trashed.length > 0 ? ` (${trashed.length})` : ""}
-                    {tab === k && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-violet-600" />}
+                    {tab === k && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-blue-600" />}
                   </button>
                 ))}
               </div>
@@ -481,8 +481,8 @@ export function DocumentsClient() {
                   <Dropdown label={`Sort by: ${sort}`} options={["Recently Added", "Name", "Size"]} onSelect={setSort} />
                   {tab === "all" && <Dropdown label={typeFilter === "All Types" ? "Filter" : typeFilter} options={["All Types", "PDF", "JPG", "PNG", "DOCX"]} onSelect={setTypeFilter} />}
                   <div className="flex items-center gap-1 rounded-xl border border-border bg-surface p-0.5">
-                    <button onClick={() => setView("list")} className={cn("grid h-8 w-8 place-items-center rounded-lg", view === "list" ? "bg-violet-50 text-violet-600" : "text-faint")}><List className="h-4 w-4" /></button>
-                    <button onClick={() => setView("grid")} className={cn("grid h-8 w-8 place-items-center rounded-lg", view === "grid" ? "bg-violet-50 text-violet-600" : "text-faint")}><LayoutGrid className="h-4 w-4" /></button>
+                    <button onClick={() => setView("list")} className={cn("grid h-8 w-8 place-items-center rounded-lg", view === "list" ? "bg-blue-50 text-blue-600" : "text-faint")}><List className="h-4 w-4" /></button>
+                    <button onClick={() => setView("grid")} className={cn("grid h-8 w-8 place-items-center rounded-lg", view === "grid" ? "bg-blue-50 text-blue-600" : "text-faint")}><LayoutGrid className="h-4 w-4" /></button>
                   </div>
                 </div>
               )}
@@ -498,7 +498,7 @@ export function DocumentsClient() {
                     <p className="text-xs text-muted">{f.count} files</p>
                   </div>
                 ))}
-                <button onClick={() => setModal("folder")} className="flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border text-sm font-medium text-violet-600 hover:bg-violet-50">
+                <button onClick={() => setModal("folder")} className="flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border text-sm font-medium text-blue-600 hover:bg-blue-50">
                   <FolderPlus className="h-6 w-6" /> New Folder
                 </button>
               </div>
@@ -528,7 +528,7 @@ export function DocumentsClient() {
                         if (activeCat) directUploadCat.current = activeCat;
                         docInputRef.current?.click();
                       }}
-                      className="font-medium text-violet-600 hover:underline"
+                      className="font-medium text-blue-600 hover:underline"
                     >
                       Upload {tab === "photos" ? "a photo" : "one"}
                     </button>
@@ -564,7 +564,7 @@ export function DocumentsClient() {
                 {tab === "all" && activeCat && shown.length > 0 && (
                   <button
                     onClick={() => { directUploadCat.current = activeCat; docInputRef.current?.click(); }}
-                    className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card p-4 text-sm font-medium text-violet-600 shadow-card transition-colors hover:bg-violet-50"
+                    className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card p-4 text-sm font-medium text-blue-600 shadow-card transition-colors hover:bg-blue-50"
                   >
                     <Plus className="h-6 w-6" />
                     Upload to {activeCat}
@@ -578,7 +578,7 @@ export function DocumentsClient() {
                   return (
                     <div key={d.id} className="flex items-center gap-3 border-b border-border p-3 last:border-0 hover:bg-surface-2/50">
                       <div className="grid h-10 w-10 place-items-center rounded-lg" style={{ background: `${catColor(d.category)}1a`, color: catColor(d.category) }}><Icon className="h-5 w-5" /></div>
-                      <button onClick={() => d.url && window.open(d.url, "_blank")} className="min-w-0 flex-1 text-left"><p className="truncate text-sm font-medium text-ink hover:text-violet-600">{d.name}</p><p className="text-xs text-faint">{d.category}</p></button>
+                      <button onClick={() => d.url && window.open(d.url, "_blank")} className="min-w-0 flex-1 text-left"><p className="truncate text-sm font-medium text-ink hover:text-blue-600">{d.name}</p><p className="text-xs text-faint">{d.category}</p></button>
                       <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-semibold", badgeCls(d.ext))}>{d.ext}</span>
                       <span className="hidden text-xs text-muted sm:block">{d.size}</span>
                       <span className="hidden text-xs text-faint md:block">{d.date}</span>
@@ -650,7 +650,7 @@ export function DocumentsClient() {
             <div className="space-y-1">
               {quickActions.map((a) => (
                 <button key={a.label} onClick={a.onClick} className="flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left text-sm text-muted transition-colors hover:bg-surface-2 hover:text-ink">
-                  <a.icon className="h-4 w-4 text-violet-500" /> {a.label}
+                  <a.icon className="h-4 w-4 text-blue-500" /> {a.label}
                 </button>
               ))}
             </div>
@@ -685,7 +685,7 @@ export function DocumentsClient() {
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-white shadow-card-lg">
-          <span className="flex items-center gap-2"><Check className="h-4 w-4 text-violet-400" /> {toast}</span>
+          <span className="flex items-center gap-2"><Check className="h-4 w-4 text-blue-400" /> {toast}</span>
         </div>
       )}
 
@@ -756,7 +756,7 @@ function DocCard({ doc, onDelete, onDownload, onShare, onReplace, onRename, onCh
             // eslint-disable-next-line @next/next/no-img-element
             <img src={doc.thumb || doc.url} alt={doc.name} className="h-full w-full object-cover" />
           ) : (
-            <div className={cn("h-full w-full bg-gradient-to-br", doc.gradient ?? "from-violet-300 to-sky-200")} />
+            <div className={cn("h-full w-full bg-gradient-to-br", doc.gradient ?? "from-blue-300 to-sky-200")} />
           )
         ) : doc.ext === "PDF" && doc.url ? (
           <div className="h-full w-full bg-white">
@@ -819,7 +819,7 @@ function PhotoCard({ doc, onPreview, onDelete, onRename, onDownload, onShare }: 
           // eslint-disable-next-line @next/next/no-img-element
           <img src={doc.thumb || doc.url} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
         ) : (
-          <div className={cn("h-full w-full bg-gradient-to-br", doc.gradient ?? "from-violet-300 to-sky-200")} />
+          <div className={cn("h-full w-full bg-gradient-to-br", doc.gradient ?? "from-blue-300 to-sky-200")} />
         )}
       </button>
       <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100">
@@ -857,7 +857,7 @@ function ImagePreview({ url, onClose }: { url: string; onClose: () => void }) {
 function PageBtn({ children, active, disabled, onClick }: { children: React.ReactNode; active?: boolean; disabled?: boolean; onClick?: () => void }) {
   return (
     <button onClick={onClick} disabled={disabled}
-      className={cn("grid h-8 min-w-8 place-items-center rounded-lg px-2 text-sm transition-colors", active ? "bg-violet-600 font-semibold text-white" : "text-muted hover:bg-surface-2", disabled && "opacity-40")}>
+      className={cn("grid h-8 min-w-8 place-items-center rounded-lg px-2 text-sm transition-colors", active ? "bg-blue-600 font-semibold text-white" : "text-muted hover:bg-surface-2", disabled && "opacity-40")}>
       {children}
     </button>
   );
@@ -887,7 +887,7 @@ function AddCategoryModal({ onClose, onDone }: { onClose: () => void; onDone: (n
         <label className="text-xs font-medium text-muted">Icon</label>
         <div className="flex flex-wrap gap-2">
           {iconOptions.map(({ key, Icon }) => (
-            <button key={key} onClick={() => setIcon(key)} className={cn("grid h-9 w-9 place-items-center rounded-lg border", icon === key ? "border-violet-500 bg-violet-50 text-violet-600" : "border-border bg-surface text-muted hover:bg-surface-2")}>
+            <button key={key} onClick={() => setIcon(key)} className={cn("grid h-9 w-9 place-items-center rounded-lg border", icon === key ? "border-blue-500 bg-blue-50 text-blue-600" : "border-border bg-surface text-muted hover:bg-surface-2")}>
               <Icon className="h-4 w-4" />
             </button>
           ))}
@@ -903,7 +903,7 @@ function AddCategoryModal({ onClose, onDone }: { onClose: () => void; onDone: (n
       </div>
       <div className="mt-5 flex justify-end gap-2">
         <button onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted hover:bg-surface-2">Cancel</button>
-        <button onClick={() => name.trim() && onDone(name.trim(), icon, color)} disabled={!name.trim()} className="rounded-xl bg-violet-500 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-600 disabled:opacity-60">Add Category</button>
+        <button onClick={() => name.trim() && onDone(name.trim(), icon, color)} disabled={!name.trim()} className="rounded-xl bg-blue-500 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-60">Add Category</button>
       </div>
     </Modal>
   );
@@ -916,7 +916,7 @@ function AddFolderModal({ onClose, onCreate }: { onClose: () => void; onCreate: 
       <Field label="Folder name"><input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Bank Documents" autoFocus /></Field>
       <div className="mt-5 flex justify-end gap-2">
         <button onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted hover:bg-surface-2">Cancel</button>
-        <button onClick={() => name.trim() && onCreate(name.trim())} className="rounded-xl bg-violet-500 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-600">Create Folder</button>
+        <button onClick={() => name.trim() && onCreate(name.trim())} className="rounded-xl bg-blue-500 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-600">Create Folder</button>
       </div>
     </Modal>
   );
@@ -938,7 +938,7 @@ function RenameModal({ initial, onClose, onDone }: { initial: string; onClose: (
       </Field>
       <div className="mt-5 flex justify-end gap-2">
         <button onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted hover:bg-surface-2">Cancel</button>
-        <button onClick={() => name.trim() && onDone(name.trim())} disabled={!name.trim()} className="rounded-xl bg-violet-500 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-600 disabled:opacity-60">Rename</button>
+        <button onClick={() => name.trim() && onDone(name.trim())} disabled={!name.trim()} className="rounded-xl bg-blue-500 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-60">Rename</button>
       </div>
     </Modal>
   );
@@ -963,14 +963,14 @@ function CategoryPickerModal({ title, categories, selected, onClose, onSelect }:
               onClick={() => onSelect(c.name)}
               className={cn(
                 "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors",
-                isSelected ? "bg-violet-50 text-violet-700 ring-1 ring-violet-200" : "text-ink hover:bg-surface-2"
+                isSelected ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200" : "text-ink hover:bg-surface-2"
               )}
             >
               <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg" style={{ background: `${c.color}1a`, color: c.color }}>
                 <Icon className="h-4 w-4" />
               </div>
               <span className="flex-1">{c.name}</span>
-              {isSelected && <Check className="h-4 w-4 text-violet-600" />}
+              {isSelected && <Check className="h-4 w-4 text-blue-600" />}
             </button>
           );
         })}

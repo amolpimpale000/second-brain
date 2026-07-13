@@ -279,12 +279,12 @@ export function NotesClient() {
         {/* Quick Notes (right col, row 1) */}
         <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-ink"><FileText className="h-4 w-4 text-violet-500" /> Quick Notes</h3>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-ink"><FileText className="h-4 w-4 text-blue-600" /> Quick Notes</h3>
             <button onClick={() => setModal({ type: "note" })} className="text-slate-400 hover:text-ink"><Maximize2 className="h-4 w-4" /></button>
           </div>
           <textarea value={quick} onChange={(e) => setQuick(e.target.value)} placeholder="Write a quick note..."
-            className="h-20 w-full resize-none rounded-xl border border-border bg-surface-2 p-3 text-sm text-ink placeholder:text-faint focus:border-violet-400 focus:outline-none" />
-          <button onClick={addQuick} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-500 py-2.5 text-sm font-semibold text-white hover:bg-violet-600">
+            className="h-20 w-full resize-none rounded-xl border border-border bg-surface-2 p-3 text-sm text-ink placeholder:text-faint focus:border-brand focus:outline-none" />
+          <button onClick={addQuick} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">
             <Plus className="h-4 w-4" /> Add Note
           </button>
         </div>
@@ -294,7 +294,7 @@ export function NotesClient() {
           <div className="rounded-2xl border border-border bg-card p-3 shadow-card">
             <div className="mb-1.5 flex items-center justify-between px-2">
               <p className="text-sm font-semibold text-ink">Categories</p>
-              <button onClick={() => setModal({ type: "note" })} className="grid h-6 w-6 place-items-center rounded-lg text-violet-500 hover:bg-violet-50"><Plus className="h-4 w-4" /></button>
+              <button onClick={() => setModal({ type: "note" })} className="grid h-6 w-6 place-items-center rounded-lg text-blue-600 hover:bg-blue-50"><Plus className="h-4 w-4" /></button>
             </div>
             <div className="space-y-0.5">
               <CatRow icon={Layers} color="#8b5cf6" name="All Notes" count={notes.length} active={activeCat === "All Notes"} onClick={() => setActiveCat("All Notes")} />
@@ -307,21 +307,21 @@ export function NotesClient() {
           <div className="rounded-2xl border border-border bg-card p-3 shadow-card">
             <div className="mb-1.5 flex items-center justify-between px-2">
               <p className="text-sm font-semibold text-ink">Tags</p>
-              <button className="grid h-6 w-6 place-items-center rounded-lg text-violet-500 hover:bg-violet-50"><Plus className="h-4 w-4" /></button>
+              <button className="grid h-6 w-6 place-items-center rounded-lg text-blue-600 hover:bg-blue-50"><Plus className="h-4 w-4" /></button>
             </div>
             <div className="space-y-0.5">
               {noteTags.map((t) => {
                 const active = activeTag === t.name;
                 return (
                   <button key={t.name} onClick={() => setActiveTag(active ? null : t.name)}
-                    className={cn("flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition-colors", active ? "bg-violet-50 font-medium text-violet-700" : "text-muted hover:bg-surface-2")}>
+                    className={cn("flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition-colors", active ? "bg-brand-soft font-medium text-brand-ink" : "text-muted hover:bg-surface-2")}>
                     <span className="h-2 w-2 rounded-full" style={{ background: t.color }} />
                     <span>{t.name}</span>
                     <span className="ml-auto text-[11px] text-faint">{tagCount[t.name] || 0}</span>
                   </button>
                 );
               })}
-              <button className="mt-1 flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium text-violet-500 hover:bg-violet-50"><Plus className="h-3.5 w-3.5" /> Add Tag</button>
+              <button className="mt-1 flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50"><Plus className="h-3.5 w-3.5" /> Add Tag</button>
             </div>
           </div>
         </aside>
@@ -333,11 +333,11 @@ export function NotesClient() {
             <div className="relative min-w-[180px] flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search notes..."
-                className="w-full rounded-xl border border-border bg-card py-2.5 pl-9 pr-3 text-sm text-ink placeholder:text-faint shadow-card focus:border-violet-400 focus:outline-none" />
+                className="w-full rounded-xl border border-border bg-card py-2.5 pl-9 pr-3 text-sm text-ink placeholder:text-faint shadow-card focus:border-brand focus:outline-none" />
             </div>
             <Dropdown label={activeCat} options={["All Notes", ...noteCategories.map((c) => c.name)]} onSelect={setActiveCat} />
             <Dropdown label={`Sort: ${sort}`} options={["Recently Updated", "Title (A-Z)", "Pinned First"]} onSelect={setSort} />
-            <button onClick={() => setModal({ type: "note" })} className="inline-flex items-center gap-1.5 rounded-xl bg-violet-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-violet-600">
+            <button onClick={() => setModal({ type: "note" })} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">
               <Plus className="h-4 w-4" /> New Note
             </button>
           </div>
@@ -345,7 +345,7 @@ export function NotesClient() {
           {/* notes masonry */}
           {filtered.length === 0 ? (
             <div className="rounded-2xl border border-border bg-card p-16 text-center shadow-card">
-              <p className="text-sm text-muted">No notes here. <button onClick={() => setModal({ type: "note" })} className="font-medium text-violet-600 hover:underline">Create one</button></p>
+              <p className="text-sm text-muted">No notes here. <button onClick={() => setModal({ type: "note" })} className="font-medium text-blue-600 hover:underline">Create one</button></p>
             </div>
           ) : (
             <div className="gap-4 [column-gap:1rem] sm:columns-2 xl:columns-3">
@@ -362,8 +362,8 @@ export function NotesClient() {
           {/* Reminders */}
           <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="flex items-center gap-2 font-semibold text-ink"><Bell className="h-4 w-4 text-violet-500" /> Reminders</h3>
-              <button onClick={() => setModal({ type: "reminders" })} className="text-xs font-medium text-violet-600 hover:underline">View All</button>
+              <h3 className="flex items-center gap-2 font-semibold text-ink"><Bell className="h-4 w-4 text-blue-600" /> Reminders</h3>
+              <button onClick={() => setModal({ type: "reminders" })} className="text-xs font-medium text-blue-600 hover:underline">View All</button>
             </div>
             <div className="space-y-3">
               {reminders.slice(0, 4).map((r) => (
@@ -374,7 +374,7 @@ export function NotesClient() {
                     <p className="text-xs text-faint">{r.time}</p>
                   </div>
                   <button onClick={() => toggleReminder(r.id)} className="mt-0.5 shrink-0">
-                    {r.done ? <CheckCircle2 className="h-4 w-4 text-violet-500" /> : <Circle className="h-4 w-4 text-slate-300 hover:text-violet-500" />}
+                    {r.done ? <CheckCircle2 className="h-4 w-4 text-blue-600" /> : <Circle className="h-4 w-4 text-slate-300 hover:text-blue-600" />}
                   </button>
                 </div>
               ))}
@@ -385,7 +385,7 @@ export function NotesClient() {
           <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="font-semibold text-ink">Recent Notes</h3>
-              <span className="text-xs font-medium text-violet-600">Latest</span>
+              <span className="text-xs font-medium text-blue-600">Latest</span>
             </div>
             <div className="space-y-3">
               {recent.map((n) => (
@@ -403,8 +403,8 @@ export function NotesClient() {
           {/* Trash */}
           <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
             <div className="mb-1 flex items-center justify-between">
-              <h3 className="flex items-center gap-2 font-semibold text-ink"><Trash2 className="h-4 w-4 text-violet-500" /> Trash</h3>
-              <button onClick={() => setModal({ type: "trash" })} className="text-xs font-medium text-violet-600 hover:underline">View All</button>
+              <h3 className="flex items-center gap-2 font-semibold text-ink"><Trash2 className="h-4 w-4 text-blue-600" /> Trash</h3>
+              <button onClick={() => setModal({ type: "trash" })} className="text-xs font-medium text-blue-600 hover:underline">View All</button>
             </div>
             <button onClick={() => setModal({ type: "trash" })} className="flex items-center gap-2 py-1 text-sm text-muted hover:text-ink">
               <Trash2 className="h-4 w-4 text-faint" /> {trash.length} note{trash.length !== 1 ? "s" : ""}
@@ -416,7 +416,7 @@ export function NotesClient() {
       {/* toast */}
       {toast && (
         <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-white shadow-card-lg">
-          <span className="flex items-center gap-2"><Check className="h-4 w-4 text-violet-400" /> {toast}</span>
+          <span className="flex items-center gap-2"><Check className="h-4 w-4 text-blue-500" /> {toast}</span>
         </div>
       )}
 
@@ -479,7 +479,7 @@ function NoteCard({ note, onToggleItem, onStar, onPin, onEdit, onDelete }: {
         <div className="mt-2 space-y-1.5">
           {note.items.map((i) => (
             <button key={i.id} onClick={() => onToggleItem(note.id, i.id)} className="flex w-full items-center gap-2 text-left text-sm">
-              <span className={cn("grid h-4 w-4 shrink-0 place-items-center rounded border", i.done ? "border-green-500 bg-green-500 text-white" : "border-slate-300 bg-white")}>
+              <span className={cn("grid h-4 w-4 shrink-0 place-items-center rounded border", i.done ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 bg-white")}>
                 {i.done && <Check className="h-3 w-3" />}
               </span>
               <span className={cn(i.done ? "text-faint line-through" : "text-muted")}>{i.text}</span>
@@ -549,13 +549,13 @@ function NoteModal({ editing, onClose, onSave }: { editing?: RichNote; onClose: 
             <div className="space-y-2">
               {items.map((it, idx) => (
                 <div key={it.id} className="flex items-center gap-2">
-                  <button onClick={() => setItems((p) => p.map((x) => (x.id === it.id ? { ...x, done: !x.done } : x)))} className={cn("grid h-5 w-5 shrink-0 place-items-center rounded border", it.done ? "border-green-500 bg-green-500 text-white" : "border-slate-300")}>{it.done && <Check className="h-3 w-3" />}</button>
+                  <button onClick={() => setItems((p) => p.map((x) => (x.id === it.id ? { ...x, done: !x.done } : x)))} className={cn("grid h-5 w-5 shrink-0 place-items-center rounded border", it.done ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300")}>{it.done && <Check className="h-3 w-3" />}</button>
                   <input className={inputCls} value={it.text} onChange={(e) => setItems((p) => p.map((x) => (x.id === it.id ? { ...x, text: e.target.value } : x)))} placeholder={`Task ${idx + 1}`} />
                   <button onClick={() => setItems((p) => p.filter((x) => x.id !== it.id))} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-faint hover:text-red-500"><X className="h-4 w-4" /></button>
                 </div>
               ))}
             </div>
-            <button onClick={() => setItems((p) => [...p, ci("")])} className="mt-2 flex items-center gap-1.5 text-sm font-medium text-violet-600 hover:underline"><Plus className="h-4 w-4" /> Add task</button>
+            <button onClick={() => setItems((p) => [...p, ci("")])} className="mt-2 flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:underline"><Plus className="h-4 w-4" /> Add task</button>
           </div>
         )}
 
@@ -571,7 +571,7 @@ function NoteModal({ editing, onClose, onSave }: { editing?: RichNote; onClose: 
         <Field label="Colour">
           <div className="flex gap-2">
             {COLORS.map((c) => (
-              <button key={c} onClick={() => set({ color: c })} className={cn("h-8 w-8 rounded-lg", colorSwatch[c], f.color === c ? "ring-2 ring-violet-500 ring-offset-2" : "")} />
+              <button key={c} onClick={() => set({ color: c })} className={cn("h-8 w-8 rounded-lg", colorSwatch[c], f.color === c ? "ring-2 ring-blue-600 ring-offset-2" : "")} />
             ))}
           </div>
         </Field>
@@ -579,7 +579,7 @@ function NoteModal({ editing, onClose, onSave }: { editing?: RichNote; onClose: 
 
       <div className="mt-5 flex justify-end gap-2">
         <button onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted hover:bg-surface-2">Cancel</button>
-        <button onClick={submit} className="rounded-xl bg-violet-500 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-600">{editing ? "Save changes" : "Create note"}</button>
+        <button onClick={submit} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">{editing ? "Save changes" : "Create note"}</button>
       </div>
     </Modal>
   );
@@ -596,12 +596,12 @@ function RemindersModal({ reminders, onClose, onToggle, onAdd, onDelete }: {
       <div className="mb-4 flex gap-2">
         <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="New reminder…" />
         <input className={cn(inputCls, "max-w-[140px]")} value={time} onChange={(e) => setTime(e.target.value)} placeholder="When" />
-        <button onClick={() => { if (title.trim()) { onAdd(title.trim(), time.trim()); setTitle(""); setTime(""); } }} className="shrink-0 rounded-xl bg-violet-500 px-3 text-sm font-semibold text-white hover:bg-violet-600">Add</button>
+        <button onClick={() => { if (title.trim()) { onAdd(title.trim(), time.trim()); setTitle(""); setTime(""); } }} className="shrink-0 rounded-xl bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700">Add</button>
       </div>
       <div className="space-y-2">
         {reminders.map((r) => (
           <div key={r.id} className="flex items-center gap-2.5 rounded-xl border border-border p-3">
-            <button onClick={() => onToggle(r.id)}>{r.done ? <CheckCircle2 className="h-5 w-5 text-violet-500" /> : <Circle className="h-5 w-5 text-slate-300 hover:text-violet-500" />}</button>
+            <button onClick={() => onToggle(r.id)}>{r.done ? <CheckCircle2 className="h-5 w-5 text-blue-600" /> : <Circle className="h-5 w-5 text-slate-300 hover:text-blue-600" />}</button>
             <div className="min-w-0 flex-1">
               <p className={cn("text-sm font-medium", r.done ? "text-faint line-through" : "text-ink")}>{r.title}</p>
               <p className="text-xs text-faint">{r.time}</p>
@@ -617,10 +617,10 @@ function RemindersModal({ reminders, onClose, onToggle, onAdd, onDelete }: {
 /* helper row */
 function CatRow({ icon: Icon, color, name, count, active, onClick }: { icon: React.ElementType; color: string; name: string; count: number; active: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} className={cn("flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition-colors", active ? "bg-violet-50 font-medium text-violet-700" : "text-muted hover:bg-surface-2")}>
+    <button onClick={onClick} className={cn("flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition-colors", active ? "bg-brand-soft font-medium text-brand-ink" : "text-muted hover:bg-surface-2")}>
       <Icon className="h-4 w-4 shrink-0" style={{ color }} />
       <span className="truncate">{name}</span>
-      <span className={cn("ml-auto rounded-full px-1.5 py-0.5 text-[11px] font-medium", active ? "bg-violet-100 text-violet-700" : "bg-surface-2 text-faint")}>{count}</span>
+      <span className={cn("ml-auto rounded-full px-1.5 py-0.5 text-[11px] font-medium", active ? "bg-brand-soft text-brand-ink" : "bg-surface-2 text-faint")}>{count}</span>
     </button>
   );
 }

@@ -159,4 +159,4 @@ export function Field({
 }
 
 export const inputCls =
-  "w-full rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm text-ink placeholder:text-faint focus:border-green-400 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-green-500/15";
+  "w-full rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm text-ink placeholder:text-faint focus:border-brand focus:bg-surface focus:outline-none focus:ring-2 focus:ring-brand/15";
