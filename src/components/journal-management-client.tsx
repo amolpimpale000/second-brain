@@ -117,32 +117,20 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
   const [showAllCountries, setShowAllCountries] = useState(false);
   const topCountries = data.topCountries;
 
-  const SNAPSHOT_PERIODS = [
-    { value: "this_month", label: "This Month" },
-    { value: "last_30_days", label: "Last 30 Days" },
-    { value: "last_month", label: "Last Month" },
-    { value: "all_time", label: "All Time" },
-  ];
-  const [snapshotPeriod, setSnapshotPeriod] = useState("this_month");
-  const [snapshotLoading, setSnapshotLoading] = useState(false);
-  const allTimeSnapshot = data.journalPerformance.map((j) => ({ code: j.code, manuscripts: j.manuscripts, published: j.published, revenue: j.revenue, acceptance: j.acceptance }));
-  const [snapshotData, setSnapshotData] = useState(allTimeSnapshot);
+  const [snapshotLoading, setSnapshotLoading] = useState(true);
+  const [snapshotData, setSnapshotData] = useState(
+    data.journalPerformance.map((j) => ({ code: j.code, manuscripts: 0 }))
+  );
 
   useEffect(() => {
-    if (snapshotPeriod === "all_time") {
-      setSnapshotData(allTimeSnapshot);
-      return;
-    }
     let cancelled = false;
-    setSnapshotLoading(true);
-    fetch(`/api/journals/snapshot?period=${snapshotPeriod}`)
+    fetch(`/api/journals/snapshot?period=this_month`)
       .then((res) => res.json())
       .then((json) => { if (!cancelled && json.byJournal) setSnapshotData(json.byJournal); })
       .catch(() => {})
       .finally(() => { if (!cancelled) setSnapshotLoading(false); });
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snapshotPeriod]);
+  }, []);
 
   // Aggregates computed from real + placeholder journal data.
   const totalJournalManuscripts = data.journalPerformance.reduce((s, j) => s + j.manuscripts, 0);
@@ -651,28 +639,15 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           </div>
         </Panel>
 
-        <Panel
-          title="Journal Snapshot"
-          action={
-            <Dropdown
-              label={SNAPSHOT_PERIODS.find((p) => p.value === snapshotPeriod)?.label ?? "This Month"}
-              options={SNAPSHOT_PERIODS.map((p) => p.label)}
-              onSelect={(v) => setSnapshotPeriod(SNAPSHOT_PERIODS.find((p) => p.label === v)?.value ?? "this_month")}
-              align="right"
-            />
-          }
-        >
+        <Panel title="Journal Snapshot">
           <div className={cn("space-y-3", snapshotLoading && "opacity-50 transition-opacity")}>
             {data.journalPerformance.map((j) => {
               const s = snapshotData.find((x) => x.code === j.code);
               return (
                 <div key={j.code} className="rounded-xl border border-border p-2.5">
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <span className="h-2 w-2 rounded-full" style={{ background: j.color }} />
-                      <span className="text-xs font-semibold text-ink">{j.code}</span>
-                    </div>
-                    {snapshotPeriod === "all_time" && <Delta v={j.growth} />}
+                  <div className="mb-1.5 flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full" style={{ background: j.color }} />
+                    <span className="text-xs font-semibold text-ink">{j.code}</span>
                   </div>
                   <div className="grid grid-cols-3 gap-1.5 text-center">
                     <div>
@@ -686,16 +661,6 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
                     <div>
                       <p className="text-sm font-semibold text-ink">{(j.revisionRequired ?? 0).toLocaleString("en-IN")}</p>
                       <p className="text-[10px] text-faint">Corrections</p>
-                    </div>
-                  </div>
-                  <div className="mt-1.5 grid grid-cols-2 gap-1.5 text-center">
-                    <div>
-                      <p className="text-sm font-semibold text-ink">{s?.acceptance ?? 0}%</p>
-                      <p className="text-[10px] text-faint">Acceptance</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-ink">{inr(s?.revenue ?? 0)}</p>
-                      <p className="text-[10px] text-faint">Revenue</p>
                     </div>
                   </div>
                 </div>
