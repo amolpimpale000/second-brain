@@ -659,8 +659,8 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
                       <p className="text-[10px] text-faint">Paid</p>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-ink">{(j.revisionRequired ?? 0).toLocaleString("en-IN")}</p>
-                      <p className="text-[10px] text-faint">Corrections</p>
+                      <p className="text-sm font-semibold text-ink">{(j.flagged ?? 0).toLocaleString("en-IN")}</p>
+                      <p className="text-[10px] text-faint">Flagged</p>
                     </div>
                   </div>
                 </div>

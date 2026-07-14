@@ -15,6 +15,7 @@ export type JpsCounts = {
   revisionRequired: number;
   paid: number;
   published: number;
+  flagged: number;
   totalEmployees: number;
   totalAuthors: number;
   totalSubscribers: number;
@@ -97,11 +98,12 @@ const STATUS_LABEL: Record<string, string> = {
 export async function getJpsCounts(): Promise<JpsCounts> {
   const client = await createJpsConnection();
   try {
-    const [statusRes, employeeRes, authorRes, subscriberRes] = await Promise.all([
+    const [statusRes, employeeRes, authorRes, subscriberRes, flaggedRes] = await Promise.all([
       client.query("SELECT status, count(*) FROM manuscripts GROUP BY status"),
       client.query("SELECT count(*) FROM employees WHERE is_active = true"),
       client.query("SELECT count(DISTINCT author_id) FROM manuscripts WHERE author_id IS NOT NULL"),
       client.query("SELECT count(*) FROM newsletter_subscriptions").catch(() => ({ rows: [{ count: 0 }] })),
+      client.query("SELECT count(*) FROM manuscripts WHERE is_flagged = true"),
     ]);
     const byStatus = new Map<string, number>();
     for (const row of statusRes.rows) byStatus.set(row.status, Number(row.count));
@@ -119,6 +121,7 @@ export async function getJpsCounts(): Promise<JpsCounts> {
       revisionRequired: byStatus.get("revision_required") ?? 0,
       paid: byStatus.get("paid") ?? 0,
       published,
+      flagged: Number(flaggedRes.rows[0].count),
       totalEmployees: Number(employeeRes.rows[0].count),
       totalAuthors: Number(authorRes.rows[0].count),
       totalSubscribers: Number(subscriberRes.rows[0].count),

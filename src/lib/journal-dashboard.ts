@@ -152,6 +152,7 @@ async function fetchJps(): Promise<RealJournalData> {
     published: counts.published,
     rejected: counts.rejected,
     revisionRequired: counts.revisionRequired,
+    flagged: counts.flagged,
     underReview: counts.underReview,
     totalAuthors: counts.totalAuthors,
     totalSubscribers: counts.totalSubscribers,
@@ -274,6 +275,7 @@ async function fetchJournalDashboardData(): Promise<JournalDashboardData> {
       growth: j.growth, // keep sample growth until YoY history is tracked
       paid: rj.counts.paid,
       revisionRequired: rj.counts.revisionRequired,
+      flagged: rj.counts.flagged,
     };
   });
 

@@ -526,7 +526,7 @@ export const jmActivities = [
 export type JournalPerf = {
   code: string; name: string; manuscripts: number; published: number;
   acceptance: number; impact: number; revenue: number; growth: number; color: string;
-  paid?: number; revisionRequired?: number;
+  paid?: number; revisionRequired?: number; flagged?: number;
 };
 export const journalPerformance: JournalPerf[] = [
   { code: "IJPS", name: "International Journal of Pharmaceutical Sciences", manuscripts: 437, published: 312, acceptance: 71.4, impact: 4.892, revenue: 625450, growth: 28.6, color: JCOL.IJPS },

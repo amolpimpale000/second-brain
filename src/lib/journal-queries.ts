@@ -30,6 +30,7 @@ export type IjpsCounts = {
   published: number;
   rejected: number;
   revisionRequired: number;
+  flagged: number;
   underReview: number;
   totalAuthors: number;
   totalSubscribers: number;
@@ -148,7 +149,8 @@ export async function getJournalCounts(
         SUM(CASE WHEN statusID = ? THEN 1 ELSE 0 END) AS paid,
         SUM(CASE WHEN statusID = ? THEN 1 ELSE 0 END) AS published,
         SUM(CASE WHEN statusID = ? THEN 1 ELSE 0 END) AS rejected,
-        SUM(CASE WHEN statusID = ? THEN 1 ELSE 0 END) AS revisionRequired
+        SUM(CASE WHEN statusID = ? THEN 1 ELSE 0 END) AS revisionRequired,
+        SUM(CASE WHEN note_flag = 1 THEN 1 ELSE 0 END) AS flagged
       FROM ${prefix}_tblmanuscript
       WHERE isActive = 1
     `,
@@ -187,6 +189,7 @@ export async function getJournalCounts(
       published: Number(totals.published ?? 0),
       rejected: Number(totals.rejected ?? 0),
       revisionRequired,
+      flagged: Number(totals.flagged ?? 0),
       underReview: received + revisionRequired,
       totalAuthors: Number(authors.cnt ?? 0),
       totalSubscribers: Number(subscribers.cnt ?? 0),
