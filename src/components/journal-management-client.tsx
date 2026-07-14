@@ -671,7 +671,7 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
         </Panel>
 
         <Panel title="Subject Areas">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col items-center gap-4">
             <Donut
               data={data.subjectAreas.map((s) => ({ name: s.name, value: s.pct, color: s.color }))}
               center={String(data.subjectAreas.length)}

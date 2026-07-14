@@ -363,12 +363,15 @@ async function fetchJournalDashboardData(): Promise<JournalDashboardData> {
     }
   }
   const totalTypeCount = Array.from(typeMap.values()).reduce((s, c) => s + c, 0);
+  const SUBJECT_AREA_COLORS = ["#22c55e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ec4899", "#94a3b8"];
   const subjectAreas = totalTypeCount
-    ? Array.from(typeMap.entries()).map(([name, count]) => ({
-        name,
-        pct: Math.round((count / totalTypeCount) * 100),
-        color: sampleSubjectAreas.find((s) => s.name.toLowerCase().includes(name.toLowerCase().slice(0, 4)))?.color ?? "#94a3b8",
-      }))
+    ? Array.from(typeMap.entries())
+        .sort(([, a], [, b]) => b - a)
+        .map(([name, count], i) => ({
+          name,
+          pct: Math.round((count / totalTypeCount) * 100),
+          color: SUBJECT_AREA_COLORS[i % SUBJECT_AREA_COLORS.length],
+        }))
     : sampleSubjectAreas;
 
   // --- subscription: summed real subscriber counts ---
