@@ -677,8 +677,18 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
                   <div className="grid grid-cols-3 gap-1.5 text-center">
                     <div>
                       <p className="text-sm font-semibold text-ink">{(s?.manuscripts ?? 0).toLocaleString("en-IN")}</p>
-                      <p className="text-[10px] text-faint">Manuscripts</p>
+                      <p className="text-[10px] text-faint">Received</p>
                     </div>
+                    <div>
+                      <p className="text-sm font-semibold text-ink">{(j.paid ?? 0).toLocaleString("en-IN")}</p>
+                      <p className="text-[10px] text-faint">Paid</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-ink">{(j.revisionRequired ?? 0).toLocaleString("en-IN")}</p>
+                      <p className="text-[10px] text-faint">Corrections</p>
+                    </div>
+                  </div>
+                  <div className="mt-1.5 grid grid-cols-2 gap-1.5 text-center">
                     <div>
                       <p className="text-sm font-semibold text-ink">{s?.acceptance ?? 0}%</p>
                       <p className="text-[10px] text-faint">Acceptance</p>

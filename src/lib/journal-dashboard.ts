@@ -272,6 +272,8 @@ async function fetchJournalDashboardData(): Promise<JournalDashboardData> {
       acceptance: round1((rj.counts.publishedArticles / Math.max(rj.counts.totalManuscripts, 1)) * 100),
       revenue: rj.revenue.total,
       growth: j.growth, // keep sample growth until YoY history is tracked
+      paid: rj.counts.paid,
+      revisionRequired: rj.counts.revisionRequired,
     };
   });
 
