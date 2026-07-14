@@ -664,19 +664,23 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
         </Panel>
 
         <Panel title="Manuscripts by Journal">
-          <div className="flex items-center gap-4">
-            <Donut data={data.submissionsByJournal} center={totalSubmissionsByJournal.toLocaleString("en-IN")} sub="Total" />
+          <div className="flex flex-col gap-4">
+            <div className="flex justify-center">
+              <Donut data={data.submissionsByJournal} center={totalSubmissionsByJournal.toLocaleString("en-IN")} sub="Total" />
+            </div>
             <Legend items={data.submissionsByJournal} />
           </div>
         </Panel>
 
         <Panel title="Subject Areas">
-          <div className="flex flex-col items-center gap-4">
-            <Donut
-              data={data.subjectAreas.map((s) => ({ name: s.name, value: s.pct, color: s.color }))}
-              center={String(data.subjectAreas.length)}
-              sub="Areas"
-            />
+          <div className="flex flex-col gap-4">
+            <div className="flex justify-center">
+              <Donut
+                data={data.subjectAreas.map((s) => ({ name: s.name, value: s.pct, color: s.color }))}
+                center={String(data.subjectAreas.length)}
+                sub="Areas"
+              />
+            </div>
             <Legend items={data.subjectAreas.map((s) => ({ name: s.name, value: s.pct, pct: s.pct, color: s.color }))} />
           </div>
         </Panel>
