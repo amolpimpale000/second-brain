@@ -492,8 +492,39 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
         })}
       </div>
 
-      {/* Consolidated P&L across all journals, with month toggle */}
-      <ConsolidatedPnL />
+      {/* Consolidated P&L across all journals, with month toggle — 3/4 width, Journal Snapshot alongside at 1/4 */}
+      <div className="grid gap-5 xl:grid-cols-4">
+        <ConsolidatedPnL className="xl:col-span-3" />
+        <Panel title="Journal Snapshot">
+          <div className={cn("space-y-3", snapshotLoading && "opacity-50 transition-opacity")}>
+            {data.journalPerformance.map((j) => {
+              const s = snapshotData.find((x) => x.code === j.code);
+              return (
+                <div key={j.code} className="rounded-xl border border-border p-2.5">
+                  <div className="mb-1.5 flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full" style={{ background: j.color }} />
+                    <span className="text-xs font-semibold text-ink">{j.code}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5 text-center">
+                    <div>
+                      <p className="text-sm font-semibold text-ink">{(s?.manuscripts ?? 0).toLocaleString("en-IN")}</p>
+                      <p className="text-[10px] text-faint">Received</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-ink">{(j.paid ?? 0).toLocaleString("en-IN")}</p>
+                      <p className="text-[10px] text-faint">Paid</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-ink">{(j.flagged ?? 0).toLocaleString("en-IN")}</p>
+                      <p className="text-[10px] text-faint">Flagged</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Panel>
+      </div>
 
       {/* Per-journal identity cards */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -639,33 +670,14 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           </div>
         </Panel>
 
-        <Panel title="Journal Snapshot">
-          <div className={cn("space-y-3", snapshotLoading && "opacity-50 transition-opacity")}>
-            {data.journalPerformance.map((j) => {
-              const s = snapshotData.find((x) => x.code === j.code);
-              return (
-                <div key={j.code} className="rounded-xl border border-border p-2.5">
-                  <div className="mb-1.5 flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full" style={{ background: j.color }} />
-                    <span className="text-xs font-semibold text-ink">{j.code}</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-1.5 text-center">
-                    <div>
-                      <p className="text-sm font-semibold text-ink">{(s?.manuscripts ?? 0).toLocaleString("en-IN")}</p>
-                      <p className="text-[10px] text-faint">Received</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-ink">{(j.paid ?? 0).toLocaleString("en-IN")}</p>
-                      <p className="text-[10px] text-faint">Paid</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-ink">{(j.flagged ?? 0).toLocaleString("en-IN")}</p>
-                      <p className="text-[10px] text-faint">Flagged</p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+        <Panel title="Subject Areas">
+          <div className="flex items-center gap-4">
+            <Donut
+              data={data.subjectAreas.map((s) => ({ name: s.name, value: s.pct, color: s.color }))}
+              center={String(data.subjectAreas.length)}
+              sub="Areas"
+            />
+            <Legend items={data.subjectAreas.map((s) => ({ name: s.name, value: s.pct, pct: s.pct, color: s.color }))} />
           </div>
         </Panel>
       </div>
