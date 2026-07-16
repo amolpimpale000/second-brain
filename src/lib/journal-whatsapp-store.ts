@@ -51,32 +51,50 @@ export async function recordWhatsAppSent(
   messageId?: string
 ): Promise<void> {
   const sb = admin();
-  const { error } = await sb
-    .from(TABLE)
-    .upsert(
-      {
-        alert_key: alertKey,
-        template,
-        journal_code: journalCode,
-        phone,
-        last_sent_at: new Date().toISOString(),
-        message_id: messageId ?? null,
-        delivery_status: null,
-        delivery_updated_at: null,
-      },
-      { onConflict: "alert_key" }
-    );
+
+  // Try the full upsert (table has message_id / delivery columns).
+  const fullRow = {
+    alert_key: alertKey,
+    template,
+    journal_code: journalCode,
+    phone,
+    last_sent_at: new Date().toISOString(),
+    message_id: messageId ?? null,
+    delivery_status: null,
+    delivery_updated_at: null,
+  };
+  let { error } = await sb.from(TABLE).upsert(fullRow, { onConflict: "alert_key" });
+
+  // If the table hasn't been migrated yet (missing columns), fall back to
+  // the original 5-column upsert so dedup still works.
+  if (error && error.message.includes("column")) {
+    const minimalRow = {
+      alert_key: alertKey,
+      template,
+      journal_code: journalCode,
+      phone,
+      last_sent_at: new Date().toISOString(),
+    };
+    ({ error } = await sb.from(TABLE).upsert(minimalRow, { onConflict: "alert_key" }));
+  }
+
   if (error) throw error;
 }
 
 /** Called by the Interakt webhook when a message's delivery status changes. */
 export async function updateDeliveryStatus(messageId: string, status: string): Promise<boolean> {
   const sb = admin();
+  // If the delivery columns aren't migrated yet, the update matches zero rows
+  // and we silently return false — the webhook still 200s (so Interakt doesn't
+  // retry), but no state is recorded. Once the columns exist, this records
+  // status normally.
   const { data, error } = await sb
     .from(TABLE)
     .update({ delivery_status: status, delivery_updated_at: new Date().toISOString() })
     .eq("message_id", messageId)
     .select();
-  if (error) throw error;
+  if (error && !error.message.includes("column")) {
+    throw error;
+  }
   return (data?.length ?? 0) > 0;
 }
