@@ -177,11 +177,11 @@ export function AlertsBell({ initialData }: { initialData?: AlertsResponse }) {
       <div className={cn("fixed inset-0 z-50", open ? "" : "pointer-events-none")} aria-hidden={!open}>
         <div
           onClick={() => setOpen(false)}
-          className={cn("absolute inset-0 bg-ink/40 backdrop-blur-sm transition-opacity duration-300", open ? "opacity-100" : "opacity-0")}
+          className={cn("absolute inset-0 bg-ink/50 backdrop-blur-sm transition-opacity duration-300", open ? "opacity-100" : "opacity-0")}
         />
         <aside
           className={cn(
-            "absolute right-0 top-0 flex h-full w-full max-w-[440px] flex-col bg-bg shadow-2xl transition-transform duration-300 ease-out",
+            "absolute right-0 top-0 flex h-full w-full max-w-[440px] flex-col border-l border-border bg-card shadow-2xl transition-transform duration-300 ease-out",
             open ? "translate-x-0" : "translate-x-full"
           )}
           role="dialog"

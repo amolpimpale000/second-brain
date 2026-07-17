@@ -539,11 +539,6 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
                   <p className="truncate text-[11px] text-faint">{j.name}</p>
                 </div>
               </div>
-              <div className="mt-3 flex items-center gap-2">
-                <p className="text-xl font-bold text-ink">{j.manuscripts.toLocaleString("en-IN")}</p>
-                <Delta v={j.growth} />
-              </div>
-              <p className="text-[11px] text-faint">Total Submissions</p>
               <div className="mt-2.5 flex items-center justify-between border-t border-border pt-2 text-[11px]">
                 <span className="text-muted">Published: <span className="font-semibold text-ink">{j.published.toLocaleString("en-IN")}</span></span>
                 <span className="text-muted">IF/Impact: <span className="font-semibold text-ink">{j.impact.toFixed(3)}</span></span>
