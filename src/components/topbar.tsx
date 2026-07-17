@@ -1,11 +1,12 @@
 "use client";
 
-import { Search, Bell, Plus, ChevronDown, Menu } from "lucide-react";
+import { Search, Plus, ChevronDown, Menu } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { owner } from "@/lib/data";
 import { cn } from "@/lib/utils";
+import { AlertsBell } from "@/components/alerts-drawer";
 
 const quickLinks = [
   { label: "Transaction", href: "/finances" },
@@ -78,13 +79,7 @@ export function Topbar({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
             </div>
           )}
         </div>
-        <Link
-          href="/journal-management"
-          title="Journal alerts"
-          className="relative grid h-10 w-10 place-items-center rounded-xl border border-border bg-surface text-muted transition-colors hover:text-ink"
-        >
-          <Bell className="h-[18px] w-[18px]" />
-        </Link>
+        <AlertsBell />
         <div className="ml-1 flex items-center gap-2.5 rounded-xl border border-border bg-surface py-1.5 pl-1.5 pr-3">
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-soft text-sm font-semibold text-brand-ink">
             AP

@@ -6,14 +6,13 @@ import {
   BookOpen, FileText, CheckCircle2, Clock, Users, IndianRupee, ArrowUpRight, ArrowDownRight,
   Plus,
   Pencil, Trash2, Eye, ChevronLeft, ChevronRight, MousePointerClick, Target,
-  Star, CalendarDays, Wallet, AlertTriangle,
+  CalendarDays, Wallet, AlertTriangle,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { MultiLineChart, SegmentedGauge, GroupedBars } from "@/components/charts";
 import { Dropdown, Modal } from "@/components/vault-ui";
 import { GoogleAdsLogo } from "@/components/google-ads-logo";
 import { Logo } from "@/components/logo";
-import { AlertsBell } from "@/components/alerts-drawer";
 import { ConsolidatedPnL } from "@/components/consolidated-pnl";
 import { RevenueOverview } from "@/components/revenue-overview";
 import { EmployeeProductivityPanel } from "@/components/employee-productivity-chart";
@@ -45,12 +44,15 @@ const PERIOD_OPTIONS = [
 ];
 const journalLabel = (code: string) => JOURNAL_OPTIONS.find((j) => j.code === code)?.label ?? code;
 
-const JOURNAL_DOMAIN: Record<string, string> = {
-  IJPS: "ijpsjournal.com",
-  IJSRT: "ijsrtjournal.com",
-  IJMPS: "ijmpsjournal.com",
-  IJES: "ijesjournal.com",
-  JPS: "jpsjournal.com",
+// Local paths to pre-downloaded journal logos in /public/journal-logos/.
+// These small journal sites aren't indexed by Clearbit, so we serve
+// static copies instead of relying on external APIs that return blanks.
+const JOURNAL_LOGO: Record<string, string> = {
+  IJPS: "/journal-logos/ijpsjournal.png",
+  IJSRT: "/journal-logos/ijsrtjournal.png",
+  IJMPS: "/journal-logos/ijmpsjournal.png",
+  IJES: "/journal-logos/ijesjournal.png",
+  JPS: "/journal-logos/jpsjournal.jpg",
 };
 
 function Delta({ v, className }: { v: number; className?: string }) {
@@ -454,7 +456,6 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           <p className="mt-1 text-sm text-muted">Complete analytics and insights across all journals.</p>
         </div>
         <div className="flex items-center gap-2">
-          <AlertsBell />
           <button
             onClick={() => setShowAddModal(true)}
             className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
@@ -532,7 +533,7 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
           return (
             <div key={j.code} className="rounded-2xl border border-border bg-card p-4 shadow-card">
               <div className="flex items-center gap-2.5">
-                <Logo domain={JOURNAL_DOMAIN[j.code]} label={j.code} size={40} rounded="rounded-full" />
+                <Logo src={JOURNAL_LOGO[j.code]} label={j.code} size={40} rounded="rounded-full" />
                 <div className="min-w-0">
                   <p className="text-sm font-bold" style={{ color: j.color }}>{j.code}</p>
                   <p className="truncate text-[11px] text-faint">{j.name}</p>
@@ -550,26 +551,6 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
             </div>
           );
         })}
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
-          <div className="flex items-center gap-2.5">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full border-2 border-indigo-200 bg-indigo-50 text-indigo-600">
-              <Star className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-indigo-600">All Journals</p>
-              <p className="truncate text-[11px] text-faint">Overall</p>
-            </div>
-          </div>
-          <div className="mt-3 flex items-center gap-2">
-            <p className="text-xl font-bold text-ink">{totalJournalManuscripts.toLocaleString("en-IN")}</p>
-            <Delta v={avgGrowth} />
-          </div>
-          <p className="text-[11px] text-faint">Total Submissions</p>
-          <div className="mt-2.5 flex items-center justify-between border-t border-border pt-2 text-[11px]">
-            <span className="text-muted">Published: <span className="font-semibold text-ink">{totalJournalPublished.toLocaleString("en-IN")}</span></span>
-            <span className="text-muted">Avg. IF: <span className="font-semibold text-ink">{avgImpact.toFixed(3)}</span></span>
-          </div>
-        </div>
       </div>
 
       <div className="space-y-4">
@@ -580,7 +561,7 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
               className="rounded-2xl border border-border bg-card p-4 shadow-card"
             >
               <div className="flex items-center gap-2.5">
-                <Logo domain={JOURNAL_DOMAIN[b.code]} label={b.code} size={36} rounded="rounded-lg" />
+                <Logo src={JOURNAL_LOGO[b.code]} label={b.code} size={36} rounded="rounded-lg" />
                 <span className="truncate text-sm font-semibold text-ink">{b.name}</span>
               </div>
               <p className="mt-3 text-[10px] font-medium uppercase tracking-wider text-faint">Revenue</p>
