@@ -700,12 +700,47 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
                       </td>
                       {EXPENSE_CATEGORIES.map((c) => {
                         const amt = cellAmount(row.code, c);
+                        const entries = amt > 0 ? cellEntries(row.code, c) : [];
                         return (
                           <td key={c} className="py-3 px-3 text-right tabular-nums">
                             {amt > 0 ? (
-                              <button onClick={() => setDetailCell({ journal: row.code, category: c, label: `${row.label} — ${c}` })} className="font-medium text-ink hover:text-indigo-600 hover:underline">
-                                {inr(amt)}
-                              </button>
+                              <div className="group/expense relative inline-block">
+                                <button
+                                  onClick={() => setDetailCell({ journal: row.code, category: c, label: `${row.label} — ${c}` })}
+                                  className="font-medium text-ink hover:text-indigo-600 hover:underline"
+                                >
+                                  {inr(amt)}
+                                </button>
+                                {/* Hover tooltip: lists what this expense is for.
+                                    Pure CSS — no focus-trap needed since the click
+                                    target already opens the full drill-down modal. */}
+                                <div
+                                  role="tooltip"
+                                  className="pointer-events-none absolute bottom-full right-0 z-30 mb-2 hidden w-64 rounded-xl border border-border bg-card p-2.5 text-left shadow-card-lg group-hover/expense:block"
+                                >
+                                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">
+                                    {c} · {entries.length} {entries.length === 1 ? "entry" : "entries"}
+                                  </p>
+                                  <ul className="max-h-52 space-y-1.5 overflow-y-auto pr-1">
+                                    {entries.map((e) => (
+                                      <li key={e.id} className="border-b border-border/60 pb-1.5 last:border-0 last:pb-0">
+                                        <div className="flex items-baseline justify-between gap-2">
+                                          <p className="truncate text-xs font-semibold text-ink">{e.paymentTo || "—"}</p>
+                                          <span className="shrink-0 text-xs font-semibold text-ink">{inr(e.amount)}</span>
+                                        </div>
+                                        {e.description && (
+                                          <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted">{e.description}</p>
+                                        )}
+                                        <p className="mt-0.5 text-[10px] text-faint">
+                                          {new Date(e.date + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                                          {e.mode ? ` · ${e.mode}` : ""}
+                                        </p>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                  <p className="mt-1.5 text-center text-[10px] text-faint">Click amount for full breakdown →</p>
+                                </div>
+                              </div>
                             ) : (
                               <span className="text-faint">₹0</span>
                             )}
@@ -714,7 +749,33 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
                       })}
                       <td className="py-3 px-3 text-right tabular-nums">
                         {adsAmount(row.code) > 0 ? (
-                          <span className="font-medium text-indigo-600">{inr(adsAmount(row.code))}</span>
+                          (() => {
+                            const jAds = matrixAds.byJournal.find((j) => j.code === row.code);
+                            const topCampaigns = (jAds?.campaigns ?? []).slice().sort((a, b) => b.cost - a.cost).slice(0, 6);
+                            return (
+                              <div className="group/expense relative inline-block">
+                                <span className="font-medium text-indigo-600">{inr(adsAmount(row.code))}</span>
+                                {topCampaigns.length > 0 && (
+                                  <div
+                                    role="tooltip"
+                                    className="pointer-events-none absolute bottom-full right-0 z-30 mb-2 hidden w-64 rounded-xl border border-border bg-card p-2.5 text-left shadow-card-lg group-hover/expense:block"
+                                  >
+                                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">
+                                      Google Ads · {topCampaigns.length} campaign{topCampaigns.length === 1 ? "" : "s"}
+                                    </p>
+                                    <ul className="max-h-52 space-y-1 overflow-y-auto pr-1">
+                                      {topCampaigns.map((camp) => (
+                                        <li key={camp.name} className="flex items-baseline justify-between gap-2 border-b border-border/60 pb-1 last:border-0 last:pb-0">
+                                          <p className="truncate text-xs text-ink" title={camp.name}>{camp.name}</p>
+                                          <span className="shrink-0 text-xs font-semibold text-ink">{inr(camp.cost)}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()
                         ) : (
                           <span className="text-faint">₹0</span>
                         )}
