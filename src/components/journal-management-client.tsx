@@ -527,27 +527,6 @@ export function JournalManagementClient({ data }: { data: JournalDashboardData }
         </Panel>
       </div>
 
-      {/* Per-journal identity cards */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {data.journalPerformance.map((j) => {
-          return (
-            <div key={j.code} className="rounded-2xl border border-border bg-card p-4 shadow-card">
-              <div className="flex items-center gap-2.5">
-                <Logo src={JOURNAL_LOGO[j.code]} label={j.code} size={40} rounded="rounded-full" />
-                <div className="min-w-0">
-                  <p className="text-sm font-bold" style={{ color: j.color }}>{j.code}</p>
-                  <p className="truncate text-[11px] text-faint">{j.name}</p>
-                </div>
-              </div>
-              <div className="mt-2.5 flex items-center justify-between border-t border-border pt-2 text-[11px]">
-                <span className="text-muted">Published: <span className="font-semibold text-ink">{j.published.toLocaleString("en-IN")}</span></span>
-                <span className="text-muted">IF/Impact: <span className="font-semibold text-ink">{j.impact.toFixed(3)}</span></span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {data.businessProfitability.map((b) => (
