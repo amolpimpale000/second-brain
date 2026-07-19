@@ -187,8 +187,9 @@ export function AlertsBell({ initialData }: { initialData?: AlertsResponse }) {
           className={cn("absolute inset-0 bg-ink/50 backdrop-blur-sm transition-opacity duration-300", open ? "opacity-100" : "opacity-0")}
         />
         <aside
+          onClick={(e) => e.stopPropagation()}
           className={cn(
-            "absolute right-0 top-0 flex h-full w-full max-w-[440px] flex-col border-l border-border bg-card shadow-2xl transition-transform duration-300 ease-out",
+            "absolute right-0 top-0 z-10 flex h-full w-full max-w-[440px] flex-col border-l border-border bg-card shadow-2xl transition-transform duration-300 ease-out",
             open ? "translate-x-0" : "translate-x-full"
           )}
           role="dialog"
