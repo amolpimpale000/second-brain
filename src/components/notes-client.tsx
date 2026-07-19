@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FileText, Pin, LayoutGrid, Bell, Trash2, Plus, Search, Maximize2,
   Lock, Wallet, Briefcase, Lightbulb, Heart, Plane, Folder, GraduationCap, Circle, Layers,
@@ -10,6 +10,7 @@ import type { RichNote, ChecklistItem, Reminder } from "@/lib/data";
 import { sampleNotes, sampleReminders, sampleNoteTrash, noteCategories, noteTags } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import { Modal, Field, inputCls, Dropdown } from "@/components/vault-ui";
+import { AnchoredPopup } from "@/components/anchored-popup";
 import { createClient, hasSupabaseEnv } from "@/utils/supabase/client";
 
 /* helpers -------------------------------------------------------------------*/
@@ -74,24 +75,20 @@ const reminderToRow = (r: Reminder): Row => ({
 
 function Menu({ items }: { items: { label: string; icon: React.ElementType; onClick: () => void; danger?: boolean }[] }) {
   const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
   return (
     <div className="relative">
-      <button onClick={() => setOpen((o) => !o)} className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 hover:bg-black/5 hover:text-ink">
+      <button ref={btnRef} onClick={() => setOpen((o) => !o)} className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 hover:bg-black/5 hover:text-ink">
         <MoreHorizontal className="h-4 w-4" />
       </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-20 mt-1 min-w-[150px] rounded-xl border border-border bg-card p-1 shadow-card-lg">
-            {items.map((it) => (
-              <button key={it.label} onClick={() => { it.onClick(); setOpen(false); }}
-                className={cn("flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2", it.danger ? "text-red-500" : "text-muted hover:text-ink")}>
-                <it.icon className="h-4 w-4" /> {it.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+      <AnchoredPopup open={open} onClose={() => setOpen(false)} anchorEl={btnRef.current} align="right" className="min-w-[150px] p-1">
+        {items.map((it) => (
+          <button key={it.label} onClick={() => { it.onClick(); setOpen(false); }}
+            className={cn("flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2", it.danger ? "text-red-500" : "text-muted hover:text-ink")}>
+            <it.icon className="h-4 w-4" /> {it.label}
+          </button>
+        ))}
+      </AnchoredPopup>
     </div>
   );
 }

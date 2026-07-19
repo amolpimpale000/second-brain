@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   Plus, Pencil, Trash2, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, X, Wallet,
@@ -15,6 +15,7 @@ import { cn, inr } from "@/lib/utils";
 import { INVESTMENT_TYPES, investColor } from "@/lib/investment-types";
 import type { FinInvestment } from "@/lib/finance-store";
 import { Logo } from "@/components/logo";
+import { AnchoredPopup } from "@/components/anchored-popup";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Type metadata
@@ -108,6 +109,7 @@ function MfSymbolInput({ value, onChange }: { value: string; onChange: (schemeCo
   const [results, setResults] = useState<{ schemeCode: string; schemeName: string }[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (query.trim().length < 3) { setResults([]); return; }
@@ -123,39 +125,37 @@ function MfSymbolInput({ value, onChange }: { value: string; onChange: (schemeCo
     return () => { cancelled = true; clearTimeout(t); };
   }, [query]);
 
+  const showResults = open && query.trim().length >= 3;
+  // Width matches the input column it sits under; let the popup stretch to ~360px.
   return (
     <div className="relative">
       <input
+        ref={inputRef}
         value={query}
         onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
         placeholder="Search fund name, e.g. Axis Small Cap"
         className={inputCls}
       />
-      {open && (query.trim().length >= 3) && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 right-0 z-50 mt-1 max-h-52 overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-card-lg">
-            {loading ? (
-              <p className="px-3 py-2 text-xs text-faint">Searching…</p>
-            ) : results.length === 0 ? (
-              <p className="px-3 py-2 text-xs text-faint">No matches.</p>
-            ) : (
-              results.map((r) => (
-                <button
-                  key={r.schemeCode}
-                  type="button"
-                  onClick={() => { onChange(r.schemeCode, r.schemeName); setQuery(r.schemeName); setOpen(false); }}
-                  className="block w-full rounded-lg px-3 py-2 text-left text-xs text-ink hover:bg-surface-2"
-                >
-                  {r.schemeName}
-                  <span className="ml-1 text-faint">#{r.schemeCode}</span>
-                </button>
-              ))
-            )}
-          </div>
-        </>
-      )}
+      <AnchoredPopup open={showResults} onClose={() => setOpen(false)} anchorEl={inputRef.current} align="left" className="max-h-52 overflow-y-auto p-1" zIndex="z-40">
+        {loading ? (
+          <p className="px-3 py-2 text-xs text-faint">Searching…</p>
+        ) : results.length === 0 ? (
+          <p className="px-3 py-2 text-xs text-faint">No matches.</p>
+        ) : (
+          results.map((r) => (
+            <button
+              key={r.schemeCode}
+              type="button"
+              onClick={() => { onChange(r.schemeCode, r.schemeName); setQuery(r.schemeName); setOpen(false); }}
+              className="block w-full rounded-lg px-3 py-2 text-left text-xs text-ink hover:bg-surface-2"
+            >
+              {r.schemeName}
+              <span className="ml-1 text-faint">#{r.schemeCode}</span>
+            </button>
+          ))
+        )}
+      </AnchoredPopup>
     </div>
   );
 }
@@ -305,6 +305,7 @@ export function InvestmentsClient({ initial }: { initial: FinInvestment[] }) {
   const [subTab, setSubTab] = useState("Overview");
   const [perfBy, setPerfBy] = useState<"type" | "holding">("type");
   const [rowMenu, setRowMenu] = useState<string | null>(null);
+  const rowMenuBtnRef = useRef<HTMLButtonElement | null>(null);
 
   function flash(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
 
@@ -452,20 +453,19 @@ export function InvestmentsClient({ initial }: { initial: FinInvestment[] }) {
                     </span>
                   </td>
                   <td className="py-3">
-                    <div className="relative flex justify-end">
-                      <button onClick={() => setRowMenu(rowMenu === i.id ? null : i.id)} className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-surface-2 hover:text-ink">
+                    <div className="flex justify-end">
+                      <button
+                        ref={(el) => { if (rowMenu === i.id) rowMenuBtnRef.current = el; }}
+                        onClick={() => setRowMenu(rowMenu === i.id ? null : i.id)}
+                        className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-surface-2 hover:text-ink"
+                      >
                         <MoreVertical className="h-4 w-4" />
                       </button>
-                      {rowMenu === i.id && (
-                        <>
-                          <div className="fixed inset-0 z-10" onClick={() => setRowMenu(null)} />
-                          <div className="absolute right-0 top-8 z-20 w-40 rounded-xl border border-border bg-card p-1 shadow-card-lg">
-                            <button onClick={() => { setRowMenu(null); setModal({ kind: "value", investment: i }); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[13px] text-muted hover:bg-surface-2 hover:text-ink"><TrendingUp className="h-3.5 w-3.5" /> Update Value</button>
-                            <button onClick={() => { setRowMenu(null); setModal({ kind: "edit", investment: i }); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[13px] text-muted hover:bg-surface-2 hover:text-ink"><Pencil className="h-3.5 w-3.5" /> Edit</button>
-                            <button onClick={() => remove(i)} className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[13px] text-red-500 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /> Delete</button>
-                          </div>
-                        </>
-                      )}
+                      <AnchoredPopup open={rowMenu === i.id} onClose={() => setRowMenu(null)} anchorEl={rowMenuBtnRef.current} align="right" className="w-40 p-1" zIndex="z-40">
+                        <button onClick={() => { setRowMenu(null); setModal({ kind: "value", investment: i }); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[13px] text-muted hover:bg-surface-2 hover:text-ink"><TrendingUp className="h-3.5 w-3.5" /> Update Value</button>
+                        <button onClick={() => { setRowMenu(null); setModal({ kind: "edit", investment: i }); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[13px] text-muted hover:bg-surface-2 hover:text-ink"><Pencil className="h-3.5 w-3.5" /> Edit</button>
+                        <button onClick={() => remove(i)} className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[13px] text-red-500 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /> Delete</button>
+                      </AnchoredPopup>
                     </div>
                   </td>
                 </tr>

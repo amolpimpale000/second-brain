@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import { cn, inr } from "@/lib/utils";
+import { AnchoredPopup } from "@/components/anchored-popup";
 
 type JournalIncome = { code: string; income: number };
 type MonthlyPnL = {
@@ -86,6 +87,8 @@ export function ConsolidatedPnL({ className }: { className?: string }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [byJournalMetric, setByJournalMetric] = useState<"Total Income">("Total Income");
   const [metricMenuOpen, setMetricMenuOpen] = useState(false);
+  const monthBtnRef = useRef<HTMLButtonElement | null>(null);
+  const metricBtnRef = useRef<HTMLButtonElement | null>(null);
   const fetched = useRef(false);
 
   const load = useCallback(async () => {
@@ -165,32 +168,28 @@ export function ConsolidatedPnL({ className }: { className?: string }) {
           </button>
           <div className="relative">
             <button
+              ref={monthBtnRef}
               onClick={() => setMenuOpen((o) => !o)}
               disabled={loading || !cur}
               className="inline-flex min-w-[120px] items-center justify-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-ink hover:bg-surface-2 disabled:opacity-50"
             >
               {cur?.label ?? "—"} <ChevronDown className={cn("h-3.5 w-3.5 text-faint transition-transform", menuOpen && "rotate-180")} />
             </button>
-            {menuOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-                <div className="absolute right-0 z-50 mt-1 max-h-64 w-44 overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-card-lg">
-                  {months.map((m, i) => (
-                    <button
-                      key={m.month}
-                      onClick={() => { setIdx(i); setMenuOpen(false); }}
-                      className={cn(
-                        "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2",
-                        i === idx ? "font-semibold text-ink" : "text-muted"
-                      )}
-                    >
-                      <span>{m.label}</span>
-                      <span className={cn("text-xs", m.profit >= 0 ? "text-emerald-600" : "text-rose-500")}>{inr(m.profit, { compact: true })}</span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
+            <AnchoredPopup open={menuOpen} onClose={() => setMenuOpen(false)} anchorEl={monthBtnRef.current} align="right" className="w-44 max-h-64 overflow-y-auto p-1">
+              {months.map((m, i) => (
+                <button
+                  key={m.month}
+                  onClick={() => { setIdx(i); setMenuOpen(false); }}
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2",
+                    i === idx ? "font-semibold text-ink" : "text-muted"
+                  )}
+                >
+                  <span>{m.label}</span>
+                  <span className={cn("text-xs", m.profit >= 0 ? "text-emerald-600" : "text-rose-500")}>{inr(m.profit, { compact: true })}</span>
+                </button>
+              ))}
+            </AnchoredPopup>
           </div>
           <button
             onClick={() => setIdx((i) => Math.max(0, i - 1))}
@@ -271,24 +270,20 @@ export function ConsolidatedPnL({ className }: { className?: string }) {
               </div>
               <div className="relative">
                 <button
+                  ref={metricBtnRef}
                   onClick={() => setMetricMenuOpen((o) => !o)}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink hover:bg-surface-2"
                 >
                   {byJournalMetric} <ChevronDown className={cn("h-3.5 w-3.5 text-faint transition-transform", metricMenuOpen && "rotate-180")} />
                 </button>
-                {metricMenuOpen && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setMetricMenuOpen(false)} />
-                    <div className="absolute right-0 z-50 mt-1 w-40 rounded-xl border border-border bg-card p-1 shadow-card-lg">
-                      <button
-                        onClick={() => { setByJournalMetric("Total Income"); setMetricMenuOpen(false); }}
-                        className="block w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-ink hover:bg-surface-2"
-                      >
-                        Total Income
-                      </button>
-                    </div>
-                  </>
-                )}
+                <AnchoredPopup open={metricMenuOpen} onClose={() => setMetricMenuOpen(false)} anchorEl={metricBtnRef.current} align="right" className="w-40 p-1">
+                  <button
+                    onClick={() => { setByJournalMetric("Total Income"); setMetricMenuOpen(false); }}
+                    className="block w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-ink hover:bg-surface-2"
+                  >
+                    Total Income
+                  </button>
+                </AnchoredPopup>
               </div>
             </div>
 

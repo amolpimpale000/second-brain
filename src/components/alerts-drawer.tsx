@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Bell, X, Clock, FileWarning, UserX, RefreshCw, ShieldAlert, MailWarning,
   Check, RotateCcw, Settings2, ChevronDown, Loader2, Gift, PhoneOff,
@@ -61,6 +62,8 @@ export function AlertsBell({ initialData }: { initialData?: AlertsResponse }) {
   const [journalFilter, setJournalFilter] = useState<string>("all");
   const [showSettings, setShowSettings] = useState(false);
   const fetchedOnce = useRef(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -173,8 +176,12 @@ export function AlertsBell({ initialData }: { initialData?: AlertsResponse }) {
         </button>
       </div>
 
-      {/* Overlay + Drawer */}
-      <div className={cn("fixed inset-0 z-50", open ? "" : "pointer-events-none")} aria-hidden={!open}>
+      {/* Overlay + Drawer — rendered via portal so it escapes any ancestor
+          that establishes a containing block for position:fixed (e.g. the
+          topbar's backdrop-filter, which would otherwise clip the drawer to
+          just the topbar's height and break the layout). */}
+      {mounted && typeof document !== "undefined" && createPortal(
+        <div className={cn("fixed inset-0 z-50", open ? "" : "pointer-events-none")} aria-hidden={!open}>
         <div
           onClick={() => setOpen(false)}
           className={cn("absolute inset-0 bg-ink/50 backdrop-blur-sm transition-opacity duration-300", open ? "opacity-100" : "opacity-0")}
@@ -323,7 +330,9 @@ export function AlertsBell({ initialData }: { initialData?: AlertsResponse }) {
             )}
           </div>
         </aside>
-      </div>
+        </div>,
+        document.body,
+      )}
     </>
   );
 }

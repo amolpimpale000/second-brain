@@ -1,12 +1,13 @@
 "use client";
 
 import { Search, Plus, ChevronDown, Menu } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { owner } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import { AlertsBell } from "@/components/alerts-drawer";
+import { AnchoredPopup } from "@/components/anchored-popup";
 
 const quickLinks = [
   { label: "Transaction", href: "/finances" },
@@ -20,15 +21,7 @@ export function Topbar({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    if (open) document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
+  const qaRef = useRef<HTMLButtonElement | null>(null);
 
   function submitSearch() {
     const q = query.trim();
@@ -60,24 +53,22 @@ export function Topbar({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
       </div>
 
       <div className="ml-auto flex items-center gap-2">
-        <div className="relative hidden sm:block" ref={ref}>
-          <button onClick={() => setOpen(!open)} className="btn-brand inline-flex">
+        <div className="hidden sm:block">
+          <button ref={qaRef} onClick={() => setOpen(!open)} className="btn-brand inline-flex">
             <Plus className="h-4 w-4" /> Quick add <ChevronDown className={cn("h-3 w-3 transition-transform", open && "rotate-180")} />
           </button>
-          {open && (
-            <div className="absolute right-0 top-full z-40 mt-2 w-40 rounded-xl border border-border bg-card p-1 shadow-card-lg">
-              {quickLinks.map((l) => (
-                <Link
-                  key={l.label}
-                  href={l.href}
-                  onClick={() => setOpen(false)}
-                  className="block rounded-lg px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-ink"
-                >
-                  {l.label}
-                </Link>
-              ))}
-            </div>
-          )}
+          <AnchoredPopup open={open} onClose={() => setOpen(false)} anchorEl={qaRef.current} align="right" className="w-40 p-1">
+            {quickLinks.map((l) => (
+              <Link
+                key={l.label}
+                href={l.href}
+                onClick={() => setOpen(false)}
+                className="block rounded-lg px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-ink"
+              >
+                {l.label}
+              </Link>
+            ))}
+          </AnchoredPopup>
         </div>
         <AlertsBell />
         <div className="ml-1 flex items-center gap-2.5 rounded-xl border border-border bg-surface py-1.5 pl-1.5 pr-3">

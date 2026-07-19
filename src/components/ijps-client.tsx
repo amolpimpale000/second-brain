@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { Modal, Field, inputCls } from "@/components/vault-ui";
 import { GoogleAdsLogo } from "@/components/google-ads-logo";
 import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
+import { AnchoredPopup } from "@/components/anchored-popup";
 
 const axis = { tick: { fill: "var(--faint)", fontSize: 11 }, axisLine: false, tickLine: false } as const;
 
@@ -84,30 +85,27 @@ type MonthOption = (typeof MONTH_OPTIONS)[number];
 
 function MonthFilter({ value, onChange }: { value: MonthOption; onChange: (v: MonthOption) => void }) {
   const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
   return (
     <div className="relative">
       <button
+        ref={btnRef}
         onClick={() => setOpen((o) => !o)}
         className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-2 transition-colors"
       >
         {value} <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
       </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-1 min-w-[150px] rounded-xl border border-border bg-card p-1 shadow-card-lg">
-            {MONTH_OPTIONS.map((o) => (
-              <button
-                key={o}
-                onClick={() => { onChange(o); setOpen(false); }}
-                className={cn("block w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-surface-2", o === value ? "font-semibold text-ink" : "text-muted")}
-              >
-                {o}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+      <AnchoredPopup open={open} onClose={() => setOpen(false)} anchorEl={btnRef.current} align="right" className="min-w-[150px] p-1">
+        {MONTH_OPTIONS.map((o) => (
+          <button
+            key={o}
+            onClick={() => { onChange(o); setOpen(false); }}
+            className={cn("block w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-surface-2", o === value ? "font-semibold text-ink" : "text-muted")}
+          >
+            {o}
+          </button>
+        ))}
+      </AnchoredPopup>
     </div>
   );
 }
@@ -159,6 +157,7 @@ function RazorpayCard({ journalCode, initial }: { journalCode: string; initial: 
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const rzpBtnRef = useRef<HTMLButtonElement | null>(null);
 
   async function selectPeriod(p: RzpPeriod) {
     setOpen(false);
@@ -189,27 +188,23 @@ function RazorpayCard({ journalCode, initial }: { journalCode: string; initial: 
         {/* Period dropdown */}
         <div className="relative">
           <button
+            ref={rzpBtnRef}
             onClick={() => setOpen((o) => !o)}
             className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-2 transition-colors"
           >
             {activeLabel} <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
           </button>
-          {open && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-              <div className="absolute right-0 z-50 mt-1 min-w-[150px] rounded-xl border border-border bg-card p-1 shadow-card-lg">
-                {RZP_PERIODS.map((o) => (
-                  <button
-                    key={o.value}
-                    onClick={() => selectPeriod(o.value)}
-                    className={cn("block w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-surface-2", o.value === period ? "font-semibold text-ink" : "text-muted")}
-                  >
-                    {o.label}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+          <AnchoredPopup open={open} onClose={() => setOpen(false)} anchorEl={rzpBtnRef.current} align="right" className="min-w-[150px] p-1">
+            {RZP_PERIODS.map((o) => (
+              <button
+                key={o.value}
+                onClick={() => selectPeriod(o.value)}
+                className={cn("block w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-surface-2", o.value === period ? "font-semibold text-ink" : "text-muted")}
+              >
+                {o.label}
+              </button>
+            ))}
+          </AnchoredPopup>
         </div>
       </div>
 
@@ -280,6 +275,7 @@ export function IjpsClient({
   const [editingExpense, setEditingExpense] = useState<ExpenseRow | null>(null);
   const [expenseFilter, setExpenseFilter] = useState<string>("All Categories");
   const [filterOpen, setFilterOpen] = useState(false);
+  const filterBtnRef = useRef<HTMLButtonElement | null>(null);
 
   const [moManuscript, setMoManuscript] = useState<MonthOption>("All Time");
   const [moRevenue, setMoRevenue] = useState<MonthOption>("All Time");
@@ -1134,27 +1130,23 @@ export function IjpsClient({
           <div className="flex items-center gap-2">
             <div className="relative">
               <button
+                ref={filterBtnRef}
                 onClick={() => setFilterOpen((o) => !o)}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-medium text-muted hover:bg-surface-2 transition-colors"
               >
                 <Filter className="h-3.5 w-3.5" /> {expenseFilter === "All Categories" ? "Filter" : expenseFilter}
               </button>
-              {filterOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setFilterOpen(false)} />
-                  <div className="absolute right-0 z-50 mt-1 min-w-[180px] max-h-64 overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-card-lg">
-                    {expenseCategories.map((c) => (
-                      <button
-                        key={c}
-                        onClick={() => { setExpenseFilter(c); setFilterOpen(false); }}
-                        className={cn("block w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-surface-2", c === expenseFilter ? "font-semibold text-ink" : "text-muted")}
-                      >
-                        {c}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
+              <AnchoredPopup open={filterOpen} onClose={() => setFilterOpen(false)} anchorEl={filterBtnRef.current} align="right" className="min-w-[180px] max-h-64 overflow-y-auto p-1">
+                {expenseCategories.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => { setExpenseFilter(c); setFilterOpen(false); }}
+                    className={cn("block w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-surface-2", c === expenseFilter ? "font-semibold text-ink" : "text-muted")}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </AnchoredPopup>
             </div>
             <button
               onClick={exportExpenses}

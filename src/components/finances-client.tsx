@@ -17,6 +17,7 @@ import {
 import { cn, inr } from "@/lib/utils";
 import { INVESTMENT_TYPES } from "@/lib/investment-types";
 import { Logo } from "@/components/logo";
+import { AnchoredPopup } from "@/components/anchored-popup";
 import type {
   FinanceData, FinanceEntity, FinAccount, FinTransaction, FinGoal, FinLoan, FinInvestment,
   FinBill, FinDue, FinBudget,
@@ -252,31 +253,23 @@ function RowActions({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => 
 
 function MonthSel({ value, onChange }: { value: "this" | "last"; onChange: (v: "this" | "last") => void }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    if (open) document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative">
       <button
+        ref={btnRef}
         onClick={() => setOpen(!open)}
         className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-muted hover:bg-surface-2 transition-colors"
       >
         {value === "this" ? "This Month" : "Last Month"} <ChevronDown className={cn("h-3 w-3 transition-transform", open && "rotate-180")} />
       </button>
-      {open && (
-        <div className="absolute right-0 top-full z-20 mt-1 w-32 rounded-xl border border-border bg-card p-1 shadow-card-lg">
-          {([["this", "This Month"], ["last", "Last Month"]] as const).map(([v, label]) => (
-            <button key={v} onClick={() => { onChange(v); setOpen(false); }} className="block w-full rounded-lg px-3 py-1.5 text-left text-xs text-muted hover:bg-surface-2 hover:text-ink">
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
+      <AnchoredPopup open={open} onClose={() => setOpen(false)} anchorEl={btnRef.current} align="right" className="w-32 p-1">
+        {([["this", "This Month"], ["last", "Last Month"]] as const).map(([v, label]) => (
+          <button key={v} onClick={() => { onChange(v); setOpen(false); }} className="block w-full rounded-lg px-3 py-1.5 text-left text-xs text-muted hover:bg-surface-2 hover:text-ink">
+            {label}
+          </button>
+        ))}
+      </AnchoredPopup>
     </div>
   );
 }
@@ -847,7 +840,7 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [quickOpen, setQuickOpen] = useState(false);
-  const quickRef = useRef<HTMLDivElement>(null);
+  const quickRef = useRef<HTMLButtonElement | null>(null);
   const [overviewMonth, setOverviewMonth] = useState<"this" | "last">("this");
 
   // Expenses tab controls
@@ -877,14 +870,6 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
       setTxnSearch(q);
     }
   }, [searchParams]);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (quickRef.current && !quickRef.current.contains(e.target as Node)) setQuickOpen(false);
-    }
-    if (quickOpen) document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [quickOpen]);
 
   function flash(msg: string) {
     setToast(msg);
@@ -2204,32 +2189,31 @@ export function FinancesClient({ initial }: { initial: FinanceData }) {
             );
           })}
         </div>
-        <div className="relative" ref={quickRef}>
+        <div className="relative">
           <button
+            ref={quickRef}
             onClick={() => setQuickOpen(!quickOpen)}
             className="mr-1 inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-blue-700 transition-colors"
           >
             <Plus className="h-4 w-4" /> Quick Add <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", quickOpen && "rotate-180")} />
           </button>
-          {quickOpen && (
-            <div className="absolute right-0 top-full z-30 mt-1.5 w-48 rounded-xl border border-border bg-card p-1 shadow-card-lg">
-              {QUICK_ADDS.map((q) => (
-                <button
-                  key={q.label}
-                  onClick={() => { setQuickOpen(false); if (q.kind === "budget") openBudgetModal(); else setModal({ kind: q.kind } as ModalState); }}
-                  className="block w-full rounded-lg px-3 py-2 text-left text-[13px] text-muted hover:bg-surface-2 hover:text-ink"
-                >
-                  {q.label}
-                </button>
-              ))}
+          <AnchoredPopup open={quickOpen} onClose={() => setQuickOpen(false)} anchorEl={quickRef.current} align="right" className="w-48 p-1">
+            {QUICK_ADDS.map((q) => (
               <button
-                onClick={() => { setQuickOpen(false); router.push("/investments"); }}
+                key={q.label}
+                onClick={() => { setQuickOpen(false); if (q.kind === "budget") openBudgetModal(); else setModal({ kind: q.kind } as ModalState); }}
                 className="block w-full rounded-lg px-3 py-2 text-left text-[13px] text-muted hover:bg-surface-2 hover:text-ink"
               >
-                Investment
+                {q.label}
               </button>
-            </div>
-          )}
+            ))}
+            <button
+              onClick={() => { setQuickOpen(false); router.push("/investments"); }}
+              className="block w-full rounded-lg px-3 py-2 text-left text-[13px] text-muted hover:bg-surface-2 hover:text-ink"
+            >
+              Investment
+            </button>
+          </AnchoredPopup>
         </div>
       </div>
 

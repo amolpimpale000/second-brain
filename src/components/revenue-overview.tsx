@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Loader2 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { cn, inr } from "@/lib/utils";
+import { AnchoredPopup } from "@/components/anchored-popup";
 
 type JournalIncome = { code: string; income: number };
 type MonthlyPnL = { month: string; label: string; income: number; expenses: number; profit: number; byJournal: JournalIncome[] };
@@ -70,6 +71,7 @@ export function RevenueOverview() {
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<Period>("This Month");
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuBtnRef = useRef<HTMLButtonElement | null>(null);
   const fetched = useRef(false);
 
   const load = useCallback(async () => {
@@ -126,30 +128,26 @@ export function RevenueOverview() {
         <p className="text-xs text-muted">Total Revenue</p>
         <div className="relative">
           <button
+            ref={menuBtnRef}
             onClick={() => setMenuOpen((o) => !o)}
             className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink hover:bg-surface-2"
           >
             {period} <ChevronDown className={cn("h-3.5 w-3.5 text-faint transition-transform", menuOpen && "rotate-180")} />
           </button>
-          {menuOpen && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-              <div className="absolute right-0 z-50 mt-1 w-36 rounded-xl border border-border bg-card p-1 shadow-card-lg">
-                {PERIODS.map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => { setPeriod(p); setMenuOpen(false); }}
-                    className={cn(
-                      "block w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-surface-2",
-                      p === period ? "font-semibold text-ink" : "text-muted"
-                    )}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+          <AnchoredPopup open={menuOpen} onClose={() => setMenuOpen(false)} anchorEl={menuBtnRef.current} align="right" className="w-36 p-1">
+            {PERIODS.map((p) => (
+              <button
+                key={p}
+                onClick={() => { setPeriod(p); setMenuOpen(false); }}
+                className={cn(
+                  "block w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-surface-2",
+                  p === period ? "font-semibold text-ink" : "text-muted"
+                )}
+              >
+                {p}
+              </button>
+            ))}
+          </AnchoredPopup>
         </div>
       </div>
       <div className="flex items-center gap-2">

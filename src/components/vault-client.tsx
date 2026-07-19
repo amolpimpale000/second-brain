@@ -11,6 +11,7 @@ import {
 import type { VaultAccount, VaultCard, CardNetwork, CardTheme } from "@/lib/data";
 import { vaultCategories, vaultCards as seedCards } from "@/lib/data";
 import { cn } from "@/lib/utils";
+import { AnchoredPopup } from "@/components/anchored-popup";
 import { BrandLogo, NetworkMark, Modal, Dropdown, Field, inputCls } from "@/components/vault-ui";
 
 /* ------------------------------------------------------------------ helpers */
@@ -96,23 +97,19 @@ function Menu({ trigger, items, align = "right" }: {
   align?: "left" | "right";
 }) {
   const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
   return (
     <div className="relative">
-      <button onClick={() => setOpen((o) => !o)}>{trigger}</button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className={cn("absolute z-20 mt-1 min-w-[168px] rounded-xl border border-border bg-card p-1 shadow-card-lg", align === "right" ? "right-0" : "left-0")}>
-            {items.map((it) => (
-              <button key={it.label} onClick={() => { it.onClick(); setOpen(false); }}
-                className={cn("flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2",
-                  it.danger ? "text-red-500 hover:text-red-600" : "text-muted hover:text-ink")}>
-                <it.icon className="h-4 w-4" /> {it.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+      <button ref={btnRef} onClick={() => setOpen((o) => !o)}>{trigger}</button>
+      <AnchoredPopup open={open} onClose={() => setOpen(false)} anchorEl={btnRef.current} align={align} className="min-w-[168px] p-1">
+        {items.map((it) => (
+          <button key={it.label} onClick={() => { it.onClick(); setOpen(false); }}
+            className={cn("flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2",
+              it.danger ? "text-red-500 hover:text-red-600" : "text-muted hover:text-ink")}>
+            <it.icon className="h-4 w-4" /> {it.label}
+          </button>
+        ))}
+      </AnchoredPopup>
     </div>
   );
 }

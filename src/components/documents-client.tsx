@@ -11,6 +11,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import type { DocItem, DocCategory } from "@/lib/data";
 import { docCategories as defaultCategories, docFolders } from "@/lib/data";
 import { cn } from "@/lib/utils";
+import { AnchoredPopup } from "@/components/anchored-popup";
 import { Modal, Field, inputCls, Dropdown } from "@/components/vault-ui";
 
 /* helpers -------------------------------------------------------------------*/
@@ -101,24 +102,20 @@ function isDocFolderArray(v: unknown): v is typeof docFolders {
 
 function Menu({ items }: { items: { label: string; icon: React.ElementType; onClick: () => void; danger?: boolean }[] }) {
   const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
   return (
     <div className="relative">
-      <button onClick={() => setOpen((o) => !o)} className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-ink">
+      <button ref={btnRef} onClick={() => setOpen((o) => !o)} className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-ink">
         <MoreVertical className="h-4 w-4" />
       </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-1 min-w-[160px] rounded-xl border border-border bg-card p-1 shadow-card-lg">
-            {items.map((it) => (
-              <button key={it.label} onClick={() => { it.onClick(); setOpen(false); }}
-                className={cn("flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2", it.danger ? "text-red-500" : "text-muted hover:text-ink")}>
-                <it.icon className="h-4 w-4" /> {it.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+      <AnchoredPopup open={open} onClose={() => setOpen(false)} anchorEl={btnRef.current} align="right" className="min-w-[160px] p-1">
+        {items.map((it) => (
+          <button key={it.label} onClick={() => { it.onClick(); setOpen(false); }}
+            className={cn("flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2", it.danger ? "text-red-500" : "text-muted hover:text-ink")}>
+            <it.icon className="h-4 w-4" /> {it.label}
+          </button>
+        ))}
+      </AnchoredPopup>
     </div>
   );
 }

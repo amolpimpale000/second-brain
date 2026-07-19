@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X, ChevronDown } from "lucide-react";
 import { SiVisa, SiMastercard, SiAmericanexpress } from "react-icons/si";
 import { cn } from "@/lib/utils";
+import { AnchoredPopup } from "@/components/anchored-popup";
 
 /* Real brand logo via favicon service, with colored-initial fallback. */
 export function BrandLogo({
@@ -115,30 +116,27 @@ export function Dropdown({
   align?: "left" | "right";
 }) {
   const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
   return (
     <div className="relative">
       <button
+        ref={btnRef}
         onClick={() => setOpen((o) => !o)}
         className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-sm text-muted transition-colors hover:bg-surface-2"
       >
         {label} <ChevronDown className="h-3.5 w-3.5" />
       </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className={cn("absolute z-20 mt-1 min-w-[160px] rounded-xl border border-border bg-card p-1 shadow-card-lg", align === "right" ? "right-0" : "left-0")}>
-            {options.map((o) => (
-              <button
-                key={o}
-                onClick={() => { onSelect(o); setOpen(false); }}
-                className="block w-full rounded-lg px-3 py-2 text-left text-sm text-muted hover:bg-surface-2 hover:text-ink"
-              >
-                {o}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+      <AnchoredPopup open={open} onClose={() => setOpen(false)} anchorEl={btnRef.current} align={align} className="min-w-[160px] p-1">
+        {options.map((o) => (
+          <button
+            key={o}
+            onClick={() => { onSelect(o); setOpen(false); }}
+            className="block w-full rounded-lg px-3 py-2 text-left text-sm text-muted hover:bg-surface-2 hover:text-ink"
+          >
+            {o}
+          </button>
+        ))}
+      </AnchoredPopup>
     </div>
   );
 }
