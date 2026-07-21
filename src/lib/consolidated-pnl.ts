@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
-import { getRazorpayMonthlyIncomeForJournal, RAZORPAY_JOURNAL_CODES } from "./razorpay";
+import { RAZORPAY_JOURNAL_CODES } from "./razorpay";
+import { getRevenueSnapshotsWithFallback } from "./revenue-snapshots-store";
 import { listCombinedExpenses } from "./journal-expenses-store";
 import { getGoogleAdsSpendByMonth } from "./google-ads";
 
@@ -9,13 +10,15 @@ import { getGoogleAdsSpendByMonth } from "./google-ads";
 //
 //   income   = real Razorpay captured payments, summed across all 5 journals
 //              (the accurate "money collected" figure — same source the
-//              per-journal Razorpay card reconciles against).
+//              per-journal Razorpay card reconciles against), read from the
+//              daily-cached razorpay_revenue_snapshots table so we don't hit
+//              the Razorpay API on every page load.
 //   expenses = this app's own tracked journal expenses (Supabase) + live
 //              Google Ads spend, summed across all journals.
 //   profit   = income - expenses.
 //
-// All reads are read-only. Cached for 30 min since a monthly P&L doesn't need
-// per-request freshness and the Razorpay windowed fetch is relatively heavy.
+// All reads are read-only. Cached for 24h in-process (the snapshot table is
+// the real freshness boundary; this just avoids redundant Supabase reads).
 // ---------------------------------------------------------------------------
 
 export type JournalIncome = { code: string; income: number };
@@ -48,9 +51,9 @@ async function fetchConsolidatedPnL(months: number): Promise<MonthlyPnL[]> {
   const keys = lastNMonthKeys(months);
   const codes = RAZORPAY_JOURNAL_CODES;
 
-  const [incomeMaps, expenses, adsMaps] = await Promise.all([
-    // Razorpay income per journal (each a Map<month, rupees>)
-    Promise.all(codes.map((c) => getRazorpayMonthlyIncomeForJournal(c, months).catch(() => new Map<string, number>()))),
+  const [snapshots, expenses, adsMaps] = await Promise.all([
+    // Daily-cached Razorpay income per journal (Map<journalCode, MonthlyRevenuePoint[]>)
+    getRevenueSnapshotsWithFallback(months),
     // Tracked journal expenses (Supabase)
     listCombinedExpenses().catch(() => []),
     // Google Ads spend per journal
@@ -66,6 +69,14 @@ async function fetchConsolidatedPnL(months: number): Promise<MonthlyPnL[]> {
       )
     ),
   ]);
+
+  // Build per-journal Map<month, rupees> from the cached snapshots, keyed by
+  // position to match the original incomeMaps shape.
+  const incomeMaps: Map<string, number>[] = codes.map((c) => {
+    const m = new Map<string, number>();
+    for (const pt of snapshots.get(c) ?? []) m.set(pt.month, pt.amount);
+    return m;
+  });
 
   // Manual expenses bucketed by month
   const manualByMonth = new Map<string, number>();
@@ -92,7 +103,7 @@ async function fetchConsolidatedPnL(months: number): Promise<MonthlyPnL[]> {
   });
 }
 
-const cachedConsolidatedPnL = unstable_cache(fetchConsolidatedPnL, ["consolidated-pnl"], { revalidate: 1800 });
+const cachedConsolidatedPnL = unstable_cache(fetchConsolidatedPnL, ["consolidated-pnl"], { revalidate: 86400 });
 
 export async function getConsolidatedPnL(months = 12): Promise<MonthlyPnL[]> {
   return cachedConsolidatedPnL(months);

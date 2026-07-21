@@ -22,7 +22,6 @@ import {
   getJournalCounts,
   getJournalRevenue,
   getJournalMonthlyTrends,
-  getJournalMonthlyRevenue,
   getJournalArticleTypes,
   getJournalRecentActivity,
   getJournalEmployees,
@@ -39,13 +38,13 @@ import {
   getJpsCounts,
   getJpsRevenue,
   getJpsMonthlyTrends,
-  getJpsMonthlyRevenue,
   getJpsTypeBreakdown,
   getJpsRecentActivity,
   getJpsEmployees,
   getJpsCountryBreakdown,
 } from "./jps-queries";
 import { listCombinedExpenses, type JournalExpense } from "./journal-expenses-store";
+import { getRevenueSnapshotsWithFallback } from "./revenue-snapshots-store";
 import { getGoogleAdsSpend, getGoogleAdsSpendByMonth, type GoogleAdsSpend, type MonthlyAdsSpend } from "./google-ads";
 import { countryFlag, toTitleCase } from "./country-flags";
 
@@ -178,16 +177,10 @@ async function fetchJps(): Promise<RealJournalData> {
 }
 
 async function fetchMonthlyRevenue(): Promise<Map<string, MonthlyRevenuePoint[]>> {
-  const results = await Promise.allSettled([
-    ...CONNECTED_JOURNALS.map(async (j) => ({ code: j.code, data: await getJournalMonthlyRevenue(j.code, j.prefix, undefined, 12) })),
-    (async () => ({ code: "JPS", data: await getJpsMonthlyRevenue() }))(),
-  ]);
-  const map = new Map<string, MonthlyRevenuePoint[]>();
-  results.forEach((r) => {
-    if (r.status === "fulfilled") map.set(r.value.code, r.value.data);
-    else console.error("Monthly revenue fetch failed:", r.reason);
-  });
-  return map;
+  // Revenue now comes from daily-cached Razorpay snapshots (accurate "money
+  // collected" data), not the MySQL payment tables which dropped ~35 writes
+  // for IJPS in July alone. Self-heals on first run before the cron is set up.
+  return getRevenueSnapshotsWithFallback(12);
 }
 
 async function fetchMonthlyAdsSpend(): Promise<Map<string, MonthlyAdsSpend[]>> {

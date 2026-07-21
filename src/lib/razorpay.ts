@@ -19,7 +19,7 @@ export type RazorpayIncome = {
   error?: string;
 };
 
-function getCreds(code: string): { keyId: string; keySecret: string } | null {
+export function getCreds(code: string): { keyId: string; keySecret: string } | null {
   // Accept both the conventional UPPERCASE names (RAZORPAY_KEY_ID_IJPS, as set
   // in Hostinger) and the mixed-case names used in local .env.local
   // (Razorpay_Key_ID_IJPS) — env-var names are case-sensitive on Linux, so we
@@ -47,7 +47,7 @@ function lastMonthKey(): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-type RazorpayPayment = {
+export type RazorpayPayment = {
   id: string;
   amount: number;
   status: string;
@@ -74,7 +74,7 @@ async function fetchPage(auth: string, from: number, to: number, skip: number): 
 // batches instead of one-at-a-time so large windows (this year / all time,
 // which can be thousands of payments = dozens of pages) resolve in seconds
 // rather than minutes. A page shorter than 100 marks the end.
-async function fetchAllPayments(keyId: string, keySecret: string, from: number, to: number, maxPages = 20): Promise<RazorpayPayment[]> {
+export async function fetchAllPayments(keyId: string, keySecret: string, from: number, to: number, maxPages = 20): Promise<RazorpayPayment[]> {
   const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
   const BATCH = 10; // concurrent requests per round
   const all: RazorpayPayment[] = [];

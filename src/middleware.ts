@@ -10,6 +10,7 @@ const CRON_PATHS = [
   "/api/journals/whatsapp-alerts/check",
   "/api/journals/whatsapp-alerts/trial",
   "/api/journals/whatsapp-alerts/webhook",
+  "/api/journals/revenue-sync",
 ];
 
 // The unlock link itself must stay reachable without the cookie it grants —
